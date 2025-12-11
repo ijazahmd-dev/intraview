@@ -5,13 +5,13 @@ import { AuthProvider } from "./context/AuthContext";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
-import SoftMinimalismLogin from "./pages/LoginPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminUsersPage from "./pages/adminUserManagement/AdminUsersPage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
+
 
 
 function App() {
@@ -26,7 +26,6 @@ function App() {
                     <Route path="/" element={<Navigate to="/signup" />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/login" element={<Login />} />
-                    <Route path="/loginpage" element={<SoftMinimalismLogin />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} /> 
                     <Route path="/home" element={
