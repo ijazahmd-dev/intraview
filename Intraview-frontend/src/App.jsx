@@ -11,6 +11,9 @@ import AdminUsersPage from "./pages/adminUserManagement/AdminUsersPage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
+import Sidebar from "./components/Sidebar";
+import Navbar from "./components/Navbar";
+
 
 
 
@@ -23,15 +26,17 @@ function App() {
             
                 
                 <Routes>
-                    <Route path="/" element={<Navigate to="/signup" />} />
+                    <Route path="/" element={<Navigate to="/home" />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} /> 
+                    <Route path="/admin-sidebar" element={<Sidebar/>} /> 
+                    <Route path="/admin-navbar" element={<Navbar/>} /> 
                     <Route path="/home" element={
-                                                <ProtectedRoute>
+                                                // <ProtectedRoute>
                                                     <Home/>
-                                                </ProtectedRoute>
+                                                // </ProtectedRoute>
                                                 } />
 
                                                 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { fetchAdminMe } from "../api/adminApi";
+import { adminLogout, fetchAdminMe } from "../api/adminApi";
 
 const AdminAuthContext = createContext(null);
 
@@ -24,8 +24,16 @@ export const AdminAuthProvider = ({ children }) => {
     loadAdmin();
   }, []);
 
+
+  const logoutAdmin = async () => {
+        await adminLogout();
+        setAdmin(null);
+    };
+
+
+
   return (
-    <AdminAuthContext.Provider value={{ admin, setAdmin, loading }}>
+    <AdminAuthContext.Provider value={{ admin, setAdmin, loading, logoutAdmin }}>
       {children}
     </AdminAuthContext.Provider>
   );
