@@ -13,6 +13,7 @@ import AdminLogin from "./pages/admin/AdminLogin";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
+import InterviewerOptions from "./pages/interviewer/InterviewerOptions";
 
 
 
@@ -23,6 +24,7 @@ function App() {
         <BrowserRouter>
             <ToastContainer />
             <AuthProvider>
+                <AdminAuthProvider>
             
                 
                 <Routes>
@@ -33,6 +35,8 @@ function App() {
                     <Route path="/reset-password" element={<ResetPassword />} /> 
                     <Route path="/admin-sidebar" element={<Sidebar/>} /> 
                     <Route path="/admin-navbar" element={<Navbar/>} /> 
+                    <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
+
                     <Route path="/home" element={
                                                 // <ProtectedRoute>
                                                     <Home/>
@@ -41,12 +45,7 @@ function App() {
 
                                                 
                                         
-                </Routes>
-            
-            </AuthProvider>
 
-            <AdminAuthProvider>
-            <Routes>
                 <Route path="/admin/login" element={<AdminLogin />} />
 
                 <Route
@@ -59,6 +58,7 @@ function App() {
                 />
             </Routes>
             </AdminAuthProvider>
+        </AuthProvider>    
         </BrowserRouter>
         
         </>

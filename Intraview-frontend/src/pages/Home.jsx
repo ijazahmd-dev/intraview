@@ -11,6 +11,7 @@ export default function Home() {
 
   const handleLogin = () => navigate('/login')
   const handleSignup = () => navigate('/signup')
+  const handleInterviewRequest = () => navigate('/interviewer/request')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -149,57 +150,79 @@ export default function Home() {
       </section>
 
       {/* Demo Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="bg-gray-100 rounded-2xl p-8 md:p-12">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Experience a Voice-Based Mock Interview Now
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Try a sample mock interview — no signup required. See SkillVerse simulate real interview scenarios with voice and instant insights.
-              </p>
-              <button className="text-teal-600 font-medium hover:text-teal-700 flex items-center">
-                Try a Free Demo Interview →
-              </button>
-            </div>
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 shadow-2xl">
-              <div className="bg-gray-700 rounded-lg p-4 mb-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop" alt="Interviewer" className="w-12 h-12 rounded-full" />
-                  <div>
-                    <p className="text-white font-medium">Just in Case</p>
-                    <p className="text-gray-400 text-sm">@ Morgan Winters</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-white">
-                <button className="hover:bg-gray-700 p-2 rounded">
-                  <SkipBack className="w-5 h-5" />
-                </button>
-                <button 
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="bg-white text-gray-900 hover:bg-gray-100 p-3 rounded-full"
-                >
-                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                </button>
-                <button className="hover:bg-gray-700 p-2 rounded">
-                  <SkipForward className="w-5 h-5" />
-                </button>
-                <button className="hover:bg-gray-700 p-2 rounded">
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-                <button className="hover:bg-gray-700 p-2 rounded">
-                  <Settings className="w-5 h-5" />
-                </button>
-                <button className="hover:bg-gray-700 p-2 rounded">
-                  <Maximize2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+  <div
+    className="rounded-3xl bg-gray-100 p-10 md:p-16 shadow-xl"
+
+  >
+    <div className="grid md:grid-cols-2 gap-12 items-center">
+
+      {/* LEFT SIDE – TEXT */}
+      <div>
+        <h2 className="text-4xl font-bold text-gray-900 leading-tight mb-6">
+          Become an Interviewer on IntraView
+        </h2>
+
+        <p className="text-gray-600 text-lg leading-relaxed mb-6">
+          Share your expertise and mentor the next generation of professionals.
+          IntraView allows seasoned candidates, working professionals, and
+          industry experts to conduct mock interviews and get paid for each
+          session. Flexible hours. Meaningful impact.
+        </p>
+
+        <ul className="space-y-3 text-gray-700 mb-8">
+          <li className="flex items-start gap-3">
+            <span className="text-green-600 text-xl">•</span>
+            Flexible interview scheduling
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-green-600 text-xl">•</span>
+            Earn for every mock interview you conduct
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="text-green-600 text-xl">•</span>
+            Help candidates improve with real-world insights
+          </li>
+        </ul>
+
+        <button
+          className="px-8 py-3 bg-teal-500 rounded-xl text-white font-semibold shadow-md transition transform hover:scale-[1.02]"
+              onClick={handleInterviewRequest}
+        >
+          Apply to Become an Interviewer →
+        </button>
+      </div>
+
+      {/* RIGHT SIDE – ILLUSTRATION BLOCK */}
+      <div className="relative">
+        <div
+          className="rounded-2xl shadow-2xl p-6 md:p-8"
+          style={{ backgroundColor: "#ffffff" }}
+        >
+          <img
+            src=""
+            alt="Interviewer illustration"
+            className="w-full h-auto object-contain opacity-95"
+          />
         </div>
-      </section>
+
+        {/* Decorative floating shape */}
+        <div
+          className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30 blur-xl"
+          style={{ backgroundColor: "#A1BC98" }}
+        ></div>
+
+        <div
+          className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full opacity-20 blur-xl"
+          style={{ backgroundColor: "#D2DCB6" }}
+        ></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
 
       {/* Pricing Section */}
       <section className="bg-white py-16">

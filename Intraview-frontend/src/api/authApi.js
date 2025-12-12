@@ -13,7 +13,7 @@ export const verifyOtp = async (data) => {
 };
 
 // Resend OTP
-export const resendOtp = async (data) => {
+export const resendSignupOtp = async (data) => {
     return await API.post("/auth/resend-otp/", data);
 };
 
@@ -50,4 +50,10 @@ export const googleLogin = async (idToken) => {
   });
   return res.data;
 };
+
+
+export const resendForgotOtp = async (data) => {
+    return await API.post("/auth/forgot-password/resend-otp/", data);
+};
+
  

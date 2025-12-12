@@ -204,3 +204,19 @@ class AdminLogoutView(APIView):
         response.delete_cookie("admin_refresh_token")
 
         return response
+    
+
+
+
+
+class AdminMeView(APIView):
+    authentication_classes = [AdminCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            "username": user.username,
+            "email": user.email,
+            "role": user.role
+        })

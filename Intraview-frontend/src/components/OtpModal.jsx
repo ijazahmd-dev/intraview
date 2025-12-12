@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { verifyOtp, verifyForgotOtp, resendOtp } from "../api/authApi";
+import { verifyOtp, verifyForgotOtp, resendSignupOtp, resendForgotOtp } from "../api/authApi";
 import toaster from "../utils/toaster";
 
 const OtpModal = ({ email, mode = "signup", onSuccess, onClose }) => {
@@ -32,16 +32,21 @@ const OtpModal = ({ email, mode = "signup", onSuccess, onClose }) => {
     };
 
     const handleResend = async () => {
-        setResending(true);
-        try {
-            await resendOtp({ email });
-            toaster.success("OTP resent successfully!");
-        } catch (err) {
-            toaster.error(err.response?.data?.error || "Failed to resend OTP");
-        } finally {
-            setResending(false);
+    setResending(true);
+    try {
+        if (mode === "forgot-password") {
+            await resendForgotOtp({ email });
+        } else {
+            await resendSignupOtp({ email });
         }
-    };
+
+        toaster.success("OTP resent successfully!");
+    } catch (err) {
+        toaster.error(err.response?.data?.error || "Failed to resend OTP");
+    } finally {
+        setResending(false);
+    }
+};
 
     return (
         <div className="fixed inset-0 bg-white/10 backdrop-blur-md bg-opacity-50 flex items-center justify-center z-50 p-4">

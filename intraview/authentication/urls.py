@@ -24,10 +24,14 @@ urlpatterns = [
     path("forgot-password/", views.RequestPasswordResetView.as_view(), name="forgot-password"),
     path("forgot-password/verify-otp/", views.VerifyResetOTPView.as_view(), name="fp-verify-otp"),
     path("forgot-password/reset/", views.ResetPasswordView.as_view(), name="reset-password"),
+    path("forgot-password/resend-otp/", views.ResendResetOTPView.as_view()),
+
     path("google-login/", views.GoogleLoginView.as_view(), name="google-login"),
 
     path("admin/login/", views_admin.AdminLoginView.as_view(), name="admin-login"),
     path("admin/logout/", views_admin.AdminLogoutView.as_view(), name="admin-logout"),
+    path("admin/me/", views_admin.AdminMeView.as_view(), name="admin-me"),
+
     
 ]
 

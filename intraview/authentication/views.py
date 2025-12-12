@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request
+from django.core.cache import cache
 
 User = get_user_model()
 
@@ -276,6 +277,39 @@ class VerifyResetOTPView(APIView):
             "message": "OTP verified successfully.",
             "reset_token": reset_token,
         })
+    
+
+
+
+class ResendResetOTPView(APIView):
+    def post(self, request):
+        email = request.data.get("email", "").lower().strip()
+
+        if not email:
+            return Response({"error": "Email is required."}, status=400)
+
+        # Check if an OTP already exists for this email
+        cache_key = f"otp:{email}"
+        if cache.get(cache_key) is None:
+            return Response(
+                {"error": "No active reset request found. Please start again."},
+                status=400
+            )
+
+        # Rate limit protection
+        if not OTPService.can_send_otp(email):
+            return Response(
+                {"error": "OTP request limit exceeded. Try again later."},
+                status=429
+            )
+
+        # Generate and store new OTP
+        otp = OTPService.generate_otp()
+        OTPService.store_otp(email, otp)
+        send_otp_task.delay(email, otp)
+
+        return Response({"message": "OTP resent successfully."})
+
     
 
 
