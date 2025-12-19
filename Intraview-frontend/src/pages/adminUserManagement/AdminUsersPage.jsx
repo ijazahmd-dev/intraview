@@ -68,7 +68,7 @@ const AdminUsersPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: '#faf7f7' }}>
+    <div className="flex min-h-screen" style={{ backgroundColor: '#ffffff' }}>
       <Sidebar/>
       <div className="flex-1 flex flex-col">
         <Navbar />

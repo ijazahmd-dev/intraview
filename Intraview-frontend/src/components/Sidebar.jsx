@@ -33,7 +33,7 @@ const Sidebar = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       ),
-      label: "Interviewers",
+      label: "Interviewer Applications",
       path: "/admin/interviewers",
       badge: null
     },
@@ -128,7 +128,7 @@ const Sidebar = () => {
       className="   flex flex-col transition-all duration-300 shadow-2xl"
       style={{ 
         width: collapsed ? '80px' : '280px',
-        backgroundColor: '#eeefe9ff'
+        backgroundColor: '#ffffffff'
       }}
     >
       {/* Header */}
