@@ -1,6 +1,18 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
+
+class InterviewerStatus(models.TextChoices):
+    NOT_APPLIED = "NOT_APPLIED", "Not Applied"
+    PENDING_APPROVAL = "PENDING_APPROVAL", "Pending Approval"
+    REJECTED = "REJECTED", "Rejected"
+    APPROVED_NOT_ONBOARDED = "APPROVED_NOT_ONBOARDED", "Approved (Not Onboarded)"
+    ACTIVE = "ACTIVE", "Active"
+    SUSPENDED = "SUSPENDED", "Suspended"
+
+
+
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('user', 'Candidate'),
@@ -17,6 +29,7 @@ class CustomUser(AbstractUser):
 
     email = models.EmailField(unique=True, db_index=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES,default='user')
+    interviewer_status = models.CharField(max_length=30,choices=InterviewerStatus.choices,default=InterviewerStatus.NOT_APPLIED,)
     profile_picture_url = models.URLField(blank=True, null=True)
     social_auth_id = models.CharField(max_length=255, blank=True, null=True)  # For Google ID
     is_email_verified = models.BooleanField(default=False)
@@ -30,3 +43,7 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+
+
+
