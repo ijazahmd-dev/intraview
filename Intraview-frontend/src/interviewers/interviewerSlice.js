@@ -48,6 +48,9 @@ const interviewerSlice = createSlice({
     status: "IDLE", // NOT_APPLIED | PENDING | APPROVED_NOT_ONBOARDED | ACTIVE | REJECTED
     loading: false,
     error: null,
+    rejection_reason: null,
+    submitted_at: null,
+    application_id: null,
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -58,6 +61,9 @@ const interviewerSlice = createSlice({
       .addCase(fetchInterviewerStatus.fulfilled, (state, action) => {
         state.loading = false;
         state.status = action.payload.status;
+        state.rejection_reason = action.payload.rejection_reason || null;
+        state.submitted_at = action.payload.submitted_at || null;
+        state.application_id = action.payload.application_id || null;
       })
       .addCase(fetchInterviewerStatus.rejected, (state, action) => {
         state.loading = false;

@@ -5,12 +5,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 
+from authentication.models import InterviewerStatus
 from .models import InterviewerApplication
 from .serializers import (
     InterviewerApplicationCreateSerializer,
     InterviewerApplicationAdminSerializer,
 )
 from authentication.permissions import IsAdminRole  # adjust import
+from authentication.authentication import AdminCookieJWTAuthentication
+from .tasks import send_application_approved_email, send_application_rejected_email,send_application_submitted_email
+
+
+
 
 
 class InterviewerApplicationCreateView(APIView):
@@ -28,6 +34,16 @@ class InterviewerApplicationCreateView(APIView):
         )
         if serializer.is_valid():
             serializer.save(user=request.user)
+
+            user = request.user
+            user.interviewer_status = InterviewerStatus.PENDING_APPROVAL
+            user.save(update_fields=["interviewer_status"])
+
+
+            send_application_submitted_email.delay(
+                request.user.email,
+                request.user.username,
+            )
             return Response(
                 {"message": "Interviewer application submitted successfully."},
                 status=status.HTTP_201_CREATED,
@@ -45,6 +61,7 @@ class InterviewerApplicationStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        user = request.user
         try:
             app = request.user.interviewer_application
         except InterviewerApplication.DoesNotExist:
@@ -56,8 +73,10 @@ class InterviewerApplicationStatusView(APIView):
         return Response(
             {
                 "status": app.status,
+                "interviewer_status": user.interviewer_status,
                 "rejection_reason": app.rejection_reason,
                 "submitted_at": app.created_at,
+                "application_id": app.id,
             },
             status=status.HTTP_200_OK,
         )
@@ -71,11 +90,30 @@ class AdminInterviewerApplicationListView(ListAPIView):
     GET /api/admin/interviewer-applications/
     List all applications for review.
     """
-
+    authentication_classes = [AdminCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsAdminRole]
     serializer_class = InterviewerApplicationAdminSerializer
-    queryset = InterviewerApplication.objects.all()
-    # you can later add filtering by ?status=PENDING
+    # queryset = InterviewerApplication.objects.all()
+
+    def get_queryset(self):
+        qs = InterviewerApplication.objects.select_related("user").all()
+
+        status_param = self.request.query_params.get("status")
+
+        if status_param:
+            statuses = status_param.split(",")
+            qs = qs.filter(status__in=statuses)
+
+        return qs.order_by("-created_at")
+    
+
+    # def get(self, request, *args, **kwargs):
+    #     print("USER:", request.user)
+    #     print("AUTH:", request.auth)
+    #     return super().get(request, *args, **kwargs)
+    
+
+        
 
 
 class AdminInterviewerApplicationDetailView(RetrieveAPIView):
@@ -83,11 +121,13 @@ class AdminInterviewerApplicationDetailView(RetrieveAPIView):
     GET /api/admin/interviewer-applications/<id>/
     Detailed view of a single application.
     """
-
+    authentication_classes = [AdminCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsAdminRole]
     serializer_class = InterviewerApplicationAdminSerializer
     queryset = InterviewerApplication.objects.all()
     lookup_url_kwarg = "application_id"
+
+
 
 
 class AdminReviewInterviewerApplicationView(APIView):
@@ -100,7 +140,7 @@ class AdminReviewInterviewerApplicationView(APIView):
         "rejection_reason": "optional when reject"
     }
     """
-
+    authentication_classes = [AdminCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsAdminRole]
 
     def post(self, request, application_id):
@@ -122,8 +162,16 @@ class AdminReviewInterviewerApplicationView(APIView):
             app.status = InterviewerApplication.STATUS_APPROVED
 
             # Promote user to interviewer role (depends on your user model)
-            app.user.role = "interviewer"
-            app.user.save()
+            user = app.user
+            user.role = "interviewer"
+            user.interviewer_status = InterviewerStatus.APPROVED_NOT_ONBOARDED
+            user.save(update_fields=["role", "interviewer_status"])
+
+            send_application_approved_email.delay(
+                app.user.email,
+                app.user.username,
+            )
+
 
         elif action == "reject":
             if not rejection_reason:
@@ -133,6 +181,16 @@ class AdminReviewInterviewerApplicationView(APIView):
                 )
             app.status = InterviewerApplication.STATUS_REJECTED
             app.rejection_reason = rejection_reason
+
+            user = app.user
+            user.interviewer_status = InterviewerStatus.REJECTED
+            user.save(update_fields=["interviewer_status"])
+
+            send_application_rejected_email.delay(
+                app.user.email,
+                app.user.username,
+                rejection_reason,
+            )
 
         else:
             return Response({"detail": "Invalid action."}, status=400)

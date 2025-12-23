@@ -61,10 +61,10 @@ export default function ApplicationSubmitted() {
 
         <div className="flex justify-center">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/home")}
             className="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
           >
-            Go to Dashboard
+            Go to Homepage
           </button>
         </div>
       </div>

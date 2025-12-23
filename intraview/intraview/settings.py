@@ -252,6 +252,13 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 
 
+FRONTEND_URL = "http://localhost:5173"  # or production URL
+DEFAULT_FROM_EMAIL = "intraview.website@gmail.com"
+
+
+
+
+
 
 LOGGING = {
     'version': 1,

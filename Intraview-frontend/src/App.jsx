@@ -11,11 +11,12 @@ import AdminUsersPage from "./pages/adminUserManagement/AdminUsersPage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
 import { AdminAuthProvider } from "./context/AdminAuthContext";
-import Sidebar from "./components/Sidebar";
-import Navbar from "./components/Navbar";
 import InterviewerStatus from "./interviewers/pages/InterviewerStatus";
 import InterviewerApply from "./interviewers/pages/InterviewerApply";
 import InterviewerOptions from "./interviewers/pages/InterviewerOptions";
+import AdminInterviewerApplications from "./interviewers/admin/pages/AdminInterviewerApplications";
+import AdminInterviewerApplicationDetail from "./interviewers/admin/pages/AdminInterviewerApplicationDetail";
+
 
 
 
@@ -37,15 +38,14 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} /> 
-                    <Route path="/admin-sidebar" element={<Sidebar/>} /> 
-                    <Route path="/admin-navbar" element={<Navbar/>} /> 
-  
-
                     <Route path="/home" element={
                                                 // <ProtectedRoute>
                                                     <Home/>
                                                 // </ProtectedRoute>
                                                 } />
+
+
+
 
                     {/* Interviewer flow */}
                     <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
@@ -54,15 +54,34 @@ function App() {
                                                 
                                         
 
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route
-                path="/admin/users"
-                element={
-                    <AdminProtectedRoute>
-                    <AdminUsersPage />
-                    </AdminProtectedRoute>
-                }
-                />
+
+
+                    {/* Admin side Routes */}
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route
+                        path="/admin/users"
+                        element={
+                            <AdminProtectedRoute>
+                                <AdminUsersPage />
+                            </AdminProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/interviewers"
+                        element={
+                            <AdminProtectedRoute>
+                                <AdminInterviewerApplications />
+                            </AdminProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/admin/interviewers/:id"
+                        element={
+                            <AdminProtectedRoute>
+                                <AdminInterviewerApplicationDetail />
+                            </AdminProtectedRoute>
+                        }
+                    />
 
 
             </Routes>
