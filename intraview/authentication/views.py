@@ -6,8 +6,9 @@ from django.db import transaction
 import logging
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import authenticate
 
-from .serializers import SignupSerializer,LoginSerializer,GoogleLoginSerializer
+from .serializers import SignupSerializer,LoginSerializer,GoogleLoginSerializer,InterviewerLoginSerializer
 from .services.otp_service import OTPService
 from .tasks import send_otp_task
 from .services.temp_signup_service import TempSignupService
@@ -21,6 +22,7 @@ from django.conf import settings
 from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 from django.core.cache import cache
+from .models import InterviewerStatus
 
 User = get_user_model()
 
@@ -276,6 +278,7 @@ class VerifyResetOTPView(APIView):
         return Response({
             "message": "OTP verified successfully.",
             "reset_token": reset_token,
+            "client":request.data.get("client","user")
         })
     
 
@@ -490,3 +493,85 @@ class MeView(APIView):
             "email": user.email,
             "role": user.role
         })
+    
+
+
+
+
+
+
+
+
+##############################################        Interviewer View        #######################################################
+
+
+
+class InterviewerLoginView(APIView):
+    permission_classes = []  
+
+    def post(self, request):
+        serializer = InterviewerLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
+
+        user = authenticate(email=email, password=password)
+
+        if not user:
+            return Response(
+                {"error": "Invalid email or password"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if user.role != "interviewer":
+            return Response(
+                {"error": "This account is not an interviewer account"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        status_map = {
+            InterviewerStatus.NOT_APPLIED: "You have not applied to become an interviewer.",
+            InterviewerStatus.PENDING_APPROVAL: "Your application is under review.",
+            InterviewerStatus.REJECTED: "Your application was rejected.",
+            InterviewerStatus.SUSPENDED: "Your interviewer account is suspended.",
+        }
+
+        if user.interviewer_status in status_map:
+            return Response(
+                {
+                    "code": "INTERVIEWER_NOT_ACTIVE",
+                    "status": user.interviewer_status,
+                    "message": status_map[user.interviewer_status],
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # APPROVED_NOT_ONBOARDED or ACTIVE → allow login
+        refresh = RefreshToken.for_user(user)
+
+        response = Response(
+            {
+                "message": "Login successful",
+                "interviewer_status": user.interviewer_status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+        response.set_cookie(
+            "interviewer_access_token",
+            str(refresh.access_token),
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite="Lax",
+        )
+
+        response.set_cookie(
+            "interviewer_refresh_token",
+            str(refresh),
+            httponly=True,
+            secure=not settings.DEBUG,
+            samesite="Lax",
+        )
+
+        return response

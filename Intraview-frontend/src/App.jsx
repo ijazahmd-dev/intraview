@@ -16,6 +16,9 @@ import InterviewerApply from "./interviewers/pages/InterviewerApply";
 import InterviewerOptions from "./interviewers/pages/InterviewerOptions";
 import AdminInterviewerApplications from "./interviewers/admin/pages/AdminInterviewerApplications";
 import AdminInterviewerApplicationDetail from "./interviewers/admin/pages/AdminInterviewerApplicationDetail";
+import InterviewerLogin from "./authentication/user/pages/InterviewerLogin";
+import InterviewerForgotPassword from "./authentication/user/pages/InterviewerForgotPassword";
+import InterviewerResetPassword from "./authentication/user/pages/InterviewerResetPassword";
 
 
 
@@ -48,6 +51,9 @@ function App() {
 
 
                     {/* Interviewer flow */}
+                    <Route path="/interviewer/login" element={<InterviewerLogin />} />
+                    <Route path="/interviewer/forgot-password" element={<InterviewerForgotPassword />} />
+                    <Route path="/interviewer/reset-password" element={<InterviewerResetPassword />} />
                     <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
                     <Route path="/interviewer/apply" element={<InterviewerApply />} />
                     <Route path="/interviewer/status" element={<InterviewerStatus />} />

@@ -165,6 +165,7 @@ class AdminReviewInterviewerApplicationView(APIView):
             user = app.user
             user.role = "interviewer"
             user.interviewer_status = InterviewerStatus.APPROVED_NOT_ONBOARDED
+            print(user.interviewer_status,"the interviewer status is:")
             user.save(update_fields=["role", "interviewer_status"])
 
             send_application_approved_email.delay(

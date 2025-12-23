@@ -138,3 +138,10 @@ class AdminUserDetailSerializer(serializers.ModelSerializer):
         if value not in valid_roles:
             raise serializers.ValidationError("Invalid role.")
         return value
+    
+
+
+
+class InterviewerLoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)

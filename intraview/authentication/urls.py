@@ -32,6 +32,8 @@ urlpatterns = [
     path("admin/logout/", views_admin.AdminLogoutView.as_view(), name="admin-logout"),
     path("admin/me/", views_admin.AdminMeView.as_view(), name="admin-me"),
 
+    path("interviewer/login/", views.InterviewerLoginView.as_view(), name="interviewer-login"),
+
     
 ]
 
