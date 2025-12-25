@@ -35,6 +35,20 @@ urlpatterns = [
 
 
 
+    # Dashboard APIs
+    path(
+        "interviewer/dashboard/",
+        views.InterviewerDashboardSummaryView.as_view(),
+        name="interviewer-dashboard-summary",
+    ),
+    path(
+        "interviewer/me/profile/",
+        views.InterviewerDashboardProfileView.as_view(),
+        name="interviewer-dashboard-profile",
+    ),
+
+
+
 
 
 

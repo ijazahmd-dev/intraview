@@ -19,6 +19,7 @@ from authentication.permissions import IsAdminRole  # adjust import
 from authentication.authentication import AdminCookieJWTAuthentication
 from .tasks import send_application_approved_email, send_application_rejected_email,send_application_submitted_email
 from authentication.permissions import IsOnboardingInterviewer,IsActiveInterviewer
+from authentication.authentication import InterviewerCookieJWTAuthentication
 
 
 
@@ -32,7 +33,7 @@ class InterviewerApplicationCreateView(APIView):
     POST /api/interviewer/apply/
     Authenticated normal user submits an application.
     """
-
+    
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -271,6 +272,7 @@ class InterviewerApplicationEligibilityView(APIView):
 
 
 class InterviewerProfileView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
 
     def get(self, request):
@@ -310,6 +312,7 @@ class InterviewerProfileView(APIView):
 
 
 class InterviewerAvailabilityCreateView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
 
     def post(self, request):
@@ -373,6 +376,7 @@ class InterviewerAvailabilityCreateView(APIView):
 
 
 class InterviewerAvailabilityListView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
 
     def get(self, request):
@@ -398,6 +402,7 @@ class InterviewerAvailabilityListView(APIView):
 
 
 class InterviewerAvailabilityDeleteView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
 
     def delete(self, request, slot_id):
@@ -430,7 +435,7 @@ class SubmitInterviewerVerificationView(APIView):
     POST /api/interviewer/verification/
     Optional identity verification submission.
     """
-
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -467,7 +472,7 @@ class InterviewerVerificationStatusView(APIView):
     """
     GET /api/interviewer/verification/status/
     """
-
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -492,7 +497,7 @@ class CompleteInterviewerOnboardingView(APIView):
     POST /api/interviewer/onboarding/complete/
     Finalizes onboarding and activates interviewer account.
     """
-
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
 
     def post(self, request):
@@ -556,6 +561,7 @@ class CompleteInterviewerOnboardingView(APIView):
 
 
 class InterviewerOnboardingStatusView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -585,6 +591,177 @@ class InterviewerOnboardingStatusView(APIView):
 
 
 
+
+
+
+
+
+
+
+class InterviewerDashboardSummaryView(APIView):
+    """
+    GET /api/interviewer/dashboard/
+    Static/placeholder summary for interviewer dashboard widgets.
+    """
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def get(self, request):
+        # Dummy data for now; later you will compute from Interview model
+        data = {
+            "header": {
+                "name": request.user.interviewer_profile.display_name
+                if hasattr(request.user, "interviewer_profile")
+                else request.user.get_full_name() or request.user.email,
+            },
+            "stats": {
+                "total_interviews": 128,
+                "total_interviews_change": "+12% this month",
+                "average_rating": 4.8,
+                "average_rating_change": "+0.3 from last month",
+                "completion_rate": 0.96,
+                "completion_rate_note": "Same as last month",
+                "total_earnings": 3840,
+                "total_earnings_change": "+18% this month",
+            },
+            "upcoming_interviews": [
+                {
+                    "id": 1,
+                    "candidate_name": "Sarah Johnson",
+                    "type": "System Design",
+                    "status": "Confirmed",
+                    "date": "2025-10-17",
+                    "time": "14:00",
+                    "timezone": "IST",
+                    "mode": "Live",
+                },
+                {
+                    "id": 2,
+                    "candidate_name": "Michael Chen",
+                    "type": "Backend",
+                    "status": "Confirmed",
+                    "date": "2025-10-18",
+                    "time": "10:30",
+                    "timezone": "IST",
+                    "mode": "Live",
+                },
+                {
+                    "id": 3,
+                    "candidate_name": "Emily Rodriguez",
+                    "type": "Behavioral",
+                    "status": "Pending",
+                    "date": "2025-10-19",
+                    "time": "16:00",
+                    "timezone": "IST",
+                    "mode": "Live",
+                },
+            ],
+            "notifications": [
+                {
+                    "id": 1,
+                    "title": "New Session Request",
+                    "description": "A new mock interview request has arrived.",
+                    "type": "info",
+                    "created_at": "2025-10-17T10:00:00Z",
+                },
+                {
+                    "id": 2,
+                    "title": "Session Starting Soon",
+                    "description": "Your next session starts in 30 minutes.",
+                    "type": "warning",
+                    "created_at": "2025-10-17T10:30:00Z",
+                },
+            ],
+            "performance": {
+                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+                "interviews": [10, 14, 13, 18, 22, 26],
+            },
+            "session_breakdown": {
+                "human_interviews": 78,
+                "peer_reviews": 32,
+                "ai_assisted": 18,
+            },
+            "availability_this_week": {
+                "available_hours": 24,
+                "booked_hours": 16,
+                "open_slots": 8,
+            },
+            "average_session_duration": {
+                "technical": 45,
+                "behavioral": 35,
+                "overall": 42,
+            },
+        }
+        return Response(data)
+
+
+
+
+
+
+
+class InterviewerDashboardProfileView(APIView):
+    """
+    GET /api/interviewer/me/profile/
+    PUT/PATCH /api/interviewer/me/profile/
+    Used from the dashboard/profile screen (not onboarding).
+    """
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def get(self, request):
+        try:
+            profile = request.user.interviewer_profile
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Interviewer profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = InterviewerProfileSerializer(profile)
+        return Response(serializer.data)
+
+    def put(self, request):
+        """
+        Replace full profile (for a full edit form).
+        """
+        try:
+            profile = request.user.interviewer_profile
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Interviewer profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = InterviewerProfileSerializer(
+            instance=profile,
+            data=request.data,
+            partial=False,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def patch(self, request):
+        """
+        Partial update (for toggles from dashboard, e.g. public/accepting bookings).
+        """
+        try:
+            profile = request.user.interviewer_profile
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Interviewer profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = InterviewerProfileSerializer(
+            instance=profile,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 
