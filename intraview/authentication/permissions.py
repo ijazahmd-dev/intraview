@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 from .models import InterviewerStatus
+from interviewers.models import VerificationStatus
 
 
 class IsAdminRole(BasePermission):
@@ -42,3 +43,26 @@ class IsOnboardingInterviewer(BasePermission):
                 InterviewerStatus.ACTIVE,
             ]
         )
+    
+
+
+
+
+
+class IsVerifiedInterviewer(BasePermission):
+    """
+    Only verified interviewers can accept interviews
+    """
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user.is_authenticated:
+            return False
+
+        if user.role != "interviewer":
+            return False
+
+        try:
+            return user.verification.status == VerificationStatus.APPROVED
+        except:
+            return False

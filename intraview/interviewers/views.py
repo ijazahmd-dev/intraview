@@ -4,17 +4,25 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
+from datetime import timedelta
 
 from authentication.models import InterviewerStatus
-from .models import InterviewerApplication
+from .models import InterviewerApplication,InterviewerProfile,InterviewerAvailability,InterviewerVerification,VerificationStatus
 from .serializers import (
     InterviewerApplicationCreateSerializer,
     InterviewerApplicationAdminSerializer,
+    InterviewerProfileSerializer,
+    InterviewerAvailabilityCreateSerializer,
+    InterviewerVerificationSubmitSerializer,
 )
 from authentication.permissions import IsAdminRole  # adjust import
 from authentication.authentication import AdminCookieJWTAuthentication
 from .tasks import send_application_approved_email, send_application_rejected_email,send_application_submitted_email
+from authentication.permissions import IsOnboardingInterviewer,IsActiveInterviewer
 
+
+
+# ------------------------------------------ User-facing APIs --------------------------------------------------
 
 
 
@@ -82,7 +90,11 @@ class InterviewerApplicationStatusView(APIView):
         )
 
 
-# ---------- Admin-facing APIs ----------
+
+
+# ------------------------------------------ Admin-facing APIs --------------------------------------------------
+
+
 
 
 class AdminInterviewerApplicationListView(ListAPIView):
@@ -168,6 +180,29 @@ class AdminReviewInterviewerApplicationView(APIView):
             print(user.interviewer_status,"the interviewer status is:")
             user.save(update_fields=["role", "interviewer_status"])
 
+            InterviewerProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "display_name": (
+                        f"{app.first_name} {app.last_name}".strip()
+                        or user.username
+                    ),
+                    "headline": f"{app.years_of_experience}+ years experience",
+                    "bio": app.expertise_summary,
+                    "years_of_experience": app.years_of_experience,
+                    "location": app.location,
+                    "timezone": app.timezone,
+                    "specializations": app.specializations,
+                    "languages": app.languages,
+                    "education": [app.education] if app.education else [],
+                    "certifications": [],
+                    "industries": [],
+                    "is_profile_public": False,
+                    "is_accepting_bookings": False,
+                    "is_completed": False,  # onboarding not done yet
+                },
+            )
+
             send_application_approved_email.delay(
                 app.user.email,
                 app.user.username,
@@ -203,6 +238,7 @@ class AdminReviewInterviewerApplicationView(APIView):
         return Response({"message": f"Application {action}d successfully."})
     
 
+# ------------------------------------------ Admin-facing APIs end --------------------------------------------------
 
 
 class InterviewerApplicationEligibilityView(APIView):
@@ -224,4 +260,332 @@ class InterviewerApplicationEligibilityView(APIView):
             "can_apply": False,
             "status": app.status
         })
+
+
+
+
+
+
+# ------------------------------------------ Interviewer Onboarding-facing APIs --------------------------------------------------
+
+
+
+class InterviewerProfileView(APIView):
+    permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
+
+    def get(self, request):
+        profile = getattr(request.user, "interviewer_profile", None)
+        if not profile:
+            return Response(
+                {"detail": "Profile not created yet"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = InterviewerProfileSerializer(profile)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = InterviewerProfileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        profile, created = InterviewerProfile.objects.update_or_create(
+            user=request.user,
+            defaults=serializer.validated_data,
+        )
+
+        # Move onboarding step to AVAILABILITY after profile save
+        profile.onboarding_step = InterviewerProfile.OnboardingStep.AVAILABILITY
+        profile.save(update_fields=["onboarding_step"])
+
+        return Response(
+            {
+                "message": "Profile saved successfully",
+                "profile_id": profile.id,
+                "onboarding_step": profile.onboarding_step,
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+
+class InterviewerAvailabilityCreateView(APIView):
+    permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
+
+    def post(self, request):
+        serializer = InterviewerAvailabilityCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        interviewer = request.user
+
+        created_slots = []
+
+        if data.get("is_recurring"):
+            current_date = data["date"]
+            end_date = data["recurrence_end_date"]
+
+            delta = timedelta(
+                days=1 if data["recurrence_type"] == "DAILY" else 7
+            )
+
+            while current_date <= end_date:
+                slot, _ = InterviewerAvailability.objects.get_or_create(
+                    interviewer=interviewer,
+                    date=current_date,
+                    start_time=data["start_time"],
+                    end_time=data["end_time"],
+                    defaults={
+                        "timezone": data["timezone"],
+                        "is_recurring": True,
+                        "recurrence_type": data["recurrence_type"],
+                        "recurrence_end_date": end_date,
+                    },
+                )
+                created_slots.append(slot.id)
+                current_date += delta
+        else:
+            slot = InterviewerAvailability.objects.create(
+                interviewer=interviewer,
+                **data
+            )
+            created_slots.append(slot.id)
+
+
+        try:
+            profile = interviewer.interviewer_profile
+            if profile.onboarding_step == InterviewerProfile.OnboardingStep.AVAILABILITY:
+                profile.onboarding_step = InterviewerProfile.OnboardingStep.VERIFICATION
+                profile.save(update_fields=["onboarding_step"])
+        except InterviewerProfile.DoesNotExist:
+            pass    
+        
+
+        return Response(
+            {
+                "message": "Availability added successfully.",
+                "slots_created": created_slots,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+    
+
+
+
+class InterviewerAvailabilityListView(APIView):
+    permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
+
+    def get(self, request):
+        qs = InterviewerAvailability.objects.filter(
+            interviewer=request.user
+        )
+
+        data = [
+            {
+                "id": slot.id,
+                "date": slot.date,
+                "start_time": slot.start_time,
+                "end_time": slot.end_time,
+                "timezone": slot.timezone,
+                "is_recurring": slot.is_recurring,
+            }
+            for slot in qs
+        ]
+
+        return Response(data)
+
+
+
+
+class InterviewerAvailabilityDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
+
+    def delete(self, request, slot_id):
+        try:
+            slot = InterviewerAvailability.objects.get(
+                id=slot_id,
+                interviewer=request.user
+            )
+        except InterviewerAvailability.DoesNotExist:
+            return Response(
+                {"detail": "Slot not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        slot.delete()
+        return Response(
+            {"message": "Availability removed."},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+
+
+
+
+
+
+class SubmitInterviewerVerificationView(APIView):
+    """
+    POST /api/interviewer/verification/
+    Optional identity verification submission.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        verification, _ = InterviewerVerification.objects.get_or_create(
+            user=request.user
+        )
+
+        serializer = InterviewerVerificationSubmitSerializer(
+            instance=verification,
+            data=request.data,
+            context={"request": request},
+            partial=True,
+        )
+
+        serializer.is_valid(raise_exception=True)
+
+        serializer.save(
+            status=VerificationStatus.PENDING,
+            submitted_at=timezone.now(),
+            rejection_reason="",
+        )
+
+        return Response(
+            {"message": "Verification submitted successfully and is under review."},
+            status=status.HTTP_200_OK,
+        )
+
+
+
+
+
+
+class InterviewerVerificationStatusView(APIView):
+    """
+    GET /api/interviewer/verification/status/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            verification = request.user.verification
+        except InterviewerVerification.DoesNotExist:
+            return Response({
+                "status": "NOT_SUBMITTED"
+            })
+
+        return Response({
+            "status": verification.status,
+            "rejection_reason": verification.rejection_reason,
+            "submitted_at": verification.submitted_at,
+        })
+
+
+
+
+class CompleteInterviewerOnboardingView(APIView):
+    """
+    POST /api/interviewer/onboarding/complete/
+    Finalizes onboarding and activates interviewer account.
+    """
+
+    permission_classes = [IsAuthenticated, IsOnboardingInterviewer]
+
+    def post(self, request):
+        user = request.user
+
+        # Safety checks
+        if user.interviewer_status != InterviewerStatus.APPROVED_NOT_ONBOARDED:
+            return Response(
+                {"detail": "Onboarding already completed or not allowed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check profile completion
+        try:
+            profile = user.interviewer_profile
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Profile not completed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if profile.onboarding_step not in [
+            InterviewerProfile.OnboardingStep.AVAILABILITY,
+            InterviewerProfile.OnboardingStep.VERIFICATION,
+            InterviewerProfile.OnboardingStep.COMPLETED,
+        ]:
+            # has not even finished profile step properly
+            return Response(
+                {"detail": "Complete your profile before finishing onboarding."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check availability
+        has_availability = InterviewerAvailability.objects.filter(
+            interviewer=user
+        ).exists()
+
+        if not has_availability:
+            return Response(
+                {"detail": "Set your availability before finishing onboarding."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        profile.mark_completed()
+
+        # ✅ All checks passed → activate interviewer
+        user.interviewer_status = InterviewerStatus.ACTIVE
+        user.save(update_fields=["interviewer_status"])
+
+        return Response(
+            {
+                "message": "Onboarding completed successfully.",
+                "next": "DASHBOARD",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+
+
+
+
+class InterviewerOnboardingStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        profile = getattr(user, "interviewer_profile", None)
+
+        return Response({
+            "interviewer_status": user.interviewer_status,
+            "profile_completed": bool(profile and profile.onboarding_step != InterviewerProfile.OnboardingStep.PROFILE),
+            "has_availability": InterviewerAvailability.objects.filter(
+                interviewer=user
+            ).exists(),
+            "verification_status": getattr(
+                getattr(user, "verification", None),
+                "status",
+                "NOT_SUBMITTED"
+            ),
+            "onboarding_step": getattr(
+                profile, "onboarding_step", InterviewerProfile.OnboardingStep.PROFILE
+            ),
+            "is_completed": getattr(profile, "is_completed", False),
+        })
+
+
+
+
+
+
+
+
+
+
 

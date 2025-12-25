@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import InterviewerApplication
+from .models import InterviewerApplication, InterviewerProfile, InterviewerAvailability, InterviewerVerification
+
 
 
 class InterviewerApplicationCreateSerializer(serializers.ModelSerializer):
@@ -39,4 +40,108 @@ class InterviewerApplicationAdminSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InterviewerApplication
+        fields = "__all__"
+
+
+
+
+
+class InterviewerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterviewerProfile
+        fields = [
+            "id",
+            "display_name",
+            "headline",
+            "bio",
+            "profile_picture",
+            "years_of_experience",
+            "location",
+            "timezone",
+            "specializations",
+            "languages",
+            "education",
+            "certifications",
+            "industries",
+            "is_profile_public",
+            "is_accepting_bookings",
+            "is_completed",
+            "onboarding_step",
+        ]
+
+    def validate_specializations(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Specializations must be a list.")
+        return value
+
+    def validate_languages(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Languages must be a list.")
+        return value
+        
+
+
+
+
+class InterviewerAvailabilityCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterviewerAvailability
+        fields = [
+            "date",
+            "start_time",
+            "end_time",
+            "timezone",
+            "is_recurring",
+            "recurrence_type",
+            "recurrence_end_date",
+        ]
+
+    def validate(self, attrs):
+        if attrs["start_time"] >= attrs["end_time"]:
+            raise serializers.ValidationError(
+                "Start time must be before end time."
+            )
+
+        if attrs.get("is_recurring"):
+            if not attrs.get("recurrence_type"):
+                raise serializers.ValidationError(
+                    "recurrence_type is required for recurring availability."
+                )
+            if not attrs.get("recurrence_end_date"):
+                raise serializers.ValidationError(
+                    "recurrence_end_date is required for recurring availability."
+                )
+
+        return attrs
+    
+
+
+
+
+
+class InterviewerVerificationSubmitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterviewerVerification
+        fields = [
+            "document_type",
+            "document_number",
+            "document_file",
+        ]
+
+    def validate(self, attrs):
+        user = self.context["request"].user
+
+        if hasattr(user, "verification") and user.verification.status == "PENDING":
+            raise serializers.ValidationError(
+                "Your verification is already under review."
+            )
+
+        return attrs
+
+
+class InterviewerVerificationDetailSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = InterviewerVerification
         fields = "__all__"
