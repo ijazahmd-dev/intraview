@@ -184,10 +184,9 @@ class AdminReviewInterviewerApplicationView(APIView):
             InterviewerProfile.objects.get_or_create(
                 user=user,
                 defaults={
-                    "display_name": (
-                        f"{app.first_name} {app.last_name}".strip()
-                        or user.username
-                    ),
+                    "display_name": 
+                    # (f"{app.first_name} {app.last_name}".strip()or user.username),
+                    user.username,
                     "headline": f"{app.years_of_experience}+ years experience",
                     "bio": app.expertise_summary,
                     "years_of_experience": app.years_of_experience,
@@ -738,6 +737,7 @@ class InterviewerDashboardProfileView(APIView):
             data=request.data,
             partial=False,
         )
+
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

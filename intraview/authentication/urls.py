@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import views_admin
 from rest_framework.routers import SimpleRouter
+from . import refresh_access
 
 
 
@@ -33,6 +34,12 @@ urlpatterns = [
     path("admin/me/", views_admin.AdminMeView.as_view(), name="admin-me"),
 
     path("interviewer/login/", views.InterviewerLoginView.as_view(), name="interviewer-login"),
+
+
+
+    path("user/token/refresh/", refresh_access.UserCookieTokenRefreshView.as_view()),
+    path("admin/token/refresh/", refresh_access.AdminCookieTokenRefreshView.as_view()),
+    path("interviewer/token/refresh/", refresh_access.InterviewerCookieTokenRefreshView.as_view()),
 
     
 ]
