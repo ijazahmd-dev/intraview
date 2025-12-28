@@ -1,12 +1,16 @@
 
 import React, { useState } from 'react';
-import { useAuth } from "../context/AuthContext";
+
 import { useNavigate } from 'react-router-dom'; 
 import { Play, Pause, SkipBack, SkipForward, RotateCcw, Settings, Maximize2, Mic, Target, Clock, Lightbulb } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser } from '../authentication/authSlice';
+
 
 export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const { user, logoutUser } = useAuth();
+  const { user } = useSelector((state)=>state.auth)
+  const dispatch = useDispatch()
   const navigate = useNavigate()
 
   const handleLogin = () => navigate('/login')
@@ -36,7 +40,7 @@ export default function Home() {
               <div className="flex items-center space-x-4">
               {user ? (
                 <button 
-                  onClick={logoutUser}
+                  onClick={() => dispatch(logoutUser())}
                   className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-medium"
                 >
                   Logout

@@ -1,7 +1,179 @@
+// import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+// import Signup from "./pages/Signup";
+// import { ToastContainer } from "react-toastify";
+
+// import Login from "./pages/Login";
+// import ProtectedRoute from "./components/ProtectedRoute";
+// import Home from "./pages/Home";
+// import ForgotPassword from "./pages/ForgotPassword";
+// import ResetPassword from "./pages/ResetPassword";
+// import AdminUsersPage from "./pages/adminUserManagement/AdminUsersPage";
+// import AdminProtectedRoute from "./components/AdminProtectedRoute";
+// import AdminLogin from "./pages/admin/AdminLogin";
+
+// import InterviewerStatus from "./interviewers/pages/InterviewerStatus";
+// import InterviewerApply from "./interviewers/pages/InterviewerApply";
+// import InterviewerOptions from "./interviewers/pages/InterviewerOptions";
+// import AdminInterviewerApplications from "./interviewers/admin/pages/AdminInterviewerApplications";
+// import AdminInterviewerApplicationDetail from "./interviewers/admin/pages/AdminInterviewerApplicationDetail";
+// import InterviewerLogin from "./authentication/user/pages/InterviewerLogin";
+// import InterviewerForgotPassword from "./authentication/user/pages/InterviewerForgotPassword";
+// import InterviewerResetPassword from "./authentication/user/pages/InterviewerResetPassword";
+// import ProfileStep from "./interviewerOnboarding/user/pages/ProfileStep";
+// import AvailabilityStep from "./interviewerOnboarding/user/pages/AvailabilityStep";
+// import VerificationStep from "./interviewerOnboarding/user/pages/VerificationStep";
+// import CompleteStep from "./interviewerOnboarding/user/pages/CompleteStep";
+// import InterviewerOnboardingLayout from "./interviewerOnboarding/user/pages/InterviewerOnboardingLayout";
+// import InterviewerDashboardLayout from "./interviewerDashboard/interviewer/InterviewerDashboardLayout";
+// import InterviewerDashboardHome from "./interviewerDashboard/interviewer/pages/InterviewerDashboardHome";
+// import InterviewerProfilePage from "./interviewerDashboard/interviewer/pages/InterviewerProfilePage";
+// import InterviewerAvailabilityPage from "./interviewerDashboard/interviewer/pages/InterviewerAvailabilityPage";
+
+
+
+
+
+// function App() {
+//     return (
+//       <>
+//         <BrowserRouter>
+//             <ToastContainer />
+
+            
+                
+//                 <Routes>
+
+
+//                     <Route path="/" element={<Navigate to="/home" />} />
+//                     <Route path="/signup" element={<Signup />} />
+//                     <Route path="/login" element={<Login />} />
+//                     <Route path="/forgot-password" element={<ForgotPassword />} />
+//                     <Route path="/reset-password" element={<ResetPassword />} /> 
+//                     <Route path="/home" element={
+//                                                 // <ProtectedRoute>
+//                                                     <Home/>
+//                                                 // </ProtectedRoute>
+//                                                 } />
+
+
+
+
+//                     {/* Interviewer flow */}
+//                     <Route path="/interviewer/login" element={<InterviewerLogin />} />
+//                     <Route path="/interviewer/forgot-password" element={<InterviewerForgotPassword />} />
+//                     <Route path="/interviewer/reset-password" element={<InterviewerResetPassword />} />
+//                     <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
+//                     <Route path="/interviewer/apply" element={<InterviewerApply />} />
+//                     <Route path="/interviewer/status" element={<InterviewerStatus />} />
+
+//                     {/* Interviewer onboarding flow */}
+//                     <Route
+//                         path="/interviewer/onboarding"
+//                         element={<InterviewerOnboardingLayout />}
+//                     >
+//                         <Route path="profile" element={<ProfileStep />} />
+//                         <Route path="availability" element={<AvailabilityStep />} />
+//                         <Route path="verification" element={<VerificationStep />} />
+//                         {/* tutorials step could just reuse verification or be a simple content page */}
+//                         <Route path="tutorials" element={<VerificationStep />} />
+//                         <Route path="complete" element={<CompleteStep />} />
+//                     </Route>
+
+
+//                     <Route
+//                         path="/interviewer/dashboard"
+//                         element={<InterviewerDashboardLayout />}
+//                         >
+//                         <Route index element={<InterviewerDashboardHome />} />
+//                         <Route path="profile" element={<InterviewerProfilePage />} />
+//                         <Route path="availability" element={<InterviewerAvailabilityPage />} />
+//                     </Route>
+                                                
+                                        
+
+
+
+//                     {/* Admin side Routes */}
+//                     <Route path="/admin/login" element={<AdminLogin />} />
+//                     <Route
+//                         path="/admin/users"
+//                         element={
+//                             <AdminProtectedRoute>
+//                                 <AdminUsersPage />
+//                             </AdminProtectedRoute>
+//                         }
+//                     />
+//                     <Route
+//                         path="/admin/interviewers"
+//                         element={
+//                             <AdminProtectedRoute>
+//                                 <AdminInterviewerApplications />
+//                             </AdminProtectedRoute>
+//                         }
+//                     />
+//                     <Route
+//                         path="/admin/interviewers/:id"
+//                         element={
+//                             <AdminProtectedRoute>
+//                                 <AdminInterviewerApplicationDetail />
+//                             </AdminProtectedRoute>
+//                         }
+//                     />
+
+
+//             </Routes>
+
+//         </BrowserRouter>
+        
+//         </>
+//     );
+// }
+
+// export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Signup from "./pages/Signup";
 import { ToastContainer } from "react-toastify";
-import { AuthProvider } from "./context/AuthContext";
+
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
@@ -10,33 +182,59 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminUsersPage from "./pages/adminUserManagement/AdminUsersPage";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 import AdminLogin from "./pages/admin/AdminLogin";
-import { AdminAuthProvider } from "./context/AdminAuthContext";
+
 import InterviewerStatus from "./interviewers/pages/InterviewerStatus";
 import InterviewerApply from "./interviewers/pages/InterviewerApply";
 import InterviewerOptions from "./interviewers/pages/InterviewerOptions";
 import AdminInterviewerApplications from "./interviewers/admin/pages/AdminInterviewerApplications";
 import AdminInterviewerApplicationDetail from "./interviewers/admin/pages/AdminInterviewerApplicationDetail";
 import InterviewerLogin from "./authentication/user/pages/InterviewerLogin";
-import InterviewerForgotPassword from "./authentication/user/pages/InterviewerForgotPassword";
-import InterviewerResetPassword from "./authentication/user/pages/InterviewerResetPassword";
+import ProfileStep from "./interviewerOnboarding/user/pages/ProfileStep";
+import AvailabilityStep from "./interviewerOnboarding/user/pages/AvailabilityStep";
+import VerificationStep from "./interviewerOnboarding/user/pages/VerificationStep";
+import CompleteStep from "./interviewerOnboarding/user/pages/CompleteStep";
+import InterviewerOnboardingLayout from "./interviewerOnboarding/user/pages/InterviewerOnboardingLayout";
+import InterviewerDashboardLayout from "./interviewerDashboard/interviewer/InterviewerDashboardLayout";
+import InterviewerDashboardHome from "./interviewerDashboard/interviewer/pages/InterviewerDashboardHome";
+import InterviewerProfilePage from "./interviewerDashboard/interviewer/pages/InterviewerProfilePage";
+import InterviewerAvailabilityPage from "./interviewerDashboard/interviewer/pages/InterviewerAvailabilityPage";
+
+import { useEffect } from "react";  // ← ADD
+import { useDispatch, useSelector } from "react-redux";  // ← ADD
+import { fetchUser } from "./authentication/authSlice";  // ← ADD
+import { fetchAdmin } from "./authentication/adminAuthSlice";  // ← ADD
 
 
 
 
+function AppInner() {
+  const dispatch = useDispatch();
+  const authBootstrapped = useSelector((state) => state.auth.bootstrapped);
+  const adminBootstrapped = useSelector((state) => state.adminAuth.bootstrapped);
 
-function App() {
+
+
+
+  useEffect(() => {
+    dispatch(fetchUser());
+    dispatch(fetchAdmin());
+  }, [dispatch]);
+
+  // Show loading until auth is bootstrapped
+  if (!authBootstrapped || !adminBootstrapped) {
     return (
-      <>
-        <BrowserRouter>
-            <ToastContainer />
-            <AuthProvider>
-                <AdminAuthProvider>
-            
-                
-                <Routes>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-500 text-sm">Loading...</p>
+      </div>
+    );
+  }
 
+  return (
+    <>
+      <ToastContainer />
+      <Routes>
 
-                    <Route path="/" element={<Navigate to="/home" />} />
+        <Route path="/" element={<Navigate to="/home" />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -52,11 +250,32 @@ function App() {
 
                     {/* Interviewer flow */}
                     <Route path="/interviewer/login" element={<InterviewerLogin />} />
-                    <Route path="/interviewer/forgot-password" element={<InterviewerForgotPassword />} />
-                    <Route path="/interviewer/reset-password" element={<InterviewerResetPassword />} />
                     <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
                     <Route path="/interviewer/apply" element={<InterviewerApply />} />
                     <Route path="/interviewer/status" element={<InterviewerStatus />} />
+
+                    {/* Interviewer onboarding flow */}
+                    <Route
+                        path="/interviewer/onboarding"
+                        element={<InterviewerOnboardingLayout />}
+                    >
+                        <Route path="profile" element={<ProfileStep />} />
+                        <Route path="availability" element={<AvailabilityStep />} />
+                        <Route path="verification" element={<VerificationStep />} />
+                        {/* tutorials step could just reuse verification or be a simple content page */}
+                        <Route path="tutorials" element={<VerificationStep />} />
+                        <Route path="complete" element={<CompleteStep />} />
+                    </Route>
+
+
+                    <Route
+                        path="/interviewer/dashboard"
+                        element={<InterviewerDashboardLayout />}
+                        >
+                        <Route index element={<InterviewerDashboardHome />} />
+                        <Route path="profile" element={<InterviewerProfilePage />} />
+                        <Route path="availability" element={<InterviewerAvailabilityPage />} />
+                    </Route>
                                                 
                                         
 
@@ -89,10 +308,20 @@ function App() {
                         }
                     />
 
+      </Routes>
+    </>
+  );
+}
 
-            </Routes>
-            </AdminAuthProvider>
-        </AuthProvider>    
+
+
+
+
+function App() {
+    return (
+      <>
+        <BrowserRouter>
+            <AppInner />
         </BrowserRouter>
         
         </>
@@ -100,3 +329,49 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

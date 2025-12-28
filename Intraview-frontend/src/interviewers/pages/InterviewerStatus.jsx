@@ -371,12 +371,12 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, HelpCircle, AlertTriangle } from "lucide-react";
 import { fetchInterviewerStatus } from "../interviewerSlice";
-import { useAuth } from "../../context/AuthContext";
+
 
 export default function InterviewerStatus() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useSelector((state)=> state.auth)
 
   const {
     status,

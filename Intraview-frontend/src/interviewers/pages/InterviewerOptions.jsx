@@ -4,13 +4,13 @@ import React, { useEffect, useMemo } from "react";
 import { ArrowRight, LogIn, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { useAuth } from "../../context/AuthContext";
+
 import { fetchEligibility } from "../interviewerSlice";
 
 export default function InterviewerOptions() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user } = useAuth();
+  const { user } = useSelector((state)=>state.auth)
   const { eligibility, loadingEligibility, application_id } = useSelector(
     (s) => s.interviewer
   );

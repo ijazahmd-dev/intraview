@@ -8,6 +8,7 @@ export const loginInterviewer = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const res = await api.interviewerLogin(credentials);
+      localStorage.setItem("auth_role", "interviewer");
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data);
