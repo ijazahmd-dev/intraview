@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { login, getCurrentUser, logout } from "../api/authApi";
-import API from "../utils/axiosClient";
+
 
 // Restore session from cookies
 export const fetchUser = createAsyncThunk(

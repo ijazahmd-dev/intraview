@@ -207,11 +207,11 @@ import { fetchAdmin } from "./authentication/adminAuthSlice";  // ← ADD
 
 
 
+
 function AppInner() {
   const dispatch = useDispatch();
   const authBootstrapped = useSelector((state) => state.auth.bootstrapped);
   const adminBootstrapped = useSelector((state) => state.adminAuth.bootstrapped);
-
 
 
 
@@ -244,6 +244,7 @@ function AppInner() {
                                                     <Home/>
                                                 // </ProtectedRoute>
                                                 } />
+
 
 
 

@@ -9,6 +9,17 @@ export const fetchProfile = () =>
 export const updateProfile = (payload) =>
   API.put("api/interviewer/me/profile/", payload);
 
+export const uploadProfilePicture = (file) => {
+  const formData = new FormData();
+  formData.append("profile_picture", file);
+  return API.post("/api/interviewer/me/profile-picture/", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const deleteProfilePicture = () => 
+  API.delete("/api/interviewer/me/profile-picture/");
+
 export const patchProfile = (payload) =>
   API.patch("api/interviewer/me/profile/", payload);
 
