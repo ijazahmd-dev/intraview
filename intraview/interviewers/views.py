@@ -14,6 +14,7 @@ from .serializers import (
     InterviewerProfileSerializer,
     InterviewerAvailabilityCreateSerializer,
     InterviewerVerificationSubmitSerializer,
+    InterviewerProfilePictureSerializer
 )
 from authentication.permissions import IsAdminRole  # adjust import
 from authentication.authentication import AdminCookieJWTAuthentication
@@ -718,6 +719,7 @@ class InterviewerDashboardProfileView(APIView):
             )
 
         serializer = InterviewerProfileSerializer(profile)
+        print(serializer.data)
         return Response(serializer.data)
 
     def put(self, request):
@@ -766,3 +768,85 @@ class InterviewerDashboardProfileView(APIView):
 
 
 
+
+
+class InterviewerProfilePictureView(APIView):
+    """
+    POST /api/interviewer/me/profile-picture/ - Upload profile picture
+    DELETE /api/interviewer/me/profile-picture/ - Remove profile picture
+    """
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def post(self, request):
+        """
+        Upload new profile picture
+        Expects: multipart/form-data with profile_picture file
+        """
+        try:
+            profile = request.user.interviewer_profile
+            
+            serializer = InterviewerProfilePictureSerializer(
+                profile,
+                data=request.FILES,
+                partial=True
+            )
+            
+            if serializer.is_valid():
+                serializer.save()
+                
+                return Response(
+                    {
+                        "message": "Profile picture updated successfully",
+                        "profile_picture": serializer.data["profile_picture"],
+                    },
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Interviewer profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Upload failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def delete(self, request):
+        """
+        Remove current profile picture
+        """
+        try:
+            profile = request.user.interviewer_profile
+            
+            if profile.profile_picture:
+                # Delete file from storage
+                profile.profile_picture.delete(save=False)
+                profile.profile_picture = None
+                profile.save(update_fields=["profile_picture"])
+                
+                return Response(
+                    {
+                        "message": "Profile picture removed successfully",
+                        "profile_picture": None
+                    },
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return Response(
+                    {"message": "No profile picture to remove"},
+                    status=status.HTTP_200_OK
+                )
+                
+        except InterviewerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Interviewer profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )

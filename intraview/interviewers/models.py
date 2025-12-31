@@ -9,6 +9,7 @@ from django.utils import timezone
 User = get_user_model()
 
 
+
 class InterviewerApplication(models.Model):
     STATUS_PENDING = "PENDING"
     STATUS_APPROVED = "APPROVED"
@@ -220,6 +221,8 @@ class VerificationStatus(models.TextChoices):
     REJECTED = "REJECTED", "Rejected"
 
 
+
+
 class InterviewerVerification(models.Model):
     user = models.OneToOneField(
         User,
@@ -268,3 +271,8 @@ class InterviewerVerification(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.status}"
+    
+
+
+
+

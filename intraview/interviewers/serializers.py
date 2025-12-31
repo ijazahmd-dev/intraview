@@ -145,3 +145,18 @@ class InterviewerVerificationDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = InterviewerVerification
         fields = "__all__"
+
+
+
+
+
+
+class InterviewerProfilePictureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterviewerProfile
+        fields = ["profile_picture"]
+
+    def validate_profile_picture(self, value):
+        if value and value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Image too large (max 5MB).")
+        return value  
