@@ -1,4 +1,4 @@
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from authentication.authentication import AdminCookieJWTAuthentication
 from authentication.permissions import IsAdminRole
 from .serializers import InterviewerVerificationDetailSerializer
@@ -26,6 +26,20 @@ class AdminInterviewerVerificationListView(ListAPIView):
             qs = qs.filter(status=status_param)
 
         return qs.order_by("-submitted_at")
+    
+
+
+
+class AdminInterviewerVerificationDetailView(RetrieveAPIView):
+    """
+    GET /api/admin/interviewer-verifications/<id>/
+    Used by admin to preview the uploaded document & see all metadata.
+    """
+    authentication_classes = [AdminCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsAdminRole]
+    serializer_class = InterviewerVerificationDetailSerializer
+    queryset = InterviewerVerification.objects.select_related("user")
+    lookup_field = "id"
     
 
 

@@ -14,6 +14,7 @@ from .serializers import (
     InterviewerProfileSerializer,
     InterviewerAvailabilityCreateSerializer,
     InterviewerVerificationSubmitSerializer,
+    InterviewerVerificationDetailSerializer,
     InterviewerProfilePictureSerializer
 )
 from authentication.permissions import IsAdminRole  # adjust import
@@ -488,6 +489,35 @@ class InterviewerVerificationStatusView(APIView):
             "rejection_reason": verification.rejection_reason,
             "submitted_at": verification.submitted_at,
         })
+    
+
+
+class InterviewerVerificationDetailView(APIView):
+    """
+    GET /api/interviewer/verification/
+    Returns current verification object (if any), including document_file URL.
+    """
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            verification = request.user.verification
+        except InterviewerVerification.DoesNotExist:
+            return Response(
+                {
+                    "status": VerificationStatus.NOT_SUBMITTED,
+                    "document_file": None,
+                    "document_type": None,
+                    "document_number": None,
+                    "rejection_reason": "",
+                    "submitted_at": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = InterviewerVerificationDetailSerializer(verification)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 

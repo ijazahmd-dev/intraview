@@ -31,6 +31,7 @@ urlpatterns = [
 
     # admin onboarding api
     path("admin/interviewer-verifications/",views_admin.AdminInterviewerVerificationListView.as_view(),name="admin-interviewer-verification-list",),
+    path("admin/interviewer-verifications/<int:id>/",views_admin.AdminInterviewerVerificationDetailView.as_view(),name="admin-interviewer-verification-detail",),
     path("admin/interviewer-verifications/<int:verification_id>/review/",views_admin.AdminReviewInterviewerVerificationView.as_view(),name="admin-interviewer-verification-review",),
 
 
