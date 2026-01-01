@@ -136,6 +136,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { fetchDashboardSummary } from "../interviewerDashboardApi";
+import { logoutInterviewer } from "../../authentication/interviewerAuthSlice";
+import { useDispatch } from "react-redux";
 
 const navItems = [
   { 
@@ -172,6 +174,16 @@ export default function InterviewerDashboardLayout() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const handleLogout = async () => {
+  try {
+    await dispatch(logoutInterviewer()).unwrap();
+    navigate("/interviewer/login", { replace: true });
+  } catch {
+    navigate("/interviewer/login", { replace: true });
+  }
+};
 
   useEffect(() => {
     let mounted = true;
@@ -277,7 +289,7 @@ export default function InterviewerDashboardLayout() {
         {/* Footer */}
         <div className="px-6 py-5 border-t border-slate-100">
           <button
-            onClick={() => navigate("/interviewer/login")}
+            onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,7 +353,7 @@ export default function InterviewerDashboardLayout() {
 
             <div className="absolute bottom-0 left-0 right-0 px-6 py-5 border-t border-slate-100 bg-white">
               <button
-                onClick={() => navigate("/interviewer/login")}
+                onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

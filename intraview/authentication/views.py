@@ -23,6 +23,7 @@ from google.oauth2 import id_token
 from google.auth.transport.requests import Request
 from django.core.cache import cache
 from .models import InterviewerStatus
+from .authentication import InterviewerCookieJWTAuthentication
 
 User = get_user_model()
 
@@ -575,3 +576,57 @@ class InterviewerLoginView(APIView):
         )
 
         return response
+    
+
+
+
+class InterviewerLogoutView(APIView):
+
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = []  # Allow even if token invalid
+
+    def post(self, request):
+        response = Response(
+            {"message": "Interviewer logged out successfully"}, 
+            status=status.HTTP_200_OK
+        )
+        
+
+        response.delete_cookie(
+            "interviewer_access_token",
+            path='/'
+        )
+        response.delete_cookie(
+            "interviewer_refresh_token",
+            path='/'
+        )
+        
+
+        refresh_token = request.COOKIES.get("interviewer_refresh_token")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass  
+        
+        return response
+    
+
+
+
+
+class InterviewerMeView(APIView):
+
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        return Response({
+            "username": user.username,
+            "email": user.email,
+            "role": user.role
+        })
+    
+

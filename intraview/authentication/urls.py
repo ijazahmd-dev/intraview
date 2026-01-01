@@ -34,6 +34,8 @@ urlpatterns = [
     path("admin/me/", views_admin.AdminMeView.as_view(), name="admin-me"),
 
     path("interviewer/login/", views.InterviewerLoginView.as_view(), name="interviewer-login"),
+    path("interviewer/logout/", views.InterviewerLogoutView.as_view(), name="interviewer-logout"),
+    path("interviewer/me/", views.InterviewerMeView.as_view(), name="interviewer-me"),
 
 
 
