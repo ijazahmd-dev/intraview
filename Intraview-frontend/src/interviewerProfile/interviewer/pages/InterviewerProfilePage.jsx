@@ -880,7 +880,7 @@ import {
   uploadProfilePicture, 
   deleteProfilePicture,
   patchProfile 
-} from "../../interviewerDashboardApi";
+} from "../../../interviewerDashboard/interviewerDashboardApi";
 
 const normalizeArray = (val) => {
   if (Array.isArray(val)) return val;

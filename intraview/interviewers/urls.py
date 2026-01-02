@@ -29,7 +29,7 @@ urlpatterns = [
 
 
 
-    # admin onboarding api
+    # admin onboarding and virifications api
     path("admin/interviewer-verifications/",views_admin.AdminInterviewerVerificationListView.as_view(),name="admin-interviewer-verification-list",),
     path("admin/interviewer-verifications/<int:id>/",views_admin.AdminInterviewerVerificationDetailView.as_view(),name="admin-interviewer-verification-detail",),
     path("admin/interviewer-verifications/<int:verification_id>/review/",views_admin.AdminReviewInterviewerVerificationView.as_view(),name="admin-interviewer-verification-review",),
@@ -40,6 +40,7 @@ urlpatterns = [
     path("interviewer/dashboard/",views.InterviewerDashboardSummaryView.as_view(),name="interviewer-dashboard-summary",),
     path("interviewer/me/profile/",views.InterviewerDashboardProfileView.as_view(),name="interviewer-dashboard-profile",),
     path("interviewer/me/profile-picture/",views.InterviewerProfilePictureView.as_view(),name="interviewer-profile-picture"),
+    path("interviewer/verification/detail/", views.InterviewerVerificationDetailView.as_view(), name="interviewer-verification-detail"),
 
 
 

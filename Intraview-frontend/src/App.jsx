@@ -196,13 +196,15 @@ import CompleteStep from "./interviewerOnboarding/user/pages/CompleteStep";
 import InterviewerOnboardingLayout from "./interviewerOnboarding/user/pages/InterviewerOnboardingLayout";
 import InterviewerDashboardLayout from "./interviewerDashboard/interviewer/InterviewerDashboardLayout";
 import InterviewerDashboardHome from "./interviewerDashboard/interviewer/pages/InterviewerDashboardHome";
-import InterviewerProfilePage from "./interviewerDashboard/interviewer/pages/InterviewerProfilePage";
-import InterviewerAvailabilityPage from "./interviewerDashboard/interviewer/pages/InterviewerAvailabilityPage";
+import InterviewerProfilePage from "./interviewerProfile/interviewer/pages/InterviewerProfilePage";
+import InterviewerAvailabilityPage from "./interviewerProfile/interviewer/pages/InterviewerAvailabilityPage";
 
-import { useEffect } from "react";  // ← ADD
-import { useDispatch, useSelector } from "react-redux";  // ← ADD
-import { fetchUser } from "./authentication/authSlice";  // ← ADD
-import { fetchAdmin } from "./authentication/adminAuthSlice";  // ← ADD
+import { useEffect } from "react"; 
+import { useDispatch, useSelector } from "react-redux"; 
+import { fetchUser } from "./authentication/authSlice";  
+import { fetchAdmin } from "./authentication/adminAuthSlice";  
+import AdminInterviewerVerificationsPage from "./interviewerProfile/admin/pages/AdminInterviewerVerificationsPage";
+import InterviewerVerificationPage from "./interviewerProfile/interviewer/pages/InterviewerVerificationPage";
 
 
 
@@ -276,9 +278,13 @@ function AppInner() {
                         <Route index element={<InterviewerDashboardHome />} />
                         <Route path="profile" element={<InterviewerProfilePage />} />
                         <Route path="availability" element={<InterviewerAvailabilityPage />} />
+                        <Route path="verification" element={<InterviewerVerificationPage />} /> 
                     </Route>
                                                 
                                         
+
+
+
 
 
 
@@ -308,6 +314,12 @@ function AppInner() {
                             </AdminProtectedRoute>
                         }
                     />
+                    <Route path="/admin/interviewers/verifications"element={
+                          <AdminProtectedRoute>
+                            <AdminInterviewerVerificationsPage />
+                          </AdminProtectedRoute>
+                    }/>
+                    
 
       </Routes>
     </>

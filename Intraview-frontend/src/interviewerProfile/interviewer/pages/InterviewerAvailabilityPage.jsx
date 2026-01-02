@@ -270,7 +270,7 @@ import {
   fetchAvailability,
   createAvailability,
   deleteAvailability,
-} from "../../interviewerDashboardApi";
+} from "../../../interviewerDashboard/interviewerDashboardApi";
 
 export default function InterviewerAvailabilityPage() {
   const [slots, setSlots] = useState([]);

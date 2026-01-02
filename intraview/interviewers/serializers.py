@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InterviewerApplication, InterviewerProfile, InterviewerAvailability, InterviewerVerification
+from .models import InterviewerApplication, InterviewerProfile, InterviewerAvailability, InterviewerVerification, VerificationStatus
 
 
 
@@ -131,12 +131,19 @@ class InterviewerVerificationSubmitSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         user = self.context["request"].user
 
-        if hasattr(user, "verification") and user.verification.status == "PENDING":
-            raise serializers.ValidationError(
-                "Your verification is already under review."
-            )
+        if hasattr(user, "verification"):
+            status = user.verification.status
+            if status == VerificationStatus.PENDING:
+                raise serializers.ValidationError(
+                    "Your verification is already under review."
+                )
+            if status == VerificationStatus.APPROVED:
+                raise serializers.ValidationError(
+                    "Your document is already verified."
+                )
 
         return attrs
+
 
 
 class InterviewerVerificationDetailSerializer(serializers.ModelSerializer):
