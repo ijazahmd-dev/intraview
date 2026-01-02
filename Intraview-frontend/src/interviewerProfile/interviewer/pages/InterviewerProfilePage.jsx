@@ -874,6 +874,7 @@
 
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import toaster from "../../../utils/toaster";
 import { 
   fetchProfile, 
   updateProfile, 
@@ -881,6 +882,7 @@ import {
   deleteProfilePicture,
   patchProfile 
 } from "../../../interviewerDashboard/interviewerDashboardApi";
+
 
 const normalizeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -914,6 +916,7 @@ export default function InterviewerProfilePage() {
         const { data } = await fetchProfile();
         if (!mounted) return;
         setProfile(data);
+        const isVerified = data.verification_status === 'APPROVED';
         console.log("the profile pic is this.......",data.profile_picture);
         if (data.profile_picture) {
           setImagePreview(data.profile_picture  || null);
@@ -998,6 +1001,14 @@ export default function InterviewerProfilePage() {
   }, [profile?.profile_picture]);
 
   const toggleSwitch = async (field) => {
+
+    if (profile.verification_status !== 'APPROVED' && 
+      (field === 'is_profile_public' || field === 'is_accepting_bookings')) {
+        toaster.error('You must complete your identity verification first.');
+        
+    return;
+  }
+
     const newValue = !profile[field];
     setProfile((prev) => ({ ...prev, [field]: newValue }));
     
@@ -1128,6 +1139,12 @@ export default function InterviewerProfilePage() {
 
 
         {/* Toggle switches */}
+        {/* {profile.verification_status !== 'APPROVED' && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mb-4 text-sm text-amber-800">
+                🔐 <strong>Verify your identity</strong> to make profile public and accept bookings.
+                <a href="/interviewer/dashboard/verification" className="ml-2 underline">Go to verification →</a>
+              </div>
+            )} */}
         <div className="flex flex-wrap gap-4 text-xs lg:flex-nowrap">
           <div className="flex items-center gap-2">
             <span className="text-slate-500 whitespace-nowrap">Public Profile</span>

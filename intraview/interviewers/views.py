@@ -749,8 +749,16 @@ class InterviewerDashboardProfileView(APIView):
             )
 
         serializer = InterviewerProfileSerializer(profile)
-        print(serializer.data)
-        return Response(serializer.data)
+        data = serializer.data
+        
+        data['verification_status'] = getattr(
+            getattr(request.user, 'verification', None), 
+            'status', 
+            VerificationStatus.NOT_SUBMITTED
+        )
+
+        print(data)
+        return Response(data)
 
     def put(self, request):
         """
@@ -780,12 +788,19 @@ class InterviewerDashboardProfileView(APIView):
         """
         try:
             profile = request.user.interviewer_profile
+
         except InterviewerProfile.DoesNotExist:
             return Response(
                 {"detail": "Interviewer profile not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
+        
+        if not hasattr(request.user, 'verification') or request.user.verification.status != VerificationStatus.APPROVED:
+            if 'is_profile_public' in request.data or 'is_accepting_bookings' in request.data:
+                return Response(
+                    {"detail": "Identity verification required to make profile public."}, 
+                    status=400
+                )
         serializer = InterviewerProfileSerializer(
             instance=profile,
             data=request.data,
