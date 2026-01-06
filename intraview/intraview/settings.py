@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     
     'authentication',
     'interviewers',
+    'wallet',
 
     'rest_framework',
     'corsheaders',

@@ -40,6 +40,18 @@ class CustomUser(AbstractUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
 
+    @property
+    def token_balance(self):
+        """Total available tokens (balance - locked)"""
+        wallet = getattr(self, 'token_wallet', None)
+        return wallet.balance - wallet.locked_balance if wallet else 0
+
+    @property
+    def total_balance(self):
+        """Total tokens owned (balance + locked)"""
+        wallet = getattr(self, 'token_wallet', None)
+        return wallet.balance + wallet.locked_balance if wallet else 0
+
 
     def __str__(self):
         return self.username
