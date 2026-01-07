@@ -1,9 +1,9 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from django.conf import settings
 # Create your models here.
 
 
-User = get_user_model()
+
 
 
 class TokenTransactionType(models.TextChoices):
@@ -20,7 +20,7 @@ class TokenTransactionType(models.TextChoices):
 
 class TokenWallet(models.Model):
     user = models.OneToOneField(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="token_wallet"
     )
