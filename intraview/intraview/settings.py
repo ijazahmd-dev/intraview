@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'interviewers',
     'wallet',
     'payments',
+    'subscriptions',
 
     'rest_framework',
     'corsheaders',

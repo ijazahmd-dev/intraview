@@ -20,9 +20,13 @@ from wallet.services import TokenService
 from wallet.models import TokenTransactionType
 
 from .models import PaymentOrder,PaymentStatus
-from .serializers import CreatePaymentSerializer
-from .services.stripe_service import StripeService
+from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer
+from .services.stripe_token_bundle_service import StripeService
+from .services.stripe_subscription import StripeSubscriptionService
 from authentication.authentication import CookieJWTAuthentication
+from subscriptions.services.subscription_service import SubscriptionService
+from subscriptions.services.token_grant_service import SubscriptionTokenGrantService
+from subscriptions.models import SubscriptionStatus, SubscriptionPlan, UserSubscription
 
 
 
@@ -32,6 +36,7 @@ from authentication.authentication import CookieJWTAuthentication
 
 
 logger = logging.getLogger(__name__)
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 class CreateTokenPurchaseAPIView(APIView):
@@ -219,4 +224,178 @@ class StripeWebhookView(View):
     
                         
 
-                
+
+
+
+
+
+class CreateSubscriptionCheckoutAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+
+        serializer = SubscriptionCheckoutSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+
+        user = request.user
+        plan = serializer.validated_data["plan_id"]
+
+        try:
+            success_url = (
+                f"{settings.FRONTEND_URL}/subscriptions/success"
+                f"?plan_id={plan.id}"
+            )
+
+            cancel_url = (
+                f"{settings.FRONTEND_URL}/subscriptions/cancel"
+                f"?plan_id={plan.id}"
+            )
+
+
+            session = StripeSubscriptionService.create_checkout_session(
+                user=user,
+                plan=plan,
+                success_url=success_url,
+                cancel_url=cancel_url
+            )
+
+            logger.info(
+                "Subscription checkout created | user=%s | plan=%s | session=%s",
+                user.id,
+                plan.id,
+                session.id,
+            )
+
+            return Response({
+                "checkout_url": session.url,
+                "session_id": session.id,
+            },
+            status=status.HTTP_201_CREATED
+            )
+        
+        except stripe.error.StripeError as e:
+            logger.error(
+                "Stripe error during subscription checkout | user=%s | error=%s",
+                user.id,
+                str(e),
+            )
+            raise ValidationError(
+                "Unable to initiate subscription checkout."
+            )
+        
+
+
+
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class StripeSubscriptionWebhookView(View):
+    """
+    Stripe webhook for subscription lifecycle.
+    Stripe is the source of truth.
+    """
+
+    def post(self, request):
+        payload = request.body.decode("utf-8")
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+
+        try:
+            event = stripe.Webhook.construct_event(
+                payload,
+                sig_header,
+                settings.STRIPE_WEBHOOK_SECRET,
+            )
+        except ValueError:
+            logger.warning("Stripe webhook: invalid payload")
+            return HttpResponse(status=400)
+        except stripe.error.SignatureVerificationError:
+            logger.warning("Stripe webhook: invalid signature")
+            return HttpResponse(status=400)
+
+        event_type = event["type"]
+
+        # -----------------------------
+        # Subscription checkout success
+        # -----------------------------
+        if event_type == "checkout.session.completed":
+            session = event["data"]["object"]
+            metadata = session.get("metadata", {})
+
+            try:
+                user_id = int(metadata["user_id"])
+                plan_id = int(metadata["plan_id"])
+            except (KeyError, ValueError):
+                logger.error("Webhook missing metadata: %s", metadata)
+                return HttpResponse(status=400)
+
+            # Prefer Stripe subscription ID, fallback to session ID
+            subscription_id = (
+                session.get("subscription") or session.get("id")
+            )
+
+            logger.info(
+                "Stripe webhook received | type=%s | user=%s | plan=%s | sub=%s",
+                event_type,
+                user_id,
+                plan_id,
+                subscription_id,
+            )
+
+            try:
+                subscription = SubscriptionService.activate_subscription(
+                    user_id=user_id,
+                    plan_id=plan_id,
+                    stripe_subscription_id=str(subscription_id),
+                )
+
+                SubscriptionTokenGrantService.grant_monthly_tokens(
+                    subscription=subscription
+                )
+
+            except SubscriptionPlan.DoesNotExist:
+                logger.error(
+                    "Subscription activation failed: plan not found | plan_id=%s",
+                    plan_id,
+                )
+                return HttpResponse(status=400)
+
+            except Exception:
+                # IMPORTANT: Do not crash webhook
+                logger.exception("Subscription activation failed")
+                return HttpResponse(status=500)
+
+        # --------------------------------
+        # Future events (handled later)
+        # --------------------------------
+        elif event_type == "customer.subscription.deleted":
+            # TODO (Phase 3.x): mark UserSubscription CANCELLED
+            logger.info("Subscription deleted event received")
+            pass
+
+        elif event["type"] == "invoice.payment_succeeded":
+            invoice = event["data"]["object"]
+            subscription_id = invoice.get("subscription")
+
+            if not subscription_id:
+                return HttpResponse(status=200)
+
+            try:
+                subscription = UserSubscription.objects.select_related(
+                    "plan", "user"
+                ).get(stripe_subscription_id=subscription_id)
+
+                SubscriptionTokenGrantService.grant_monthly_tokens(
+                    subscription=subscription
+                )
+
+            except UserSubscription.DoesNotExist:
+                logger.warning(
+                    "Invoice for unknown subscription: %s",
+                    subscription_id,
+                )    
+
+        # Stripe expects 200 for all handled events
+        return HttpResponse(status=200)
+  
+

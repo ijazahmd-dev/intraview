@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from .models import TokenPack,PaymentOrder, PaymentStatus
 import django_filters
+
+from .models import TokenPack,PaymentOrder, PaymentStatus
+from subscriptions.models import SubscriptionPlan
+
+
+
 
 
 class CreatePaymentSerializer(serializers.Serializer):
@@ -22,10 +27,37 @@ class CreatePaymentSerializer(serializers.Serializer):
 
 
 
+class SubscriptionCheckoutSerializer(serializers.Serializer):
+    plan_id = serializers.IntegerField(min_value=1)
+
+    def validate_plan_id(self, value):
+        try:
+            plan = SubscriptionPlan.objects.get(
+                id=value,
+                is_active=True,
+            )
+        except SubscriptionPlan.DoesNotExist:
+            raise serializers.ValidationError(
+                "Invalid or inactive subscription plan."
+            )
+
+        if plan.price_inr <= 0:
+            raise serializers.ValidationError(
+                "Free plans do not require checkout."
+            )
+
+        return plan
+
+    
 
 
 
-#########################################################  Admin API  ################################################
+
+
+
+
+
+#########################################################  Admin Serializers  ################################################
     
 
 

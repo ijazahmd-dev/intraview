@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from subscriptions.models import UserSubscription
 
 
 
@@ -51,6 +52,19 @@ class CustomUser(AbstractUser):
         """Total tokens owned (balance + locked)"""
         wallet = getattr(self, 'token_wallet', None)
         return wallet.balance + wallet.locked_balance if wallet else 0
+    
+
+    
+    @property
+    def current_subscription(self):
+        return (
+            UserSubscription.objects
+            .active()
+            .filter(user=self)
+            .select_related("plan")
+            .first()
+        )
+
 
 
     def __str__(self):
