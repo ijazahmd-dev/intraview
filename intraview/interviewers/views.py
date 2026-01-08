@@ -22,7 +22,9 @@ from authentication.authentication import AdminCookieJWTAuthentication
 from .tasks import send_application_approved_email, send_application_rejected_email,send_application_submitted_email
 from authentication.permissions import IsOnboardingInterviewer,IsActiveInterviewer
 from authentication.authentication import InterviewerCookieJWTAuthentication
-
+from interviewer_subscriptions.services.entitlement_service import (
+    InterviewerEntitlementService,
+)
 
 
 # ------------------------------------------ User-facing APIs --------------------------------------------------
@@ -747,6 +749,10 @@ class InterviewerDashboardProfileView(APIView):
                 {"detail": "Interviewer profile not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        
+        # if not InterviewerEntitlementService.has_active_subscription(request.user):
+        #     profile.is_profile_public = False
+        #     profile.is_accepting_bookings = False
 
         serializer = InterviewerProfileSerializer(profile)
         data = serializer.data
@@ -801,6 +807,22 @@ class InterviewerDashboardProfileView(APIView):
                     {"detail": "Identity verification required to make profile public."}, 
                     status=400
                 )
+            
+        # if any(
+        #     field in request.data
+        #     for field in ["is_profile_public", "is_accepting_bookings"]
+        # ):
+        #     if not InterviewerEntitlementService.has_active_subscription(request.user):
+        #         return Response(
+        #             {
+        #                 "detail": (
+        #                     "Active interviewer subscription required "
+        #                     "to go public or accept bookings."
+        #                 )
+        #             },
+        #             status=403,
+        #         ) 
+
         serializer = InterviewerProfileSerializer(
             instance=profile,
             data=request.data,

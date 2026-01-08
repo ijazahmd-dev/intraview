@@ -3,6 +3,7 @@ import django_filters
 
 from .models import TokenPack,PaymentOrder, PaymentStatus
 from subscriptions.models import SubscriptionPlan
+from interviewer_subscriptions.models import InterviewerSubscriptionPlan
 
 
 
@@ -50,6 +51,23 @@ class SubscriptionCheckoutSerializer(serializers.Serializer):
 
     
 
+
+
+class InterviewerSubscriptionCheckoutSerializer(serializers.Serializer):
+    plan_id = serializers.IntegerField(min_value=1)
+
+    def validate_plan_id(self, value):
+        try:
+            plan = InterviewerSubscriptionPlan.objects.get(
+                id=value,
+                is_active=True,
+            )
+        except InterviewerSubscriptionPlan.DoesNotExist:
+            raise serializers.ValidationError(
+                "Invalid or inactive interviewer subscription plan."
+            )
+
+        return plan
 
 
 
