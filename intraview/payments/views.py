@@ -20,13 +20,23 @@ from wallet.services import TokenService
 from wallet.models import TokenTransactionType
 
 from .models import PaymentOrder,PaymentStatus
-from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer
+from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer, InterviewerSubscriptionCheckoutSerializer
 from .services.stripe_token_bundle_service import StripeService
 from .services.stripe_subscription import StripeSubscriptionService
+from .services.stripe_interviewer_subscription import StripeInterviewerSubscriptionService
 from authentication.authentication import CookieJWTAuthentication
 from subscriptions.services.subscription_service import SubscriptionService
 from subscriptions.services.token_grant_service import SubscriptionTokenGrantService
 from subscriptions.models import SubscriptionStatus, SubscriptionPlan, UserSubscription
+from authentication.authentication import InterviewerCookieJWTAuthentication
+from authentication.permissions import IsActiveInterviewer
+from interviewer_subscriptions.services.entitlement_service import (
+    InterviewerEntitlementService,
+)
+from interviewer_subscriptions.services.subscription_service import (
+    InterviewerSubscriptionService,
+)
+
 
 
 
@@ -399,3 +409,130 @@ class StripeSubscriptionWebhookView(View):
         return HttpResponse(status=200)
   
 
+
+
+
+
+
+
+
+
+class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def post(self, request):
+        interviewer = request.user
+
+        # 1️⃣ Prevent duplicate active subscriptions
+        if InterviewerEntitlementService.has_active_subscription(interviewer):
+            raise ValidationError(
+                "You already have an active interviewer subscription."
+            )
+
+        # 2️⃣ Validate plan
+        serializer = InterviewerSubscriptionCheckoutSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        plan = serializer.validated_data["plan_id"]  # ✅ This IS a Plan instance
+
+        # 3️⃣ URLs
+        success_url = (
+            f"{settings.FRONTEND_URL}/interviewer/subscription/success"
+        )
+        cancel_url = (
+            f"{settings.FRONTEND_URL}/interviewer/subscription/cancel"
+        )
+
+        # 4️⃣ Stripe checkout
+        session = StripeInterviewerSubscriptionService.create_checkout_session(
+            interviewer=interviewer,
+            plan=plan,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+
+        logger.info(
+            "Interviewer subscription checkout created | interviewer=%s | plan=%s",
+            interviewer.id,
+            plan.id,
+        )
+
+        return Response(
+            {"checkout_url": session.url},
+            status=status.HTTP_201_CREATED,
+        )
+    
+
+
+
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class StripeInterviewerSubscriptionWebhookView(View):
+    """
+    Stripe webhook for interviewer subscription lifecycle.
+    Stripe is the source of truth.
+    """
+
+    def post(self, request):
+        payload = request.body.decode("utf-8")
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+
+        try:
+            event = stripe.Webhook.construct_event(
+                payload,
+                sig_header,
+                settings.STRIPE_WEBHOOK_SECRET,
+            )
+        except ValueError:
+            logger.warning("Interviewer webhook: invalid payload")
+            return HttpResponse(status=400)
+        except stripe.error.SignatureVerificationError:
+            logger.warning("Interviewer webhook: invalid signature")
+            return HttpResponse(status=400)
+
+        event_type = event["type"]
+
+        # -----------------------------------------
+        # Subscription checkout completed
+        # -----------------------------------------
+        if event_type == "checkout.session.completed":
+            session = event["data"]["object"]
+            metadata = session.get("metadata", {})
+
+            if metadata.get("subscription_type") != "INTERVIEWER":
+                return HttpResponse(status=200)
+
+            try:
+                interviewer_id = int(metadata["interviewer_id"])
+                plan_id = int(metadata["plan_id"])
+            except (KeyError, ValueError):
+                logger.error("Interviewer webhook missing metadata: %s", metadata)
+                return HttpResponse(status=400)
+
+            stripe_subscription_id = (
+                session.get("subscription") or session.get("id")
+            )
+
+            logger.info(
+                "Interviewer subscription webhook | interviewer=%s | plan=%s | stripe_sub=%s",
+                interviewer_id,
+                plan_id,
+                stripe_subscription_id,
+            )
+
+            try:
+                InterviewerSubscriptionService.activate_subscription(
+                    interviewer_id=interviewer_id,
+                    plan_id=plan_id,
+                    stripe_subscription_id=str(stripe_subscription_id),
+                )
+            except Exception:
+                # Never fail Stripe webhook
+                logger.exception("Failed to activate interviewer subscription")
+                return HttpResponse(status=500)
+
+        return HttpResponse(status=200)

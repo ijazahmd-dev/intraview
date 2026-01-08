@@ -10,6 +10,9 @@ urlpatterns = [
     path("subscriptions/checkout/",views.CreateSubscriptionCheckoutAPIView.as_view(),name="subscription-checkout",),
     path("subscriptions/webhook/stripe/",views.StripeSubscriptionWebhookView.as_view(),name="stripe-subscription-webhook",),
 
+    path("interviewer/subscription/checkout/",views.CreateInterviewerSubscriptionCheckoutAPIView.as_view(),name="interviewer-subscription-checkout",),
+    path("interviewer-subscriptions/webhook/stripe/",views.StripeInterviewerSubscriptionWebhookView.as_view(),name="stripe-interviewer-subscription-webhook",),
+
 
 
     ####################################################################  Admin APIs  ############################################################
