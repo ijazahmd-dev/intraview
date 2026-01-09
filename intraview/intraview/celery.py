@@ -29,3 +29,4 @@ app.conf.beat_schedule = {
 
 
 # celery -A intraview worker --loglevel=info
+# celery -A intraview beat -l info

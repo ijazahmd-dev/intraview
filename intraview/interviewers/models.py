@@ -192,6 +192,12 @@ class InterviewerAvailability(models.Model):
     recurrence_type = models.CharField(max_length=10,choices=RECURRENCE_CHOICES,null=True,blank=True,)
     recurrence_end_date = models.DateField(null=True,blank=True,help_text="End date for recurring availability")
     created_at = models.DateTimeField(auto_now_add=True)
+    max_bookings = models.PositiveIntegerField(
+        default=1,
+        help_text="Maximum bookings allowed for this availability"
+    )
+    # 🔒 NEW — Soft delete
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["date", "start_time"]
@@ -205,6 +211,21 @@ class InterviewerAvailability(models.Model):
     def clean(self):
         if self.start_time >= self.end_time:
             raise ValueError("Start time must be before end time")
+        
+    def remaining_capacity(self):
+        """
+        How many bookings can still be accepted.
+        """
+        from bookings.models import InterviewBooking
+
+        used = InterviewBooking.objects.filter(
+            availability=self,
+            status__in=[
+                InterviewBooking.Status.CONFIRMED,
+                InterviewBooking.Status.COMPLETED,
+            ],
+        ).count()
+        return max(0, self.max_bookings - used)
 
     def __str__(self):
         return f"{self.interviewer} | {self.date} {self.start_time}-{self.end_time}"

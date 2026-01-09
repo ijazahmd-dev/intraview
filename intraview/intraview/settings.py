@@ -14,6 +14,9 @@ from pathlib import Path
 from datetime import timedelta
 import os
 from dotenv import load_dotenv
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -53,10 +56,12 @@ INSTALLED_APPS = [
     'payments',
     'subscriptions',
     'interviewer_subscriptions',
+    'bookings'
 
     'rest_framework',
     'corsheaders',
     'django_celery_results',
+    "django_celery_beat",
     "rest_framework_simplejwt.token_blacklist",
 
 ]
@@ -246,6 +251,12 @@ CACHES = {
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = "django-db"
 
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
 
 
 
@@ -294,6 +305,21 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 
 
 
+
+
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+        ],
+        traces_sample_rate=0.2,  # Performance tracing (safe)
+        send_default_pii=True,   # User context (email, id)
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
 
 
 
