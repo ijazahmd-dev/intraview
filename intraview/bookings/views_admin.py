@@ -25,6 +25,7 @@ class AdminInterviewBookingListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsAdminRole]
 
     serializer_class = AdminInterviewBookingSerializer
+
     queryset = (
         InterviewBooking.objects
         .select_related("candidate", "interviewer", "availability")

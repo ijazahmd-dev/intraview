@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import models
 
 
 from authentication.models import CustomUser, InterviewerStatus
@@ -17,7 +18,7 @@ from authentication.authentication import InterviewerCookieJWTAuthentication,Coo
 from authentication.permissions import IsActiveInterviewer
 from .models import InterviewBooking
 from wallet.services import TokenService
-from wallet.models import TokenTransactionType, TokenWallet
+from wallet.models import TokenTransactionType, TokenWallet, TokenTransaction
 from subscriptions.services.entitlement_service import SubscriptionEntitlementService
 
 from subscriptions.services.entitlement_service import (
@@ -26,7 +27,9 @@ from subscriptions.services.entitlement_service import (
 from .serializers import (
     CandidateInterviewerListSerializer,
     CandidateAvailabilitySerializer,
-    InterviewerCancelBookingSerializer
+    InterviewerCancelBookingSerializer,
+    CandidatePastInterviewSerializer,
+    CandidateUpcomingInterviewSerializer
 )
 from .serializers import CreateInterviewBookingSerializer
 
@@ -337,6 +340,90 @@ class CompleteInterviewBookingAPIView(APIView):
             status=status.HTTP_200_OK,
         )
     
+
+
+
+class CandidateUpcomingInterviewsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request):
+        qs = (
+            InterviewBooking.objects
+            .filter(
+                candidate=request.user,
+                status=InterviewBooking.Status.CONFIRMED,
+                start_datetime__gt=timezone.now(),
+            )
+            .select_related(
+                "availability",
+                "interviewer__interviewer_profile",
+            )
+            .order_by("start_datetime")
+        )
+
+        serializer = CandidateUpcomingInterviewSerializer(qs, many=True)
+        return Response(serializer.data)
+    
+
+
+
+
+class CandidatePastInterviewsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request):
+        qs = (
+            InterviewBooking.objects
+            .filter(
+                candidate=request.user,
+                status__in=[
+                    InterviewBooking.Status.COMPLETED,
+                    InterviewBooking.Status.CANCELLED,
+                ],
+            )
+            .select_related(
+                "availability",
+                "interviewer__interviewer_profile",
+            )
+            .order_by("-created_at")
+        )
+
+        serializer = CandidatePastInterviewSerializer(qs, many=True)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+class CandidateTokenSummaryAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        spent = (
+            TokenTransaction.objects
+            .filter(
+                wallet=request.user.token_wallet,
+                transaction_type=TokenTransactionType.SESSION_SPEND,
+            )
+            .aggregate(total=models.Sum("amount"))["total"] or 0
+        )
+
+        return Response({
+            "tokens_spent": abs(spent),
+            "current_balance": request.user.token_balance,
+        })
+
+
+
+
+
+
+
+############################################Interviewer Api ##########################################################
 
 
 

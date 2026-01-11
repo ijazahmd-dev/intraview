@@ -133,6 +133,10 @@ class UserSubscription(models.Model):
         null=True,
         unique=True
     )
+    monthly_ai_used = models.PositiveIntegerField(
+        default=0,
+        help_text="AI interviews used in current billing cycle"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

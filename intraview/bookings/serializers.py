@@ -61,6 +61,50 @@ class CreateInterviewBookingSerializer(serializers.Serializer):
             raise serializers.ValidationError("Availability not found.")
 
         return availability 
+    
+
+
+
+class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
+    interviewer_name = serializers.CharField(
+        source="interviewer.interviewer_profile.display_name"
+    )
+    date = serializers.DateField(source="availability.date")
+    start_time = serializers.TimeField(source="availability.start_time")
+    end_time = serializers.TimeField(source="availability.end_time")
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "interviewer_name",
+            "date",
+            "start_time",
+            "end_time",
+            "token_cost",
+        ]
+
+
+
+
+
+class CandidatePastInterviewSerializer(serializers.ModelSerializer):
+    interviewer_name = serializers.CharField(source="interviewer.interviewer_profile.display_name")
+    date = serializers.DateField(source="availability.date")
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "interviewer_name",
+            "date",
+            "status",
+            "token_cost",
+        ]
+
+
+
+
 
 
 
@@ -73,6 +117,23 @@ class InterviewerCancelBookingSerializer(serializers.Serializer):
         max_length=500,
         help_text="Reason for cancelling the interview"
     )
+
+
+
+
+class InterviewerUpcomingSerializer(serializers.ModelSerializer):
+    candidate_email = serializers.EmailField(source="candidate.email")
+    date = serializers.DateField(source="availability.date")
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "candidate_email",
+            "date",
+            "status",
+        ]
+
 
 
 
