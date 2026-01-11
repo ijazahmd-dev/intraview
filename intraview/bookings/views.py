@@ -1,3 +1,427 @@
 from django.shortcuts import render
+from django.utils import timezone
+from datetime import datetime
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+
+from authentication.models import CustomUser, InterviewerStatus
+from interviewers.models import InterviewerAvailability
+from authentication.authentication import InterviewerCookieJWTAuthentication,CookieJWTAuthentication
+from authentication.permissions import IsActiveInterviewer
+from .models import InterviewBooking
+from wallet.services import TokenService
+from wallet.models import TokenTransactionType, TokenWallet
+from subscriptions.services.entitlement_service import SubscriptionEntitlementService
+
+from subscriptions.services.entitlement_service import (
+    SubscriptionEntitlementService,
+)
+from .serializers import (
+    CandidateInterviewerListSerializer,
+    CandidateAvailabilitySerializer,
+    InterviewerCancelBookingSerializer
+)
+from .serializers import CreateInterviewBookingSerializer
 
 # Create your views here.
+
+
+class CandidateInterviewerListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request):
+        today = timezone.localdate()
+
+        qs = (
+            CustomUser.objects.filter(
+                role="interviewer",
+                interviewer_status=InterviewerStatus.ACTIVE,
+                interviewer_profile__is_profile_public=True,
+                interviewer_profile__is_accepting_bookings=True,
+                interviewer_profile__verification__status="APPROVED",
+                availabilities__date__gte=today,
+                availabilities__is_active=True,
+            )
+            .distinct()
+            .select_related("interviewer_profile")
+        )
+
+        serializer = CandidateInterviewerListSerializer(qs, many=True)
+        return Response(serializer.data)
+    
+
+
+
+
+
+class CandidateInterviewerAvailabilityAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, interviewer_id):
+        today = timezone.localdate()
+        date_filter = request.query_params.get("date")
+
+        interviewer = get_object_or_404(
+            CustomUser,
+            id=interviewer_id,
+            role="interviewer",
+            interviewer_status=InterviewerStatus.ACTIVE,
+            interviewer_profile__is_profile_public=True,
+            interviewer_profile__is_accepting_bookings=True,
+            interviewer_profile__verification__status="APPROVED",
+        )
+
+        # Enforce interviewer subscription
+        if not SubscriptionEntitlementService.has_subscription(interviewer):
+            return Response([], status=200)
+
+        qs = InterviewerAvailability.objects.filter(
+            interviewer=interviewer,
+            is_active=True,
+            date__gte=today,
+        )
+
+        if date_filter:
+            qs = qs.filter(date=date_filter)
+
+        qs = qs.order_by("date", "start_time")
+
+        serializer = CandidateAvailabilitySerializer(qs, many=True)
+        return Response(serializer.data)
+    
+
+
+
+
+
+class CreateInterviewBookingAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateInterviewBookingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        availability = serializer.validated_data["availability_id"]
+        candidate = request.user
+        interviewer = availability.interviewer
+
+        # -------------------------
+        # Pre-checks (no DB writes)
+        # -------------------------
+
+        if candidate.id == interviewer.id:
+            return Response(
+                {"detail": "You cannot book yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not SubscriptionEntitlementService.has_subscription(interviewer):
+            return Response(
+                {"detail": "Interviewer is not accepting bookings."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        TOKEN_COST = 10  # static for now
+
+        # -------------------------
+        # Atomic section
+        # -------------------------
+        with transaction.atomic():
+
+            # Lock availability row
+            availability = InterviewerAvailability.objects.select_for_update().get(
+                id=availability.id
+            )
+
+            if not availability.is_active:
+                return Response(
+                    {"detail": "Slot no longer available."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            if availability.remaining_capacity() <= 0:
+                return Response(
+                    {"detail": "Slot already fully booked."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            # Get & lock wallet (correct pattern)
+            wallet = TokenService.get_or_create_wallet(candidate)
+            wallet = TokenWallet.objects.select_for_update().get(id=wallet.id)
+
+            if wallet.balance < TOKEN_COST:
+                return Response(
+                    {"detail": "Insufficient token balance."},
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
+            # Lock tokens
+            TokenService.lock_tokens(
+                wallet=wallet,
+                amount=TOKEN_COST,
+                transaction_type=TokenTransactionType.BOOKING_LOCK,
+                reference_id=f"availability_{availability.id}",
+                note="Interview booking lock",
+            )
+
+            # Create booking
+            booking = InterviewBooking.objects.create(
+                candidate=candidate,
+                interviewer=interviewer,
+                availability=availability,
+                start_datetime=timezone.make_aware(
+                    datetime.combine(
+                        availability.date,
+                        availability.start_time,
+                    )
+                ),
+                end_datetime=timezone.make_aware(
+                    datetime.combine(
+                        availability.date,
+                        availability.end_time,
+                    )
+                ),
+                token_cost=TOKEN_COST,
+                status=InterviewBooking.Status.CONFIRMED,
+            )
+                                                                                            
+        # -------------------------
+        # Response
+        # -------------------------
+
+        return Response(
+            {
+                "booking_id": booking.id,
+                "status": booking.status,
+                "tokens_locked": TOKEN_COST,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+
+
+
+
+
+class CancelInterviewBookingAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def post(self, request, booking_id):
+        user = request.user
+
+        with transaction.atomic():
+            booking = (
+                InterviewBooking.objects
+                .select_for_update()
+                .get(id=booking_id)
+            )
+
+            # Authorization
+            if booking.candidate != user:
+                return Response(
+                    {"detail": "Not allowed."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Idempotency / state check
+            if booking.status != InterviewBooking.Status.CONFIRMED:
+                return Response(
+                    {"detail": "Invalid booking state."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Time gate
+            if booking.start_datetime <= timezone.now():
+                return Response(
+                    {"detail": "Cannot cancel started or completed bookings."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Lock candidate wallet (correct pattern)
+            wallet = TokenService.get_or_create_wallet(user)
+            wallet_fresh = TokenWallet.objects.select_for_update().get(id=wallet.id)
+
+            # Unlock tokens
+            TokenService.unlock_tokens(
+                wallet=wallet_fresh,
+                amount=booking.token_cost,
+                transaction_type=TokenTransactionType.BOOKING_RELEASE,
+                reference_id=f"booking_{booking.id}",
+                note="Booking cancelled by candidate",
+            )
+
+            booking.status = InterviewBooking.Status.CANCELLED
+            booking.save(update_fields=["status"])
+
+        return Response(
+            {"status": "CANCELLED"},
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+
+
+
+class CompleteInterviewBookingAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def post(self, request, booking_id):
+        user = request.user
+
+        with transaction.atomic():
+            booking = (
+                InterviewBooking.objects
+                .select_for_update()
+                .get(id=booking_id)
+            )
+
+            # Authorization
+            if booking.interviewer != user:
+                return Response(
+                    {"detail": "Not allowed."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Idempotency / state check
+            if booking.status != InterviewBooking.Status.CONFIRMED:
+                return Response(
+                    {"detail": "Invalid booking state."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Time gate
+            if booking.end_datetime > timezone.now():
+                return Response(
+                    {"detail": "Session has not ended yet."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Lock candidate wallet
+            from_wallet = TokenService.get_or_create_wallet(booking.candidate)
+            from_wallet_fresh = TokenWallet.objects.select_for_update().get(
+                id=from_wallet.id
+            )
+
+            # Lock interviewer wallet
+            to_wallet = TokenService.get_or_create_wallet(booking.interviewer)
+            to_wallet_fresh = TokenWallet.objects.select_for_update().get(
+                id=to_wallet.id
+            )
+
+            # Transfer locked tokens
+            TokenService.transfer_locked_tokens(
+                from_wallet=from_wallet_fresh,
+                to_wallet=to_wallet_fresh,
+                amount=booking.token_cost,
+                reference_id=f"booking_{booking.id}",
+                note="Interview completed",
+            )
+
+            booking.status = InterviewBooking.Status.COMPLETED
+            booking.save(update_fields=["status"])
+
+        return Response(
+            {"status": "COMPLETED"},
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+
+
+
+class InterviewerCancelBookingAPIView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def post(self, request, booking_id):
+        serializer = InterviewerCancelBookingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        reason = serializer.validated_data["reason"]
+
+        try:
+            with transaction.atomic():
+                # 🔒 Lock booking
+                booking = (
+                    InterviewBooking.objects
+                    .select_for_update()
+                    .select_related("candidate", "interviewer", "availability")
+                    .get(id=booking_id)
+                )
+
+                # 🔐 Ownership check
+                if booking.interviewer != request.user:
+                    return Response(
+                        {"detail": "You are not allowed to cancel this booking."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+                # 🔁 Idempotency
+                if booking.status != InterviewBooking.Status.CONFIRMED:
+                    return Response(
+                        {"detail": "Only confirmed bookings can be cancelled."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # ⏱ Time gate
+                if booking.start_datetime <= timezone.now():
+                    return Response(
+                        {"detail": "Cannot cancel a started or completed session."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # 🔒 Lock candidate wallet
+                candidate_wallet = TokenService.get_or_create_wallet(
+                    booking.candidate
+                )
+                candidate_wallet = TokenWallet.objects.select_for_update().get(
+                    id=candidate_wallet.id
+                )
+
+                # 🔓 Unlock tokens back to candidate
+                TokenService.unlock_tokens(
+                    wallet=candidate_wallet,
+                    amount=booking.token_cost,
+                    transaction_type="BOOKING_CANCEL_INTERVIEWER",
+                    reference_id=f"booking_{booking.id}",
+                    note="Booking cancelled by interviewer",
+                )
+
+                # 📝 Update booking
+                booking.status = InterviewBooking.Status.CANCELLED_BY_INTERVIEWER
+                booking.cancellation_reason = reason
+                booking.cancelled_at = timezone.now()
+                booking.save(
+                    update_fields=[
+                        "status",
+                        "cancellation_reason",
+                        "cancelled_at",
+                    ]
+                )
+
+        except InterviewBooking.DoesNotExist:
+            return Response(
+                {"detail": "Booking not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "message": "Booking cancelled successfully.",
+                "tokens_refunded": booking.token_cost,
+            },
+            status=status.HTTP_200_OK,
+        )

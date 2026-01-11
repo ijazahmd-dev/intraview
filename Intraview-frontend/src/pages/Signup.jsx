@@ -9,6 +9,8 @@ import { checkPasswordStrength } from "../utils/passwordStrength";
 import toaster from "../utils/toaster";
 import { useNavigate } from "react-router-dom";
 import GoogleLoginButton from "../components/GoogleLoginButton.jsx";
+import { toast } from "sonner";
+
 
 const Signup = () => {
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -58,6 +60,7 @@ const Signup = () => {
         setEmail(values.email);
         setShowOtpModal(true);
         toaster.success("OTP sent to your email!");
+
       } catch (err) {
         setStatus({
           error: err.response?.data?.error || "Signup failed",

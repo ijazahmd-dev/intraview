@@ -386,8 +386,9 @@ class InterviewerAvailabilityListView(APIView):
 
     def get(self, request):
         qs = InterviewerAvailability.objects.filter(
-            interviewer=request.user
-        )
+            interviewer=request.user,
+            is_active=True,  # Only show active slots
+        ).order_by("date", "start_time")
 
         data = [
             {
@@ -422,7 +423,9 @@ class InterviewerAvailabilityDeleteView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        slot.delete()
+        # slot.delete()
+        slot.is_active = False
+        slot.save(update_fields=["is_active"])
         return Response(
             {"message": "Availability removed."},
             status=status.HTTP_204_NO_CONTENT,

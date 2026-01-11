@@ -66,6 +66,7 @@ class SignupView(APIView):
 
                 otp = OTPService.generate_otp()
                 OTPService.store_otp(email, otp)
+                print("The otp is:",otp)
 
                 send_otp_task.delay(email, otp)
             
