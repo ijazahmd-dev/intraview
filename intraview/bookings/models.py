@@ -43,7 +43,7 @@ class InterviewBooking(models.Model):
     token_cost = models.PositiveIntegerField()
 
     status = models.CharField(
-        max_length=20,
+        max_length=200,
         choices=Status.choices,
         default=Status.PENDING,
     )

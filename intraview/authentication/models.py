@@ -57,13 +57,7 @@ class CustomUser(AbstractUser):
     
     @property
     def current_subscription(self):
-        return (
-            UserSubscription.objects
-            .active()
-            .filter(user=self)
-            .select_related("plan")
-            .first()
-        )
+        return UserSubscription.objects.active_for_user(self)
 
 
 

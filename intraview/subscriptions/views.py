@@ -5,7 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 
 
-from .serializers import UserSubscriptionSerializer
+from .serializers import UserSubscriptionSerializer, SubscriptionPlanSerializer
+from .models import SubscriptionPlan
 
 # Create your views here.
 
@@ -67,3 +68,21 @@ class UserCurrentSubscriptionAPIView(APIView):
         serializer.is_valid(raise_exception=True)
 
         return Response(serializer.validated_data)
+    
+
+
+
+
+
+
+
+class SubscriptionPlanListAPIView(APIView):
+    """
+    Returns all active subscription plans (Free/Starter/Pro).
+    Public endpoint (no auth required).
+    """
+
+    def get(self, request):
+        qs = SubscriptionPlan.objects.filter(is_active=True).order_by("price_inr")
+        serializer = SubscriptionPlanSerializer(qs, many=True)
+        return Response(serializer.data)

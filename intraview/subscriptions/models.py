@@ -79,6 +79,7 @@ class UserSubscriptionManager(models.Manager):
         return self.filter(
             user=user,
             status=SubscriptionStatus.ACTIVE,
+            end_date__gt=timezone.now(),
         ).select_related("plan").first()
     
     def active_count_for_user(self, user):

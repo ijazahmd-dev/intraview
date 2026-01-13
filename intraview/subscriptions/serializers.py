@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .models import SubscriptionPlan
 
 
 
@@ -22,3 +23,25 @@ class UserSubscriptionSerializer(serializers.Serializer):
     ai_interviews_per_month = serializers.IntegerField()
     has_priority_booking = serializers.BooleanField()
     has_advanced_ai_feedback = serializers.BooleanField()
+
+
+
+
+
+
+class SubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = [
+            "id",
+            "name",
+            "description",
+            "price_inr",
+            "billing_cycle_days",
+            "monthly_free_tokens",
+            "ai_interviews_per_month",
+            "has_priority_booking",
+            "has_advanced_ai_feedback",
+            "is_active",
+        ]
+        read_only_fields = fields
