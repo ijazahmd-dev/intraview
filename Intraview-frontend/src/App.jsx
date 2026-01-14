@@ -37,6 +37,14 @@ import { fetchAdmin } from "./authentication/adminAuthSlice";
 import AdminInterviewerVerificationsPage from "./interviewerProfile/admin/pages/AdminInterviewerVerificationsPage";
 import InterviewerVerificationPage from "./interviewerProfile/interviewer/pages/InterviewerVerificationPage";
 import UserSubscriptionsPage from "./subscriptions/user/pages/UserSubscriptionsPage";
+import SubscriptionSuccess from "./subscriptions/user/pages/SubscriptionSuccess";
+import SubscriptionCancel from "./subscriptions/user/pages/SubscriptionCancel";
+import TokenBundlesPage from "./token_bundles/user/pages/TokenBundlesPage";
+import PaymentSuccess from "./token_bundles/user/pages/PaymentSuccess";
+import PaymentCancel from "./token_bundles/user/pages/PaymentCancel";
+import InterviewerSubscriptionsPage from "./subscriptions/interviewer/pages/InterviewerSubscriptionsPage";
+import InterviewerSubscriptionSuccess from "./subscriptions/interviewer/pages/InterviewerSubscriptionSuccess";
+import InterviewerSubscriptionCancel from "./subscriptions/interviewer/pages/InterviewerSubscriptionCancel";
 
 
 
@@ -78,7 +86,13 @@ function AppInner() {
                                                     <Home/>
                                                 // </ProtectedRoute>
                                                 } />
-                    <Route path="/subscriptions" element={<UserSubscriptionsPage />} />                            
+                    <Route path="/subscriptions" element={<UserSubscriptionsPage />} /> 
+                    <Route path="/subscriptions/success" element={<SubscriptionSuccess />} />
+                    <Route path="/subscriptions/cancel" element={<SubscriptionCancel />} />
+
+                    <Route path="/tokens" element={<TokenBundlesPage />} />   
+                    <Route path="/payment/success" element={<PaymentSuccess />} />
+                    <Route path="/payment/cancel" element={<PaymentCancel />} />                        
 
 
 
@@ -117,6 +131,10 @@ function AppInner() {
                         <Route path="availability" element={<InterviewerAvailabilityPage />} />
                         <Route path="verification" element={<InterviewerVerificationPage />} /> 
                     </Route>
+
+                    <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
+                    <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
+                    <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
                                                 
                                         
 

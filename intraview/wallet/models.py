@@ -14,6 +14,8 @@ class TokenTransactionType(models.TextChoices):
     SESSION_EARN = "SESSION_EARN", "Session Earned Tokens"
     REFUND = "REFUND", "Token Refund"
     ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT", "Admin Adjustment"
+    SUBSCRIPTION_GRANT = "SUBSCRIPTION_GRANT", "Subscription Grant"
+
 
 
 

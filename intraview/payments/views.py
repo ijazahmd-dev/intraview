@@ -19,8 +19,8 @@ from rest_framework.exceptions import ValidationError
 from wallet.services import TokenService
 from wallet.models import TokenTransactionType
 
-from .models import PaymentOrder,PaymentStatus
-from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer, InterviewerSubscriptionCheckoutSerializer
+from .models import PaymentOrder,PaymentStatus, TokenPack
+from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer, InterviewerSubscriptionCheckoutSerializer,TokenPackListSerializer
 from .services.stripe_token_bundle_service import StripeService
 from .services.stripe_subscription import StripeSubscriptionService
 from .services.stripe_interviewer_subscription import StripeInterviewerSubscriptionService
@@ -47,6 +47,34 @@ from interviewer_subscriptions.services.subscription_service import (
 
 logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
+
+
+
+
+
+class TokenPackListAPIView(APIView):
+    """
+    Public endpoint.
+    Lists active token packs for users to purchase.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        qs = TokenPack.objects.filter(is_active=True).order_by("price_inr")
+        serializer = TokenPackListSerializer(qs, many=True)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+
 
 
 class CreateTokenPurchaseAPIView(APIView):
@@ -243,8 +271,18 @@ class CreateSubscriptionCheckoutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        print("=== RAW DEBUG ===")
+        print("request.body:", request.body)
+        print("request.data:", request.data)
+        print("request.content_type:", request.content_type)
+        print("type(request.data.get('plan_id')):", type(request.data.get('plan_id')))
+
 
         serializer = SubscriptionCheckoutSerializer(data=request.data)
+        print("Serializer initial_data:", serializer.initial_data) 
+        if not serializer.is_valid():
+            print("SUB CHECKOUT ERRORS:", serializer.errors)
+            return Response(serializer.errors, status=400)
         serializer.is_valid(raise_exception=True)
 
 
@@ -438,12 +476,15 @@ class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
 
         plan = serializer.validated_data["plan_id"]  # ✅ This IS a Plan instance
 
+
         # 3️⃣ URLs
         success_url = (
             f"{settings.FRONTEND_URL}/interviewer/subscription/success"
+            f"?plan_id={plan.id}"
         )
         cancel_url = (
             f"{settings.FRONTEND_URL}/interviewer/subscription/cancel"
+            f"?plan_id={plan.id}"
         )
 
         # 4️⃣ Stripe checkout

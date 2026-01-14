@@ -813,20 +813,20 @@ class InterviewerDashboardProfileView(APIView):
                     status=400
                 )
             
-        # if any(
-        #     field in request.data
-        #     for field in ["is_profile_public", "is_accepting_bookings"]
-        # ):
-        #     if not InterviewerEntitlementService.has_active_subscription(request.user):
-        #         return Response(
-        #             {
-        #                 "detail": (
-        #                     "Active interviewer subscription required "
-        #                     "to go public or accept bookings."
-        #                 )
-        #             },
-        #             status=403,
-        #         ) 
+        if any(
+            field in request.data
+            for field in ["is_profile_public", "is_accepting_bookings"]
+        ):
+            if not InterviewerEntitlementService.has_active_subscription(request.user):
+                return Response(
+                    {
+                        "detail": (
+                            "Active interviewer subscription required "
+                            "to go public or accept bookings."
+                        )
+                    },
+                    status=403,
+                ) 
 
         serializer = InterviewerProfileSerializer(
             instance=profile,

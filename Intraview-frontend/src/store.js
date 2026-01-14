@@ -5,6 +5,7 @@ import interviewerAuthReducer from './authentication/interviewerAuthSlice'
 import authReducer from "./authentication/authSlice";
 import adminAuthReducer from "./authentication/adminAuthSlice";
 import subscriptionReducer from './subscriptions/subscriptionSlice';
+import tokenReducer from './token_bundles/tokenSlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,5 +16,6 @@ export const store = configureStore({
     auth: authReducer,
     adminAuth: adminAuthReducer,
     subscription: subscriptionReducer,
+    tokens: tokenReducer,
   },
 });

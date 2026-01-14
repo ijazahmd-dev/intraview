@@ -7,6 +7,17 @@ from interviewer_subscriptions.models import InterviewerSubscriptionPlan
 
 
 
+class TokenPackListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenPack
+        fields = [
+            "id",
+            "name",
+            "price_inr",
+            "tokens",
+            "is_active",
+        ]
+
 
 
 class CreatePaymentSerializer(serializers.Serializer):

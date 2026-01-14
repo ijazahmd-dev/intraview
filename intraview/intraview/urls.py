@@ -30,7 +30,7 @@ urlpatterns = [
     path("api/", include("interviewer_subscriptions.urls")),
     path("api/", include("subscriptions.urls")),
     path("api/", include("wallet.urls")),
-    path("api/", include("payments.urls")),
+    path("api/payments/", include("payments.urls")),
     path("api/", include("interviewer_subscriptions.urls")),
 
 ]

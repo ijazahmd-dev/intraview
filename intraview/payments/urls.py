@@ -5,6 +5,7 @@ from . import views_admin
 
 urlpatterns = [
     path("token-purchase/", views.CreateTokenPurchaseAPIView.as_view(), name="create-token-purchase"),
+    path("token-packs/", views.TokenPackListAPIView.as_view(), name="token-pack-list"),
     path("webhook/stripe/", views.StripeWebhookView.as_view(), name="stripe-webhook"),
 
     path("subscriptions/checkout/",views.CreateSubscriptionCheckoutAPIView.as_view(),name="subscription-checkout",),

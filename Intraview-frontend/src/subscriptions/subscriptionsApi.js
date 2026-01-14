@@ -2,10 +2,14 @@ import API from '../utils/axiosClient';
 
 
 
-export const subscriptionAPI = {
-  // Get user's current subscription
-  getCurrentSubscription: () => API.get('/api/subscriptions/me/'),
-  
-  // Get all available plans
-  getSubscriptionPlans: () => API.get('/api/subscriptions/plans/'),
+const ENDPOINTS = {
+  current: "/api/subscriptions/me/",  
+  plans: "/api/subscriptions/plans/",
+  checkout: "/api/payments/subscriptions/checkout/",
+};
+
+export const subscriptionsApi = {
+  getCurrentSubscription: () => API.get(ENDPOINTS.current),
+  getSubscriptionPlans: () => API.get(ENDPOINTS.plans),
+  createCheckout: (planId) => API.post(ENDPOINTS.checkout, { plan_id: planId }),
 };

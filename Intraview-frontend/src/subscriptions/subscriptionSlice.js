@@ -1,28 +1,20 @@
 import { startTransition } from 'react';
-import { subscriptionAPI } from './subscriptionsApi';
+import { subscriptionsApi } from './subscriptionsApi';
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 export const fetchCurrentSubscription = createAsyncThunk(
   'subscription/fetchCurrent',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await subscriptionAPI.getCurrentSubscription();
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch subscription');
-    }
+  async () => {
+    const response = await subscriptionsApi.getCurrentSubscription();
+    return response.data;
   }
 );
 
 export const fetchSubscriptionPlans = createAsyncThunk(
   'subscription/fetchPlans',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await subscriptionAPI.getSubscriptionPlans();
-      return response.data;
-    } catch (error) {
-      return rejectWithValue('Failed to fetch plans');
-    }
+  async () => {
+    const response = await subscriptionsApi.getSubscriptionPlans();
+    return response.data;
   }
 );
 
@@ -52,7 +44,7 @@ const subscriptionSlice = createSlice({
       })
       .addCase(fetchCurrentSubscription.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.error.message;
       })
       // Plans
       .addCase(fetchSubscriptionPlans.pending, (state) => {
@@ -65,7 +57,7 @@ const subscriptionSlice = createSlice({
       })
       .addCase(fetchSubscriptionPlans.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.error.message;
       });
   },
 });
