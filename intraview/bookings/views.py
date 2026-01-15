@@ -37,6 +37,7 @@ from .serializers import (
     CandidateUpcomingInterviewSerializer,
     CreateInterviewBookingSerializer, 
     CandidateInterviewerDetailSerializer,
+    BookingDetailSerializer,
 )
 
 
@@ -286,6 +287,7 @@ class CancelInterviewBookingAPIView(APIView):
 
     def post(self, request, booking_id):
         user = request.user
+        cancellation_reason = request.data.get('cancellation_reason', '').strip()
 
         with transaction.atomic():
             booking = (
@@ -314,6 +316,12 @@ class CancelInterviewBookingAPIView(APIView):
                     {"detail": "Cannot cancel started or completed bookings."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            
+            if not cancellation_reason:
+                return Response(
+                    {"detail": "Cancellation reason is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Lock candidate wallet (correct pattern)
             wallet = TokenService.get_or_create_wallet(user)
@@ -328,11 +336,17 @@ class CancelInterviewBookingAPIView(APIView):
                 note="Booking cancelled by candidate",
             )
 
-            booking.status = InterviewBooking.Status.CANCELLED
-            booking.save(update_fields=["status"])
+            booking.status = InterviewBooking.Status.CANCELLED_BY_CANDIDATE
+            booking.cancellation_reason = cancellation_reason
+            booking.cancelled_at = timezone.now()
+            booking.save(update_fields=["status","cancellation_reason","cancelled_at"])
 
         return Response(
-            {"status": "CANCELLED"},
+            {
+            "status": "CANCELLED_BY_CANDIDATE",
+            "message": "Booking cancelled successfully. Tokens refunded.",
+            "tokens_refunded": booking.token_cost
+            },
             status=status.HTTP_200_OK,
         )
     
@@ -446,6 +460,8 @@ class CandidatePastInterviewsAPIView(APIView):
                 status__in=[
                     InterviewBooking.Status.COMPLETED,
                     InterviewBooking.Status.CANCELLED,
+                    InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
+                    InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
                 ],
             )
             .select_related(
@@ -458,6 +474,34 @@ class CandidatePastInterviewsAPIView(APIView):
         serializer = CandidatePastInterviewSerializer(qs, many=True)
         return Response(serializer.data)
 
+
+
+
+
+
+class BookingDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking.objects.select_related(
+                "candidate",
+                "interviewer__interviewer_profile",
+                "availability",
+            ),
+            id=booking_id,
+        )
+
+        # ✅ Only candidate or interviewer can view
+        if booking.candidate != request.user and booking.interviewer != request.user:
+            return Response(
+                {"detail": "Not allowed."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = BookingDetailSerializer(booking)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 

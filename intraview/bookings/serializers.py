@@ -146,6 +146,8 @@ class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
 class CandidatePastInterviewSerializer(serializers.ModelSerializer):
     interviewer_name = serializers.CharField(source="interviewer.interviewer_profile.display_name")
     date = serializers.DateField(source="availability.date")
+    start_time = serializers.TimeField(source="availability.start_time")
+    end_time = serializers.TimeField(source="availability.end_time")
 
     class Meta:
         model = InterviewBooking
@@ -153,11 +155,55 @@ class CandidatePastInterviewSerializer(serializers.ModelSerializer):
             "id",
             "interviewer_name",
             "date",
+            "start_time",
+            "end_time",
             "status",
             "token_cost",
         ]
 
 
+
+
+
+
+class BookingDetailSerializer(serializers.ModelSerializer):
+    interviewer_id = serializers.IntegerField(source="interviewer.id", read_only=True)
+    interviewer_name = serializers.CharField(
+        source="interviewer.interviewer_profile.display_name",
+        read_only=True,
+        default=""
+    )
+
+    candidate_id = serializers.IntegerField(source="candidate.id", read_only=True)
+    candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "status",
+            "token_cost",
+
+            "start_datetime",
+            "end_datetime",
+
+            "cancellation_reason",
+            "cancelled_at",
+
+            "candidate_id",
+            "candidate_email",
+
+            "interviewer_id",
+            "interviewer_name",
+
+            "created_at",
+            "updated_at",
+        ]
+
+        
+    
+
+    
 
 
 
@@ -188,6 +234,61 @@ class InterviewerUpcomingSerializer(serializers.ModelSerializer):
             "date",
             "status",
         ]
+
+
+
+
+
+
+class InterviewerBookingDetailSerializer(serializers.ModelSerializer):
+    candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+
+    # Availability snapshot
+    date = serializers.DateField(source="availability.date", read_only=True)
+    start_time = serializers.TimeField(source="availability.start_time", read_only=True)
+    end_time = serializers.TimeField(source="availability.end_time", read_only=True)
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "status",
+            "token_cost",
+            "start_datetime",
+            "end_datetime",
+            "candidate_email",
+            "date",
+            "start_time",
+            "end_time",
+            "cancellation_reason",
+            "cancelled_at",
+            "created_at",
+        ]
+
+
+
+
+
+class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
+    candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+
+    date = serializers.DateField(source="availability.date", read_only=True)
+    start_time = serializers.TimeField(source="availability.start_time", read_only=True)
+    end_time = serializers.TimeField(source="availability.end_time", read_only=True)
+
+    class Meta:
+        model = InterviewBooking
+        fields = [
+            "id",
+            "candidate_email",
+            "date",
+            "start_time",
+            "end_time",
+            "status",
+            "token_cost",
+            "created_at",
+        ]
+
 
 
 

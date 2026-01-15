@@ -47,6 +47,11 @@ import InterviewerSubscriptionSuccess from "./subscriptions/interviewer/pages/In
 import InterviewerSubscriptionCancel from "./subscriptions/interviewer/pages/InterviewerSubscriptionCancel";
 import BrowseInterviewers from "./interviewBookings/user/pages/BrowseInterviewers";
 import InterviewerDetailPage from "./interviewBookings/user/pages/InterviewerDetailPage";
+import CandidateBookingsDashboard from "./interviewBookings/user/pages/CandidateBookingsDashboard";
+import BookingDetailPage from "./interviewBookings/user/pages/BookingDetailPage";
+import UpcomingSessionsPage from "./interviewBookings/interviewer/pages/UpcomingSessionsPage";
+import CompletedSessionsPage from "./interviewBookings/interviewer/pages/CompletedSessionsPage";
+import InterviewerBookingDetailPage from "./interviewBookings/interviewer/pages/InterviewerBookingDetailPage";
 
 
 
@@ -132,6 +137,9 @@ function AppInner() {
                         <Route path="profile" element={<InterviewerProfilePage />} />
                         <Route path="availability" element={<InterviewerAvailabilityPage />} />
                         <Route path="verification" element={<InterviewerVerificationPage />} /> 
+                        <Route path="upcoming" element={<UpcomingSessionsPage />} />
+                        <Route path="completed" element={<CompletedSessionsPage />} />
+                        <Route path="bookings/:bookingId" element={<InterviewerBookingDetailPage />} />
                     </Route>
 
                     <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
@@ -140,6 +148,8 @@ function AppInner() {
 
                     <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
                     <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
+                    <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
+                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
                                                 
                                         
 

@@ -2,9 +2,10 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 from .models import InterviewBooking
-from .serializers import InterviewerCancelBookingSerializer, InterviewerUpcomingSerializer
+from .serializers import InterviewerCancelBookingSerializer, InterviewerUpcomingSerializer, InterviewerBookingDetailSerializer, InterviewerCompletedSessionSerializer
 from authentication.authentication import InterviewerCookieJWTAuthentication
 from wallet.models import TokenTransactionType,TokenTransaction
 from django.db import models
@@ -75,7 +76,7 @@ class InterviewerCancelBookingAPIView(APIView):
                 TokenService.unlock_tokens(
                     wallet=candidate_wallet,
                     amount=booking.token_cost,
-                    transaction_type="BOOKING_CANCEL_INTERVIEWER",
+                    transaction_type= TokenTransactionType.BOOKING_CANCEL_INTERVIEWER ,
                     reference_id=f"booking_{booking.id}",
                     note="Booking cancelled by interviewer",
                 )
@@ -142,9 +143,18 @@ class InterviewerHistoryAPIView(APIView):
     permission_classes = [IsAuthenticated, IsActiveInterviewer]
 
     def get(self, request):
-        bookings = InterviewBooking.objects.filter(
-            interviewer=request.user,
-            status=InterviewBooking.Status.COMPLETED,
+        qs = (
+            InterviewBooking.objects
+            .filter(
+                interviewer=request.user,
+                status__in=[
+                    InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
+                    InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
+                    InterviewBooking.Status.CANCELLED
+                ]
+            )
+            .select_related("candidate", "availability")
+            .order_by("-end_datetime")
         )
 
         earned = (
@@ -156,8 +166,37 @@ class InterviewerHistoryAPIView(APIView):
             .aggregate(total=models.Sum("amount"))["total"] or 0
         )
 
+        serializer = InterviewerCompletedSessionSerializer(qs, many=True)
+
         return Response({
-            "completed_sessions": bookings,
-            "completed_sessions_count": bookings.count(),
+            "completed_sessions": serializer.data,
+            "completed_sessions_count": qs.count(),
             "tokens_earned": earned,
         })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class InterviewerBookingDetailAPIView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+    def get(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking.objects.select_related("candidate", "availability"),
+            id=booking_id,
+            interviewer=request.user,   # ✅ interviewer ownership protection
+        )
+
+        serializer = InterviewerBookingDetailSerializer(booking)
+        return Response(serializer.data)
