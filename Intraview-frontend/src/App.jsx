@@ -45,6 +45,8 @@ import PaymentCancel from "./token_bundles/user/pages/PaymentCancel";
 import InterviewerSubscriptionsPage from "./subscriptions/interviewer/pages/InterviewerSubscriptionsPage";
 import InterviewerSubscriptionSuccess from "./subscriptions/interviewer/pages/InterviewerSubscriptionSuccess";
 import InterviewerSubscriptionCancel from "./subscriptions/interviewer/pages/InterviewerSubscriptionCancel";
+import BrowseInterviewers from "./interviewBookings/user/pages/BrowseInterviewers";
+import InterviewerDetailPage from "./interviewBookings/user/pages/InterviewerDetailPage";
 
 
 
@@ -135,6 +137,9 @@ function AppInner() {
                     <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
                     <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
                     <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
+
+                    <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
+                    <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
                                                 
                                         
 

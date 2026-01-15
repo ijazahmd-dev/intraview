@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from authentication.models import CustomUser
-from interviewers.models import InterviewerAvailability
+from interviewers.models import InterviewerAvailability,InterviewerProfile
 from .models import InterviewBooking
 
 from wallet.models import TokenTransaction, TokenTransactionType
@@ -47,13 +47,68 @@ class CandidateAvailabilitySerializer(serializers.ModelSerializer):
 
 
 
+
+
+
+class CandidateInterviewerDetailSerializer(serializers.ModelSerializer):
+    interviewer_id = serializers.IntegerField(source="user.id", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+
+    verification_status = serializers.CharField(
+        source="user.verification.status",
+        read_only=True
+    )
+
+    class Meta:
+        model = InterviewerProfile
+        fields = [
+            "interviewer_id",
+            "email",
+
+            # core
+            "display_name",
+            "headline",
+            "bio",
+            "profile_picture",
+            "years_of_experience",
+            "location",
+            "timezone",
+
+            # tags
+            "specializations",
+            "languages",
+            "education",
+            "certifications",
+            "industries",
+
+            # public flags
+            "is_profile_public",
+            "is_accepting_bookings",
+
+            # verification
+            "verification_status",
+
+            # timestamps (optional but useful)
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+
+
+
+
+
+
+
 class CreateInterviewBookingSerializer(serializers.Serializer):
 
     availability_id = serializers.IntegerField()
 
     def validate_availability_id(self, value):
         try:
-            availability = InterviewerAvailability.ojects.filter(
+            availability = InterviewerAvailability.objects.get(
                 id=value,
                 is_active=True
             )

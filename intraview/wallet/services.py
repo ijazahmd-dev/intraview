@@ -143,6 +143,7 @@ class TokenService:
         *,
         wallet: TokenWallet,
         amount: int,
+        transaction_type: str,
         reference_id: str | None = None,
         note: str = "",
     ) -> TokenTransaction:
@@ -167,7 +168,7 @@ class TokenService:
 
         return TokenTransaction.objects.create(
             wallet=wallet,
-            transaction_type=TokenTransactionType.BOOKING_LOCK,
+            transaction_type=transaction_type,
             amount=-amount,
             balance_after=wallet.balance,
             locked_balance_after=wallet.locked_balance,

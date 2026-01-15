@@ -3,6 +3,7 @@ from django.utils import timezone
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.contrib.auth import get_user_model
 
 
 from rest_framework.views import APIView
@@ -20,20 +21,33 @@ from .models import InterviewBooking
 from wallet.services import TokenService
 from wallet.models import TokenTransactionType, TokenWallet, TokenTransaction
 from subscriptions.services.entitlement_service import SubscriptionEntitlementService
+from interviewers.models import InterviewerAvailability,InterviewerProfile, VerificationStatus
+from interviewer_subscriptions.services.entitlement_service import InterviewerEntitlementService
+
 
 from subscriptions.services.entitlement_service import (
     SubscriptionEntitlementService,
 )
+from interviewer_subscriptions.services.entitlement_service import InterviewerEntitlementService
 from .serializers import (
     CandidateInterviewerListSerializer,
     CandidateAvailabilitySerializer,
     InterviewerCancelBookingSerializer,
     CandidatePastInterviewSerializer,
-    CandidateUpcomingInterviewSerializer
+    CandidateUpcomingInterviewSerializer,
+    CreateInterviewBookingSerializer, 
+    CandidateInterviewerDetailSerializer,
 )
-from .serializers import CreateInterviewBookingSerializer
+
+
+
+
+
 
 # Create your views here.
+
+
+User = get_user_model()
 
 
 class CandidateInterviewerListAPIView(APIView):
@@ -49,17 +63,65 @@ class CandidateInterviewerListAPIView(APIView):
                 interviewer_status=InterviewerStatus.ACTIVE,
                 interviewer_profile__is_profile_public=True,
                 interviewer_profile__is_accepting_bookings=True,
-                interviewer_profile__verification__status="APPROVED",
+
+                # ✅ FIX HERE
+                verification__status="APPROVED",
+
                 availabilities__date__gte=today,
                 availabilities__is_active=True,
             )
             .distinct()
-            .select_related("interviewer_profile")
+            .select_related("interviewer_profile", "verification")  # ✅ Optional improvement
         )
 
         serializer = CandidateInterviewerListSerializer(qs, many=True)
         return Response(serializer.data)
     
+
+
+
+
+class CandidateInterviewerDetailAPIView(APIView):
+    """
+    Candidate-facing interviewer profile detail API.
+    Only returns profiles that are:
+    - ACTIVE interviewers (interviewer_status=ACTIVE)
+    - Public profile enabled
+    - Accepting bookings enabled
+    - Verification APPROVED
+    """
+
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request, interviewer_id: int):
+        # ✅ User must be an ACTIVE interviewer
+        interviewer = get_object_or_404(
+            CustomUser.objects.select_related("interviewer_profile", "verification"),
+            id=interviewer_id,
+            role="interviewer",
+            interviewer_status="ACTIVE",
+        )
+
+        # ✅ Must have profile
+        profile = get_object_or_404(
+            InterviewerProfile,
+            user=interviewer,
+            is_profile_public=True,
+            is_accepting_bookings=True,
+        )
+
+        # ✅ Must be verified
+        # (If verification row may not exist, handle safely)
+        if not hasattr(interviewer, "verification") or interviewer.verification.status != VerificationStatus.APPROVED:
+            return Response(
+                {"detail": "Interviewer is not verified."},
+                status=404,
+            )
+
+        serializer = CandidateInterviewerDetailSerializer(profile)
+        return Response(serializer.data)
+
 
 
 
@@ -79,11 +141,13 @@ class CandidateInterviewerAvailabilityAPIView(APIView):
             interviewer_status=InterviewerStatus.ACTIVE,
             interviewer_profile__is_profile_public=True,
             interviewer_profile__is_accepting_bookings=True,
-            interviewer_profile__verification__status="APPROVED",
+
+            # ✅ FIX HERE (Correct relation)
+            verification__status="APPROVED",
         )
 
-        # Enforce interviewer subscription
-        if not SubscriptionEntitlementService.has_subscription(interviewer):
+        # ✅ FIX: correct entitlement check (interviewer subscription)
+        if not InterviewerEntitlementService.has_active_subscription(interviewer):
             return Response([], status=200)
 
         qs = InterviewerAvailability.objects.filter(
@@ -91,6 +155,7 @@ class CandidateInterviewerAvailabilityAPIView(APIView):
             is_active=True,
             date__gte=today,
         )
+        print("availability list",qs)
 
         if date_filter:
             qs = qs.filter(date=date_filter)
@@ -126,9 +191,9 @@ class CreateInterviewBookingAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not SubscriptionEntitlementService.has_subscription(interviewer):
+        if not InterviewerEntitlementService.has_active_subscription(interviewer):
             return Response(
-                {"detail": "Interviewer is not accepting bookings."},
+                {"detail": "Interviewer does not have an active interviewer subscription."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -416,6 +481,32 @@ class CandidateTokenSummaryAPIView(APIView):
             "tokens_spent": abs(spent),
             "current_balance": request.user.token_balance,
         })
+    
+
+
+
+class CandidateTokenBalanceAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request):
+        from wallet.services import TokenService
+        
+        wallet = TokenService.get_or_create_wallet(request.user)
+        spent = (
+            TokenTransaction.objects
+            .filter(
+                wallet=wallet,
+                transaction_type=TokenTransactionType.SESSION_SPEND,
+            )
+            .aggregate(total=models.Sum("amount"))["total"] or 0
+        )
+        
+        return Response({
+            "token_balance": wallet.balance,
+            "tokens_spent": abs(spent) if spent else 0,
+            "tokens_available": wallet.balance,
+        }, status=status.HTTP_200_OK)
 
 
 
