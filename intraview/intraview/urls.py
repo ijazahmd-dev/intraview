@@ -29,7 +29,7 @@ urlpatterns = [
     path("api/", include("interviewers.urls")),
     path("api/", include("interviewer_subscriptions.urls")),
     path("api/", include("subscriptions.urls")),
-    path("api/", include("wallet.urls")),
+    path("api/wallet/", include("wallet.urls")),
     path("api/payments/", include("payments.urls")),
     path("api/", include("interviewer_subscriptions.urls")),
     path("api/bookings/", include("bookings.urls")),

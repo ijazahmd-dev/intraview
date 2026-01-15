@@ -7,6 +7,89 @@ import django_filters
 
 
 
+class CandidateWalletSummarySerializer(serializers.Serializer):
+    total_balance = serializers.IntegerField()
+    locked_balance = serializers.IntegerField()
+    available_balance = serializers.IntegerField()
+
+
+
+class CandidateWalletTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenTransaction
+        fields = [
+            "id",
+            "transaction_type",
+            "amount",
+            "balance_after",
+            "locked_balance_after",
+            "reference_id",
+            "note",
+            "created_at",
+        ]
+
+
+
+
+class CandidateWalletStatsSerializer(serializers.Serializer):
+    tokens_purchased_total = serializers.IntegerField()
+    tokens_spent_total = serializers.IntegerField()
+    tokens_refunded_total = serializers.IntegerField()
+    tokens_locked_now = serializers.IntegerField()
+
+    transactions_count = serializers.IntegerField()
+
+
+
+
+
+
+
+################################################    INTERVIEWER SERIALIZERS    ###################################################
+
+
+
+
+class InterviewerWalletSummarySerializer(serializers.Serializer):
+    total_balance = serializers.IntegerField()
+    locked_balance = serializers.IntegerField()
+    available_balance = serializers.IntegerField()
+
+
+class InterviewerWalletTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenTransaction
+        fields = [
+            "id",
+            "transaction_type",
+            "amount",
+            "balance_after",
+            "locked_balance_after",
+            "reference_id",
+            "note",
+            "created_at",
+        ]
+
+
+class InterviewerWalletStatsSerializer(serializers.Serializer):
+    tokens_purchased_total = serializers.IntegerField()
+    tokens_earned_total = serializers.IntegerField()
+    tokens_spent_total = serializers.IntegerField()
+    tokens_refunded_total = serializers.IntegerField()
+    tokens_locked_now = serializers.IntegerField()
+    transactions_count = serializers.IntegerField()
+
+
+class InterviewerEarningsSerializer(serializers.Serializer):
+    tokens_earned_total = serializers.IntegerField()
+    earnings_last_7_days = serializers.IntegerField()
+    earnings_last_30_days = serializers.IntegerField()
+    completed_sessions_count = serializers.IntegerField()
+
+
+
+
+
 ################################################ ADMIN SERIALIZERS ###################################################
 
 class AdminTokenWalletSerializer(serializers.ModelSerializer):

@@ -127,6 +127,7 @@ class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
     date = serializers.DateField(source="availability.date")
     start_time = serializers.TimeField(source="availability.start_time")
     end_time = serializers.TimeField(source="availability.end_time")
+    
 
     class Meta:
         model = InterviewBooking
@@ -225,6 +226,9 @@ class InterviewerCancelBookingSerializer(serializers.Serializer):
 class InterviewerUpcomingSerializer(serializers.ModelSerializer):
     candidate_email = serializers.EmailField(source="candidate.email")
     date = serializers.DateField(source="availability.date")
+    start_time = serializers.TimeField(source="availability.start_time", read_only=True)
+    end_time = serializers.TimeField(source="availability.end_time", read_only=True)
+    
 
     class Meta:
         model = InterviewBooking
@@ -232,7 +236,10 @@ class InterviewerUpcomingSerializer(serializers.ModelSerializer):
             "id",
             "candidate_email",
             "date",
+            "start_time",
+            "end_time",
             "status",
+            "token_cost",
         ]
 
 

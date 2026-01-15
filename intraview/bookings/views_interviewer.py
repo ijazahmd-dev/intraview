@@ -148,6 +148,7 @@ class InterviewerHistoryAPIView(APIView):
             .filter(
                 interviewer=request.user,
                 status__in=[
+                    InterviewBooking.Status.COMPLETED,
                     InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
                     InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
                     InterviewBooking.Status.CANCELLED
