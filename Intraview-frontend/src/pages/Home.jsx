@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Pause, SkipBack, SkipForward, RotateCcw, Settings, Maximize2, Mic, Target, Clock, Lightbulb } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../authentication/authSlice';
+import { Link } from "react-router-dom";
 
 
 export default function Home() {
@@ -20,7 +21,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      {/* <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-2">
@@ -37,6 +38,70 @@ export default function Home() {
               <a href="#" className="text-gray-600 hover:text-gray-900">Demo</a>
               <a href="#" className="text-gray-600 hover:text-gray-900">Subscribe</a>
             </nav>
+              <div className="flex items-center space-x-4">
+              {user ? (
+                <button 
+                  onClick={() => dispatch(logoutUser())}
+                  className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-medium"
+                >
+                  Logout
+                </button>
+              ) : (
+                <>
+                  <button 
+                    onClick={handleLogin}
+                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+                  >
+                    Log In
+                  </button>
+                  <button 
+                    onClick={handleSignup}
+                    className="bg-teal-500 hover:bg-teal-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-medium shadow-sm"
+                  >
+                    Sign Up
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </header> */}
+
+       <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">In</span>
+              </div>
+              <span className="text-xl font-bold text-gray-900">IntraView</span>
+            </div>
+            <nav className="hidden md:flex space-x-8">
+              <Link to="/" className="text-gray-600 hover:text-gray-900">
+                Home
+              </Link>
+
+              <Link to="/about" className="text-gray-600 hover:text-gray-900">
+                About
+              </Link>
+
+              <Link to="/candidate/interviewers" className="text-gray-600 hover:text-gray-900">
+                Interviewers
+              </Link>
+
+              <Link to="/candidate/dashboard/upcoming" className="text-gray-600 hover:text-gray-900">
+                Sessions
+              </Link>
+
+              <Link to="/candidate/wallet" className="text-gray-600 hover:text-gray-900">
+                Wallet
+              </Link>
+
+              <Link to="/subscriptions" className="text-gray-600 hover:text-gray-900">
+                Subscriptions
+              </Link>
+            </nav>
+
               <div className="flex items-center space-x-4">
               {user ? (
                 <button 

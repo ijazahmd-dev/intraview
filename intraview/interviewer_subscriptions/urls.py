@@ -31,14 +31,14 @@ urlpatterns = [
 
 
     path(
-        "interviewer-subscriptions/plans/",
+        "plans/",
         views.InterviewerSubscriptionPlanListAPIView.as_view(),
         name="interviewer-subscription-plans",
     ),
 
     # ✅ Current subscription
     path(
-        "interviewer-subscriptions/me/",
+        "me/",
         views.InterviewerCurrentSubscriptionAPIView.as_view(),
         name="interviewer-current-subscription",
     ),

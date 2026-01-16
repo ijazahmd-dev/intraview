@@ -106,7 +106,12 @@ function AppInner() {
                     <Route path="/payment/success" element={<PaymentSuccess />} />
                     <Route path="/payment/cancel" element={<PaymentCancel />} />   
 
-                    <Route path="/candidate/wallet" element={<CandidateWalletPage />} />                     
+                    <Route path="/candidate/wallet" element={<CandidateWalletPage />} />    
+
+                    <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
+                    <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
+                    <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
+                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />                 
 
 
 
@@ -147,18 +152,17 @@ function AppInner() {
                         <Route path="upcoming" element={<UpcomingSessionsPage />} />
                         <Route path="completed" element={<CompletedSessionsPage />} />
                         <Route path="bookings/:bookingId" element={<InterviewerBookingDetailPage />} />
+                        <Route path="wallet" element={<InterviewerWalletPage />} />
+                        <Route path="subscriptions" element={<InterviewerSubscriptionsPage />} />
                     </Route>
 
                     <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
                     <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
                     <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
 
-                    <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
-                    <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
-                    <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
-                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
+                    
 
-                    <Route path="/interviewer/wallet" element={<InterviewerWalletPage />} />
+                    
                                                 
                                         
 

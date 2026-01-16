@@ -195,15 +195,31 @@ const navItems = [
       </svg>
     )
   },
-  // { 
-  //   to: "/interviewer/dashboard/bookings",  // Dynamic bookings handled by React Router
-  //   label: "Bookings", 
-  //   icon: (
-  //     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  //       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-  //     </svg>
-  //   )
-  // },
+  {
+  to: "/interviewer/dashboard/wallet",
+  label: "Wallet",
+  icon: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m2-6h-4a2 2 0 100 4h4m0-4v4" />
+    </svg>
+  ),
+},
+{
+  to: "/interviewer/dashboard/subscriptions",
+  label: "Subscriptions",
+  icon: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M8 7h8m-8 4h8m-8 4h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+      />
+    </svg>
+  ),
+},
+
+
 
   
 

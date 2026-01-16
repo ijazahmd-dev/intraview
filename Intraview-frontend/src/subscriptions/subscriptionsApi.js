@@ -3,8 +3,8 @@ import API from '../utils/axiosClient';
 
 
 const ENDPOINTS = {
-  current: "/api/subscriptions/me/",  
-  plans: "/api/subscriptions/plans/",
+  current: "/api/user-subscriptions/subscriptions/me/",  
+  plans: "/api/user-subscriptions/subscriptions/plans/",
   checkout: "/api/payments/subscriptions/checkout/",
 };
 

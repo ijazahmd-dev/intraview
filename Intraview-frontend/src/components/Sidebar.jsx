@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Home, Users, UserCheck, Building2, Video, 
   FileText, Database, Bell, CreditCard, 
-  Settings, HelpCircle, ChevronLeft, ChevronRight, X, Share2, IdCard,  
+  Settings, HelpCircle, ChevronLeft, ChevronRight, X, Share2, IdCard, Layers, Package
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom'; 
 
@@ -15,6 +15,9 @@ export default function Sidebar() {
     { icon: Users, label: 'Users', path: '/admin/users', fullLabel: 'User Management' },
     { icon: UserCheck, label: 'Interviewer Applicati...', path: '/admin/interviewers', fullLabel: 'Interviewer Applications' },
     { icon: IdCard, label: 'Interviewer KYC', path: '/admin/interviewers/verifications', fullLabel: 'Interviewer Verification',},
+    { icon: CreditCard, label: 'Token Packs', path: '/admin/token-packs', fullLabel: 'Token Packs' },
+    { icon: FileText, label: 'User Plans', path: '/admin/subscription-plans', fullLabel: 'User Subscription Plans' },
+    { icon: UserCheck, label: 'Interviewer Plans', path: '/admin/interviewer-subscription-plans', fullLabel: 'Interviewer Subscription Plans' },
     { icon: Building2, label: 'Companies', path: '/admin/companies', fullLabel: 'Companies' },
     { icon: Video, label: 'Sessions', path: '/admin/sessions', badge: 12, fullLabel: 'Interview Sessions' },
     { icon: FileText, label: 'Reports', path: '/admin/reports', fullLabel: 'Reports' },
