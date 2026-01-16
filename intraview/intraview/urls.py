@@ -27,11 +27,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/',include('authentication.urls')),
     path("api/", include("interviewers.urls")),
-    path("api/", include("interviewer_subscriptions.urls")),
-    path("api/", include("subscriptions.urls")),
+    path("api/interviewer-subscriptions/", include("interviewer_subscriptions.urls")),
+    path("api/user-subscriptions/", include("subscriptions.urls")),
     path("api/wallet/", include("wallet.urls")),
     path("api/payments/", include("payments.urls")),
-    path("api/", include("interviewer_subscriptions.urls")),
     path("api/bookings/", include("bookings.urls")),
 
 ]

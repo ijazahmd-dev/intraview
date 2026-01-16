@@ -52,6 +52,11 @@ import BookingDetailPage from "./interviewBookings/user/pages/BookingDetailPage"
 import UpcomingSessionsPage from "./interviewBookings/interviewer/pages/UpcomingSessionsPage";
 import CompletedSessionsPage from "./interviewBookings/interviewer/pages/CompletedSessionsPage";
 import InterviewerBookingDetailPage from "./interviewBookings/interviewer/pages/InterviewerBookingDetailPage";
+import CandidateWalletPage from "./wallets/user/pages/CandidateWalletPage";
+import InterviewerWalletPage from "./wallets/interviewer/pages/InterviewerWalletPage";
+import AdminSubscriptionPlansPage from "./subscriptions/admin/pages/AdminSubscriptionPlansPage";
+import AdminInterviewerSubscriptionPlansPage from "./subscriptions/admin/pages/AdminInterviewerSubscriptionPlansPage";
+import AdminTokenPacksPage from "./token_bundles/admin/pages/AdminTokenPacksPage";
 
 
 
@@ -99,7 +104,9 @@ function AppInner() {
 
                     <Route path="/tokens" element={<TokenBundlesPage />} />   
                     <Route path="/payment/success" element={<PaymentSuccess />} />
-                    <Route path="/payment/cancel" element={<PaymentCancel />} />                        
+                    <Route path="/payment/cancel" element={<PaymentCancel />} />   
+
+                    <Route path="/candidate/wallet" element={<CandidateWalletPage />} />                     
 
 
 
@@ -150,6 +157,8 @@ function AppInner() {
                     <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
                     <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
                     <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
+
+                    <Route path="/interviewer/wallet" element={<InterviewerWalletPage />} />
                                                 
                                         
 
@@ -189,6 +198,10 @@ function AppInner() {
                             <AdminInterviewerVerificationsPage />
                           </AdminProtectedRoute>
                     }/>
+                    <Route path="/admin/subscription-plans" element={ <AdminProtectedRoute><AdminSubscriptionPlansPage /></AdminProtectedRoute> } />
+                    <Route path="/admin/interviewer-subscription-plans" element={ <AdminProtectedRoute><AdminInterviewerSubscriptionPlansPage /></AdminProtectedRoute> } />
+
+                    <Route path="/admin/token-packs" element={ <AdminProtectedRoute><AdminTokenPacksPage /></AdminProtectedRoute>   } />
                     
 
       </Routes>

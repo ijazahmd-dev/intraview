@@ -1,9 +1,34 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from . import views_admin
+
+
+router = DefaultRouter()
+router.register(
+    r"interviewer-subscription-plans",
+    views_admin.AdminInterviewerSubscriptionPlanViewSet,
+    basename="admin-interviewer-subscription-plans",
+)
+router.register(
+    r"interviewer-subscriptions",
+    views_admin.AdminInterviewerSubscriptionViewSet,
+    basename="admin-interviewer-subscriptions",
+)
 
 
 
 urlpatterns = [
+
+
+    # admin urls
+    path("", include(router.urls)),
+
+
+
+
+
+
 
     path(
         "interviewer-subscriptions/plans/",

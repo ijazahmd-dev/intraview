@@ -21,9 +21,6 @@ class InterviewerSubscriptionPlanSerializer(serializers.ModelSerializer):
 
 
 
-
-
-
 class InterviewerCurrentSubscriptionSerializer(serializers.Serializer):
     # Core
     has_subscription = serializers.BooleanField()
@@ -78,3 +75,62 @@ class InterviewerCurrentSubscriptionSerializer(serializers.Serializer):
             "is_expired": is_expired,
             "days_remaining": days_remaining,
         }
+    
+
+
+
+
+
+
+
+################################################ADMIN API SERIALIZERS ####################################
+
+
+
+
+
+class AdminInterviewerSubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InterviewerSubscriptionPlan
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "price_inr",
+            "billing_cycle_days",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+
+
+
+
+class AdminInterviewerSubscriptionSerializer(serializers.ModelSerializer):
+    interviewer_email = serializers.EmailField(source="interviewer.email", read_only=True)
+    plan_name = serializers.CharField(source="plan.name", read_only=True)
+    plan_slug = serializers.CharField(source="plan.slug", read_only=True)
+
+    class Meta:
+        model = InterviewerSubscription
+        fields = [
+            "id",
+            "interviewer",
+            "interviewer_email",
+            "plan",
+            "plan_name",
+            "plan_slug",
+            "status",
+            "start_date",
+            "end_date",
+            "renewal_date",
+            "stripe_subscription_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "stripe_subscription_id",
+            "created_at",
+            "updated_at",
+        ]

@@ -6,6 +6,11 @@ import authReducer from "./authentication/authSlice";
 import adminAuthReducer from "./authentication/adminAuthSlice";
 import subscriptionReducer from './subscriptions/subscriptionSlice';
 import tokenReducer from './token_bundles/tokenSlice';
+import candidateWalletReducer from './wallets/candidateWalletSlice';
+import interviewerWalletReducer from './wallets/interviewerWalletSlice';
+import adminSubscriptionReducer from './subscriptions/adminSubscriptionSlice';
+import adminInterviewerSubscriptionReducer from './subscriptions/adminInterviewerSubscriptionSlice';
+import adminTokenPackReducer from './token_bundles/adminTokenPackSlice';
 
 export const store = configureStore({
   reducer: {
@@ -17,5 +22,10 @@ export const store = configureStore({
     adminAuth: adminAuthReducer,
     subscription: subscriptionReducer,
     tokens: tokenReducer,
+    candidateWallet: candidateWalletReducer,
+    interviewerWallet: interviewerWalletReducer,
+    adminSubscription: adminSubscriptionReducer,
+    adminInterviewerSubscription: adminInterviewerSubscriptionReducer,
+    adminTokenPack: adminTokenPackReducer,
   },
 });

@@ -45,3 +45,40 @@ class SubscriptionPlanSerializer(serializers.ModelSerializer):
             "is_active",
         ]
         read_only_fields = fields
+
+
+
+
+
+
+####################################################ADMIN API SERIALIZERS ####################################
+
+
+
+class AdminSubscriptionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = [
+            "id",
+            "name",
+            "description",
+            "price_inr",
+            "billing_cycle_days",
+            "monthly_free_tokens",
+            "ai_interviews_per_month",
+            "has_priority_booking",
+            "has_advanced_ai_feedback",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_price_inr(self, value):
+        if value < 0:
+            raise serializers.ValidationError("price_inr must be >= 0")
+        return value
+
+    def validate_billing_cycle_days(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("billing_cycle_days must be > 0")
+        return value
