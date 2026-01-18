@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.utils import timezone
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -215,6 +215,14 @@ class CreateInterviewBookingAPIView(APIView):
                     {"detail": "Slot no longer available."},
                     status=status.HTTP_409_CONFLICT,
                 )
+            
+            today = timezone.localdate()
+            if availability.date <= today:
+                return Response(
+                    {"detail": "You can only book sessions from tomorrow onwards."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
 
             if availability.remaining_capacity() <= 0:
                 return Response(
@@ -316,6 +324,16 @@ class CancelInterviewBookingAPIView(APIView):
                     {"detail": "Cannot cancel started or completed bookings."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            
+            now = timezone.now()
+            
+            cancel_deadline = booking.start_datetime - timedelta(hours=5)
+            if now > cancel_deadline:
+                return Response(
+                    {"detail": "You can only cancel up to 5 hours before the session."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                
             
             if not cancellation_reason:
                 return Response(
@@ -432,7 +450,7 @@ class CandidateUpcomingInterviewsAPIView(APIView):
             .filter(
                 candidate=request.user,
                 status=InterviewBooking.Status.CONFIRMED,
-                start_datetime__gt=timezone.now(),
+                end_datetime__gt=timezone.now(),
             )
             .select_related(
                 "availability",
@@ -440,6 +458,8 @@ class CandidateUpcomingInterviewsAPIView(APIView):
             )
             .order_by("start_datetime")
         )
+
+        
 
         serializer = CandidateUpcomingInterviewSerializer(qs, many=True)
         return Response(serializer.data)
@@ -453,22 +473,41 @@ class CandidatePastInterviewsAPIView(APIView):
     authentication_classes = [CookieJWTAuthentication]
 
     def get(self, request):
+        # qs = (
+        #     InterviewBooking.objects
+        #     .filter(
+        #         candidate=request.user,
+        #         status__in=[
+        #             InterviewBooking.Status.COMPLETED,
+        #             InterviewBooking.Status.CANCELLED,
+        #             InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
+        #             InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
+        #         ],
+        #     )
+        #     .select_related(
+        #         "availability",
+        #         "interviewer__interviewer_profile",
+        #     )
+        #     .order_by("-created_at")
+        # )
+        now = timezone.now()
         qs = (
             InterviewBooking.objects
+            .filter(candidate=request.user)
             .filter(
-                candidate=request.user,
-                status__in=[
+                models.Q(end_datetime__lte=now)
+                | models.Q(status__in=[
                     InterviewBooking.Status.COMPLETED,
                     InterviewBooking.Status.CANCELLED,
                     InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
                     InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
-                ],
+                ])
             )
             .select_related(
                 "availability",
                 "interviewer__interviewer_profile",
             )
-            .order_by("-created_at")
+            .order_by("-start_datetime")
         )
 
         serializer = CandidatePastInterviewSerializer(qs, many=True)

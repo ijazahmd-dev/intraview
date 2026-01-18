@@ -4,19 +4,31 @@ from . import views_admin
 
 
 urlpatterns = [
-    path("token-purchase/", views.CreateTokenPurchaseAPIView.as_view(), name="create-token-purchase"),
+    
     path("token-packs/", views.TokenPackListAPIView.as_view(), name="token-pack-list"),
+    path('order/<str:internal_order_id>/', views.PaymentOrderRetrieveAPIView.as_view(), name='payment-order-retrieve'),
+    path('invoice/<str:internal_order_id>/', views.PaymentInvoiceDownloadAPIView.as_view(), name='payment-invoice-download'),
+
+    path("token-purchase/", views.CreateTokenPurchaseAPIView.as_view(), name="create-token-purchase"),
     path("webhook/stripe/", views.StripeWebhookView.as_view(), name="stripe-webhook"),
 
     path("subscriptions/checkout/",views.CreateSubscriptionCheckoutAPIView.as_view(),name="subscription-checkout",),
     path("subscriptions/webhook/stripe/",views.StripeSubscriptionWebhookView.as_view(),name="stripe-subscription-webhook",),
+
+
+
+
+####################################################################  Interviewer APIs ############################################################
+
 
     path("interviewer/subscription/checkout/",views.CreateInterviewerSubscriptionCheckoutAPIView.as_view(),name="interviewer-subscription-checkout",),
     path("interviewer-subscriptions/webhook/stripe/",views.StripeInterviewerSubscriptionWebhookView.as_view(),name="stripe-interviewer-subscription-webhook",),
 
 
 
-    ####################################################################  Admin APIs  ############################################################
+####################################################################  Admin APIs ############################################################
+
+  
 
 
 

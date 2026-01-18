@@ -14,13 +14,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 
 from wallet.services import TokenService
 from wallet.models import TokenTransactionType
 
 from .models import PaymentOrder,PaymentStatus, TokenPack
-from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer, InterviewerSubscriptionCheckoutSerializer,TokenPackListSerializer
+from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer, InterviewerSubscriptionCheckoutSerializer,TokenPackListSerializer, PaymentOrderSerializer
 from .services.stripe_token_bundle_service import StripeService
 from .services.stripe_subscription import StripeSubscriptionService
 from .services.stripe_interviewer_subscription import StripeInterviewerSubscriptionService
@@ -30,6 +30,7 @@ from subscriptions.services.token_grant_service import SubscriptionTokenGrantSer
 from subscriptions.models import SubscriptionStatus, SubscriptionPlan, UserSubscription
 from authentication.authentication import InterviewerCookieJWTAuthentication
 from authentication.permissions import IsActiveInterviewer
+from .utils import generate_payment_invoice_pdf
 from interviewer_subscriptions.services.entitlement_service import (
     InterviewerEntitlementService,
 )
@@ -68,11 +69,83 @@ class TokenPackListAPIView(APIView):
 
 
 
+class PaymentOrderRetrieveAPIView(APIView):
+    """
+    Retrieve PaymentOrder details by internal_order_id for success page.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, internal_order_id):
+        try:
+            # Fetch order for authenticated user only
+            payment_order = PaymentOrder.objects.select_related(
+                'user', 'token_pack'
+            ).get(
+                internal_order_id=internal_order_id,
+                user=request.user,
+                status=PaymentStatus.SUCCEEDED  # Only successful payments
+            )
+
+            # Serialize response
+            serializer = PaymentOrderSerializer(payment_order)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except PaymentOrder.DoesNotExist:
+            return Response(
+                {'error': 'Payment order not found or access denied.'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 
 
 
+class PaymentInvoiceDownloadAPIView(APIView):
+    """
+    Generates and downloads PDF invoice for successful PaymentOrder.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, internal_order_id):
+        try:
+            # 1️⃣ Fetch PaymentOrder by internal_order_id
+            payment_order = PaymentOrder.objects.select_related(
+                'user', 'token_pack'
+            ).get(
+                internal_order_id=internal_order_id,
+                user=request.user,
+                status=PaymentStatus.SUCCEEDED
+            )
+
+            # 2️⃣ Generate PDF invoice
+            pdf_buffer = generate_payment_invoice_pdf(payment_order)
+            
+            # 3️⃣ Return as downloadable file
+            response = HttpResponse(
+                pdf_buffer, 
+                content_type='application/pdf'
+            )
+            response['Content-Disposition'] = f'attachment; filename="Intraview_Invoice_{payment_order.internal_order_id}.pdf"'
+            
+            logger.info(
+                f"Invoice downloaded for PaymentOrder {payment_order.id} by user {request.user.id}"
+            )
+            
+            return response
+            
+        except PaymentOrder.DoesNotExist:
+            raise NotFound("Invoice not found or access denied.")
+        except Exception as e:
+            logger.error(f"Invoice generation failed: {e}")
+            raise ValidationError("Failed to generate invoice.")
+
+
+
+
+
+################################################ Stripe views ################################################
 
 
 
@@ -577,3 +650,11 @@ class StripeInterviewerSubscriptionWebhookView(View):
                 return HttpResponse(status=500)
 
         return HttpResponse(status=200)
+    
+
+
+
+
+
+
+################################################ Stripe views end  ################################################

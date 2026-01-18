@@ -20,6 +20,20 @@ class TokenPackListSerializer(serializers.ModelSerializer):
 
 
 
+
+class PaymentOrderSerializer(serializers.ModelSerializer):
+    token_pack = TokenPackListSerializer(read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = PaymentOrder
+        fields = [
+            'id', 'internal_order_id', 'amount_inr', 'currency', 'status',
+            'created_at', 'updated_at', 'token_pack', 'user_email'
+        ]
+
+
+
 class CreatePaymentSerializer(serializers.Serializer):
     token_pack_id = serializers.IntegerField(min_value=1)
 
