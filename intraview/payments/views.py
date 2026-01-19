@@ -41,6 +41,7 @@ from interviewer_subscriptions.services.entitlement_service import (
 from interviewer_subscriptions.services.subscription_service import (
     InterviewerSubscriptionService,
 )
+from interviewer_subscriptions.models import InterviewerSubscriptionPlan, InterviewerSubscription, InterviewerSubscriptionStatus, InterviewerPaymentOrder
 from django.contrib.auth import get_user_model
 
 
@@ -645,6 +646,7 @@ class StripeSubscriptionWebhookView(View):
 
 
 
+
 class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
     authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsActiveInterviewer]
@@ -652,63 +654,76 @@ class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
     def post(self, request):
         interviewer = request.user
 
-        # 1️⃣ Prevent duplicate active subscriptions
+        # ✅ Prevent duplicate active subscriptions
         if InterviewerEntitlementService.has_active_subscription(interviewer):
-            raise ValidationError(
-                "You already have an active interviewer subscription."
-            )
+            raise ValidationError("You already have an active interviewer subscription.")
 
-        # 2️⃣ Validate plan
-        serializer = InterviewerSubscriptionCheckoutSerializer(
-            data=request.data
-        )
+        # ✅ Validate plan
+        serializer = InterviewerSubscriptionCheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        plan = serializer.validated_data["plan_id"]  # ✅ This IS a Plan instance
+        plan = serializer.validated_data["plan_id"]  # Plan instance
 
-        payment_order = SubscriptionPaymentOrder.objects.create(
-            user=interviewer,  # ✅ interviewer IS a User
-            subscription=None,  # Webhook will set
+        # ✅ Create payment order FIRST (CREATED)
+        payment_order = InterviewerPaymentOrder.objects.create(
+            user=interviewer,
+            subscription=None,  # webhook will attach
             plan=plan,
             amount_inr=plan.price_inr,
             status=PaymentStatus.CREATED,
             internal_order_id=f"INT-ORD-{interviewer.id}-{int(time.time())}",
         )
 
-
-
-        # 3️⃣ URLs
+        # ✅ URLs
         success_url = (
             f"{settings.FRONTEND_URL}/interviewer/subscription/success"
             f"?order_id={payment_order.internal_order_id}"
         )
         cancel_url = (
             f"{settings.FRONTEND_URL}/interviewer/subscription/cancel"
-            f"?plan_id={plan.id}"
+            f"?order_id={payment_order.internal_order_id}"
         )
 
-        # 4️⃣ Stripe checkout
-        session = StripeInterviewerSubscriptionService.create_checkout_session(
-            interviewer=interviewer,
-            plan=plan,
-            success_url=success_url,
-            cancel_url=cancel_url,
-            payment_order_id=payment_order.internal_order_id,
-        )
+        try:
+            # ✅ Create Stripe checkout session
+            session = StripeInterviewerSubscriptionService.create_checkout_session(
+                interviewer=interviewer,
+                plan=plan,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                payment_order_id=payment_order.internal_order_id,
+            )
 
-        logger.info(
-            "Interviewer subscription checkout created | interviewer=%s | plan=%s",
-            interviewer.id,
-            plan.id,
-            payment_order.internal_order_id,
-        )
+            # ✅ IMPORTANT: update order to PENDING (waiting for webhook payment success)
+            payment_order.status = PaymentStatus.PENDING
+            payment_order.stripe_checkout_session_id = session.id
+            payment_order.save(update_fields=["status", "stripe_checkout_session_id", "updated_at"])
 
-        return Response(
-            {"checkout_url": session.url},
-            status=status.HTTP_201_CREATED,
-        )
+            logger.info(
+                "Interviewer subscription checkout created | interviewer=%s | plan=%s | order=%s | session=%s",
+                interviewer.id,
+                plan.id,
+                payment_order.internal_order_id,
+                session.id,
+            )
+
+            return Response(
+                {
+                    "checkout_url": session.url,
+                    "order_id": payment_order.internal_order_id,  # ✅ helpful for frontend
+                    "session_id": session.id,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            # ✅ If Stripe fails, mark order FAILED
+            payment_order.status = PaymentStatus.FAILED
+            payment_order.save(update_fields=["status", "updated_at"])
+
+            logger.exception("Stripe interviewer checkout failed | order=%s", payment_order.internal_order_id)
+            raise ValidationError("Unable to initiate interviewer subscription checkout.")
     
-
 
 
 
@@ -716,8 +731,7 @@ class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
 @method_decorator(csrf_exempt, name="dispatch")
 class StripeInterviewerSubscriptionWebhookView(View):
     """
-    Stripe webhook for interviewer subscription lifecycle.
-    Stripe is the source of truth.
+    Handles Stripe webhook events for INTERVIEWER subscriptions only.
     """
 
     def post(self, request):
@@ -726,9 +740,9 @@ class StripeInterviewerSubscriptionWebhookView(View):
 
         try:
             event = stripe.Webhook.construct_event(
-                payload,
-                sig_header,
-                settings.STRIPE_WEBHOOK_SECRET,
+                payload=payload,
+                sig_header=sig_header,
+                secret=settings.STRIPE_WEBHOOK_SECRET,
             )
         except ValueError:
             logger.warning("Interviewer webhook: invalid payload")
@@ -738,48 +752,142 @@ class StripeInterviewerSubscriptionWebhookView(View):
             return HttpResponse(status=400)
 
         event_type = event["type"]
+        obj = event["data"]["object"]
+        metadata = obj.get("metadata", {}) or {}
 
-        # -----------------------------------------
-        # Subscription checkout completed
-        # -----------------------------------------
+        # ✅ Only handle interviewer subscription events
+        if metadata.get("subscription_type") != "INTERVIEWER":
+            return HttpResponse(status=200)
+
+        # ---------------------------------------------------------
+        # ✅ 1) Checkout Completed → Activate subscription + mark paid
+        # ---------------------------------------------------------
         if event_type == "checkout.session.completed":
-            session = event["data"]["object"]
-            metadata = session.get("metadata", {})
-
-            if metadata.get("subscription_type") != "INTERVIEWER":
-                return HttpResponse(status=200)
-
             try:
                 interviewer_id = int(metadata["interviewer_id"])
                 plan_id = int(metadata["plan_id"])
+                payment_order_id = metadata.get("payment_order_id")
+
+                stripe_subscription_id = obj.get("subscription") or obj.get("id")
+                stripe_checkout_session_id = obj.get("id")
+
             except (KeyError, ValueError):
                 logger.error("Interviewer webhook missing metadata: %s", metadata)
                 return HttpResponse(status=400)
 
-            stripe_subscription_id = (
-                session.get("subscription") or session.get("id")
-            )
-
-            logger.info(
-                "Interviewer subscription webhook | interviewer=%s | plan=%s | stripe_sub=%s",
-                interviewer_id,
-                plan_id,
-                stripe_subscription_id,
-            )
-
             try:
-                InterviewerSubscriptionService.activate_subscription(
-                    interviewer_id=interviewer_id,
-                    plan_id=plan_id,
-                    stripe_subscription_id=str(stripe_subscription_id),
+                with transaction.atomic():
+                    interviewer = User.objects.select_for_update().get(id=interviewer_id)
+                    plan = InterviewerSubscriptionPlan.objects.get(id=plan_id)
+
+                    # ✅ Activate interviewer subscription
+                    subscription = InterviewerSubscriptionService.activate_subscription(
+                        interviewer_id=interviewer_id,
+                        plan_id=plan_id,
+                        stripe_subscription_id=str(stripe_subscription_id),
+                    )
+
+                    # ✅ Update InterviewerPaymentOrder
+                    if payment_order_id:
+                        payment_order = InterviewerPaymentOrder.objects.select_for_update().get(
+                            internal_order_id=payment_order_id,
+                            user=interviewer,
+                        )
+
+                        payment_order.status = PaymentStatus.SUCCEEDED
+                        payment_order.stripe_checkout_session_id = stripe_checkout_session_id
+                        payment_order.stripe_subscription_id = str(stripe_subscription_id)
+                        payment_order.subscription = subscription
+                        payment_order.period_start = timezone.now()
+                        payment_order.period_end = timezone.now() + timedelta(days=plan.billing_cycle_days)
+                        payment_order.save()
+
+                logger.info(
+                    "✅ Interviewer subscription activated | interviewer=%s | plan=%s | order=%s | sub=%s",
+                    interviewer_id,
+                    plan_id,
+                    payment_order_id,
+                    stripe_subscription_id,
                 )
+
+                return HttpResponse(status=200)
+
+            except InterviewerPaymentOrder.DoesNotExist:
+                logger.error("InterviewerPaymentOrder not found | order_id=%s", payment_order_id)
+                return HttpResponse(status=404)
+
             except Exception:
-                # Never fail Stripe webhook
-                logger.exception("Failed to activate interviewer subscription")
+                logger.exception("Interviewer checkout.session.completed failed")
+                return HttpResponse(status=500)
+
+        # ---------------------------------------------------------
+        # ✅ 2) Renewal invoice payment succeeded → create new order row
+        # ---------------------------------------------------------
+        elif event_type == "invoice.payment_succeeded":
+            try:
+                stripe_subscription_id = obj.get("subscription")
+                stripe_invoice_id = obj.get("id")
+
+                if not stripe_subscription_id:
+                    return HttpResponse(status=200)
+
+                subscription = InterviewerSubscription.objects.select_related(
+                    "interviewer",
+                    "plan",
+                ).get(stripe_subscription_id=stripe_subscription_id)
+
+                # ✅ Create a NEW payment order record for renewal (audit trail)
+                InterviewerPaymentOrder.objects.create(
+                    user=subscription.interviewer,
+                    subscription=subscription,
+                    plan=subscription.plan,
+                    amount_inr=subscription.plan.price_inr,
+                    currency="INR",
+                    status=PaymentStatus.SUCCEEDED,
+                    stripe_invoice_id=stripe_invoice_id,
+                    stripe_subscription_id=stripe_subscription_id,
+                    internal_order_id=f"INT-REN-{subscription.interviewer.id}-{int(timezone.now().timestamp())}",
+                    period_start=timezone.now(),
+                    period_end=timezone.now() + timedelta(days=subscription.plan.billing_cycle_days),
+                )
+
+                logger.info(
+                    "✅ Interviewer renewal recorded | sub=%s | invoice=%s",
+                    stripe_subscription_id,
+                    stripe_invoice_id,
+                )
+
+            except InterviewerSubscription.DoesNotExist:
+                logger.warning("Interviewer renewal invoice for unknown subscription: %s", stripe_subscription_id)
+
+            except Exception:
+                logger.exception("Interviewer invoice.payment_succeeded failed")
+                return HttpResponse(status=500)
+
+        # ---------------------------------------------------------
+        # ✅ 3) Subscription cancelled on Stripe → mark cancelled locally
+        # ---------------------------------------------------------
+        elif event_type == "customer.subscription.deleted":
+            try:
+                stripe_subscription_id = obj.get("id")
+                if not stripe_subscription_id:
+                    return HttpResponse(status=200)
+
+                sub = InterviewerSubscription.objects.get(stripe_subscription_id=stripe_subscription_id)
+                sub.status = InterviewerSubscriptionStatus.CANCELLED
+                sub.save(update_fields=["status"])
+
+                logger.info("✅ Interviewer subscription cancelled | sub=%s", stripe_subscription_id)
+
+            except InterviewerSubscription.DoesNotExist:
+                logger.warning("Cancellation received for unknown interviewer subscription: %s", stripe_subscription_id)
+
+            except Exception:
+                logger.exception("Interviewer subscription cancel handler failed")
                 return HttpResponse(status=500)
 
         return HttpResponse(status=200)
-    
+
 
 
 

@@ -6,6 +6,7 @@ const ENDPOINTS = {
   plans: "/api/interviewer-subscriptions/plans/",
   current: "/api/interviewer-subscriptions/me/",
   checkout: "/api/payments/interviewer/subscription/checkout/",
+  invoiceDownload: (orderId) => `/api/interviewer-subscriptions/invoice/${orderId}/`,
 };
 
 export const interviewerSubscriptionsApi = {
@@ -14,4 +15,10 @@ export const interviewerSubscriptionsApi = {
   createCheckout: (planId) => API.post(ENDPOINTS.checkout, { 
     plan_id: planId 
   }),
+  downloadSubscriptionInvoice: async (orderId) => {
+    const response = await API.get(ENDPOINTS.invoiceDownload(orderId), {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
 };

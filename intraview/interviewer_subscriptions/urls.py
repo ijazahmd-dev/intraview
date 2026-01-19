@@ -42,5 +42,6 @@ urlpatterns = [
         views.InterviewerCurrentSubscriptionAPIView.as_view(),
         name="interviewer-current-subscription",
     ),
+    path('invoice/<str:internal_order_id>/', views.InterviewerSubscriptionInvoiceDownloadAPIView.as_view(), name='interviewer-invoice-download'),
 
 ]
