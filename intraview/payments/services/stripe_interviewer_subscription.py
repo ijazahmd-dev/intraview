@@ -7,7 +7,17 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class StripeInterviewerSubscriptionService:
     @staticmethod
-    def create_checkout_session(*, interviewer, plan, success_url, cancel_url):
+    def create_checkout_session(*, interviewer, plan, success_url, cancel_url, payment_order_id=None):
+
+        metadata = {
+            "interviewer_id": str(interviewer.id),
+            "plan_id": str(plan.id),
+            "subscription_type": "INTERVIEWER",
+        }
+
+        if payment_order_id:  
+            metadata["payment_order_id"] = payment_order_id
+
         session = stripe.checkout.Session.create(
             mode="subscription",
             payment_method_types=["card"],
@@ -26,11 +36,7 @@ class StripeInterviewerSubscriptionService:
                     "quantity": 1,
                 }
             ],
-            metadata={
-                "interviewer_id": str(interviewer.id),
-                "plan_id": str(plan.id),
-                "subscription_type": "INTERVIEWER",
-            },
+            metadata=metadata,
             success_url=success_url,
             cancel_url=cancel_url,
         )

@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from payments.models import PaymentStatus
 
 
 # Create your models here.
@@ -170,6 +171,72 @@ class UserSubscription(models.Model):
 
 
 
+
+
+
+class SubscriptionPaymentOrder(models.Model):
+    """
+    Tracks subscription payments (one-time + renewals).
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscription_payments"
+    )
+    subscription = models.ForeignKey(
+        UserSubscription,
+        on_delete=models.PROTECT,
+        related_name="payment_orders",
+        null=True,
+        blank=True,
+    )
+    plan = models.ForeignKey(
+        SubscriptionPlan,
+        on_delete=models.PROTECT,
+    )
+    
+    amount_inr = models.PositiveIntegerField()
+    currency = models.CharField(max_length=3, default="INR")
+    
+    status = models.CharField(
+        max_length=20,
+        choices=PaymentStatus.choices,  # Reuse from token payments
+        default=PaymentStatus.CREATED
+    )
+    
+    # Stripe identifiers
+    stripe_checkout_session_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    stripe_invoice_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    
+    internal_order_id = models.CharField(max_length=50, blank=True, unique=True)
+    
+    period_start = models.DateTimeField(null=True, blank=True)
+    period_end = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "status", "-created_at"]),
+            models.Index(fields=["stripe_checkout_session_id"]),
+            models.Index(fields=["internal_order_id"]),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(amount_inr__gt=0), name="subscription_amount_positive"),
+        ]
+
+
+
+
+
+
+
+
+
+
 class SubscriptionTokenGrant(models.Model):
     """
     Tracks monthly token grants per subscription billing cycle.
@@ -204,3 +271,8 @@ class SubscriptionTokenGrant(models.Model):
             f"SubscriptionGrant(sub={self.subscription_id}, "
             f"tokens={self.tokens_granted})"
         )
+    
+
+
+
+

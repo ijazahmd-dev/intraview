@@ -1,12 +1,16 @@
-from django.shortcuts import render
+from django.shortcuts import render, HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from rest_framework.exceptions import NotFound
+
 
 
 from .serializers import UserSubscriptionSerializer, SubscriptionPlanSerializer
-from .models import SubscriptionPlan
+from .models import SubscriptionPlan, SubscriptionPaymentOrder, PaymentStatus
+from authentication.authentication import CookieJWTAuthentication
+from .utils import generate_subscription_invoice_pdf
 
 # Create your views here.
 
@@ -87,3 +91,34 @@ class SubscriptionPlanListAPIView(APIView):
         qs = SubscriptionPlan.objects.filter(is_active=True).order_by("price_inr")
         serializer = SubscriptionPlanSerializer(qs, many=True)
         return Response(serializer.data)
+    
+
+
+
+
+class SubscriptionInvoiceDownloadAPIView(APIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, internal_order_id):
+        try:
+            payment_order = SubscriptionPaymentOrder.objects.select_related(
+                'user', 'subscription__plan'
+            ).get(
+                internal_order_id=internal_order_id,
+                user=request.user,
+                status=PaymentStatus.SUCCEEDED
+            )
+
+            pdf_buffer = generate_subscription_invoice_pdf(payment_order)
+            
+            response = HttpResponse(pdf_buffer, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Intraview_Subscription_Invoice_{payment_order.internal_order_id}.pdf"'
+            
+            return response
+            
+        except SubscriptionPaymentOrder.DoesNotExist:
+            raise NotFound("Subscription invoice not found.")
+    
+
+

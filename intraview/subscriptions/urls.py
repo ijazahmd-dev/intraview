@@ -19,9 +19,6 @@ urlpatterns = [
 
     #USER urls
     path("subscriptions/me/",views.UserCurrentSubscriptionAPIView.as_view(),name="user-current-subscription",),
-    path(
-        "subscriptions/plans/",
-        views.SubscriptionPlanListAPIView.as_view(),
-        name="subscription-plan-list",
-    ),
+    path("subscriptions/plans/",views.SubscriptionPlanListAPIView.as_view(),name="subscription-plan-list",),
+    path('subscriptions/invoice/<str:internal_order_id>/', views.SubscriptionInvoiceDownloadAPIView.as_view(), name='subscription-invoice-download'),
 ]

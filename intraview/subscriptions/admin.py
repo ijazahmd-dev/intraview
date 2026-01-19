@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import SubscriptionPlan, UserSubscription, SubscriptionTokenGrant
+from .models import SubscriptionPlan, UserSubscription, SubscriptionTokenGrant, SubscriptionPaymentOrder
 
 # Register your models here.
 
@@ -7,3 +7,4 @@ from .models import SubscriptionPlan, UserSubscription, SubscriptionTokenGrant
 admin.site.register(SubscriptionPlan)
 admin.site.register(UserSubscription)
 admin.site.register(SubscriptionTokenGrant)
+admin.site.register(SubscriptionPaymentOrder)
