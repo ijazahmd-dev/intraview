@@ -50,6 +50,18 @@ class InterviewBooking(models.Model):
 
     cancellation_reason = models.TextField(blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    rescheduled_by = models.CharField(
+    max_length=20,
+    choices=[
+        ("CANDIDATE", "Candidate"),
+        ("INTERVIEWER", "Interviewer"),
+    ],
+    null=True, 
+    blank=True
+)
+    rescheduled_at = models.DateTimeField(null=True, blank=True)
+    reschedule_reason = models.TextField(blank=True, max_length=500)
+    reschedule_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

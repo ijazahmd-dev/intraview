@@ -1,4 +1,7 @@
 from rest_framework import serializers
+from django.utils import timezone as django_timezone
+from django.utils import timezone
+from datetime import datetime
 from authentication.models import CustomUser
 from interviewers.models import InterviewerAvailability,InterviewerProfile
 from .models import InterviewBooking
@@ -33,18 +36,35 @@ class CandidateInterviewerListSerializer(serializers.ModelSerializer):
         ]
 
 
+
 class CandidateAvailabilitySerializer(serializers.ModelSerializer):
+    start_datetime = serializers.SerializerMethodField()
+    end_datetime = serializers.SerializerMethodField()
+    remaining_capacity = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+
     class Meta:
         model = InterviewerAvailability
         fields = [
-            "id",
-            "date",
-            "start_time",
-            "end_time",
-            "timezone",
+            "id", "title", "start_datetime", "end_datetime", 
+            "remaining_capacity", "timezone"
         ]
 
+    def get_start_datetime(self, obj):
+        """✅ FIXED: Use django_timezone.make_aware"""
+        dt = django_timezone.make_aware(datetime.combine(obj.date, obj.start_time))
+        return dt.isoformat()
 
+    def get_end_datetime(self, obj):
+        """✅ FIXED: Use django_timezone.make_aware"""
+        dt = django_timezone.make_aware(datetime.combine(obj.date, obj.end_time))
+        return dt.isoformat()
+
+    def get_remaining_capacity(self, obj):
+        return obj.remaining_capacity()
+
+    def get_title(self, obj):
+        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
 
 
 
@@ -204,6 +224,50 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         
     
 
+
+class CandidateRescheduleSerializer(serializers.Serializer):
+    new_availability_id = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(max_length=500, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        booking = self.context["booking"]
+        new_id = attrs["new_availability_id"]
+
+        # ✅ Get new availability
+        try:
+            new_avail = InterviewerAvailability.objects.get(
+                id=new_id,
+                interviewer=booking.availability.interviewer,  # Same interviewer
+                is_active=True,
+            )
+        except InterviewerAvailability.DoesNotExist:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Availability not found or inactive."}
+            )
+
+        # ❌ Cannot reschedule to same slot
+        if new_avail.id == booking.availability.id:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Cannot reschedule to the same slot."}
+            )
+
+        # ✅ Capacity check
+        if new_avail.remaining_capacity() <= 0:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Selected slot is already full."}
+            )
+
+        # ✅ Future slot (CORRECT timezone handling)
+        new_start_naive = datetime.combine(new_avail.date, new_avail.start_time)
+        new_start_aware = timezone.make_aware(new_start_naive)  # Django TZ
+        if new_start_aware <= timezone.now():
+            raise serializers.ValidationError(
+                {"new_availability_id": "Can only reschedule to future slots."}
+            )
+
+        # ✅ ADD TO ATTRS (fixes validated_data access)
+        attrs["new_availability"] = new_avail
+        return attrs
     
 
 
@@ -300,6 +364,61 @@ class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
 
 
 
+
+
+
+class InterviewerRescheduleSerializer(serializers.Serializer):
+    new_availability_id = serializers.IntegerField(min_value=1)
+    reason = serializers.CharField(max_length=500, allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        booking = self.context["booking"]
+        new_id = attrs["new_availability_id"]
+
+        # ✅ Must be interviewer's own availability
+        try:
+            new_avail = InterviewerAvailability.objects.get(
+                id=new_id,
+                interviewer=booking.availability.interviewer,  # Must own it
+                is_active=True,
+            )
+        except InterviewerAvailability.DoesNotExist:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Availability not found or inactive."}
+            )
+
+   
+        if new_avail.id == booking.availability.id:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Cannot reschedule to the same slot."}
+            )
+
+        # ✅ Capacity check
+        if new_avail.remaining_capacity() <= 0:
+            raise serializers.ValidationError(
+                {"new_availability_id": "Selected slot is already full."}
+            )
+
+        # ✅ Future slot only
+        new_start_naive = datetime.combine(new_avail.date, new_avail.start_time)
+        new_start_aware = timezone.make_aware(new_start_naive)
+        if new_start_aware <= timezone.now():
+            raise serializers.ValidationError(
+                {"new_availability_id": "Can only reschedule to future slots."}
+            )
+
+        attrs["new_availability"] = new_avail
+        return attrs
+
+
+
+
+
+
+
+
+
+
 ############################################### Interviewer Serializers  End ##############################################
 
 
@@ -309,7 +428,7 @@ class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
 
 
 
-############################################### Admin Serializers  End ##############################################
+############################################### Admin Serializers   ##############################################
 
 
 

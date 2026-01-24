@@ -57,6 +57,7 @@ import InterviewerWalletPage from "./wallets/interviewer/pages/InterviewerWallet
 import AdminSubscriptionPlansPage from "./subscriptions/admin/pages/AdminSubscriptionPlansPage";
 import AdminInterviewerSubscriptionPlansPage from "./subscriptions/admin/pages/AdminInterviewerSubscriptionPlansPage";
 import AdminTokenPacksPage from "./token_bundles/admin/pages/AdminTokenPacksPage";
+import InterviewerCalendarBookingPage from "./interviewBookings/user/pages/InterviewerCalendarBookingPage";
 
 
 
@@ -111,7 +112,8 @@ function AppInner() {
                     <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
                     <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
                     <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
-                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />                 
+                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
+                    <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />                 
 
 
 

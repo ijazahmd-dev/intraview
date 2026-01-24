@@ -1,36 +1,3 @@
-// import API from '../utils/axiosClient';
-
-
-// const ENDPOINTS = {
-//   interviewers: '/api/bookings/candidates/interviewers/',
-//   interviewerDetail: (id) => `/api/bookings/candidates/interviewers/${id}/`,
-//   availability: (id) => `/api/bookings/candidates/interviewers/${id}/availability/`,
-
-// };
-
-// export const candidateBookingsApi = {
-//   getInterviewers: (params = {}) =>
-//     API.get(ENDPOINTS.interviewers, { params }),
-
-//   getInterviewerDetail: (interviewerId) =>
-//     API.get(ENDPOINTS.interviewerDetail(interviewerId)),
-
-//   getAvailability: (interviewerId, date) =>
-//     API.get(ENDPOINTS.availability(interviewerId), {
-//       params: date ? { date } : {},
-//     }),
-
-//   createBooking: (availabilityId) => 
-//   API.post('/api/bookings/create-booking/', { availability_id: availabilityId }),
-
-
-//   getTokenBalance: () => API.get('/api/bookings/candidate/token-balance/'),
-// };
-
-
-
-
-
 
 
 
@@ -40,7 +7,7 @@ const ENDPOINTS = {
   // Interviewer endpoints
   interviewers: '/api/bookings/candidates/interviewers/',
   interviewerDetail: (id) => `/api/bookings/candidates/interviewers/${id}/`,
-  availability: (id, date) => `/api/bookings/candidates/interviewers/${id}/availability/`,
+  calendarAvailability: (id, date) => `/api/bookings/candidates/interviewers/${id}/calendar/`,
   
   // Booking creation
   createBooking: '/api/bookings/create-booking/',
@@ -67,8 +34,8 @@ export const candidateBookingsApi = {
   getInterviewerDetail: (interviewerId) =>
     API.get(ENDPOINTS.interviewerDetail(interviewerId)),
 
-  getAvailability: (interviewerId, date) =>
-    API.get(ENDPOINTS.availability(interviewerId), {
+  getCalendarAvailability: (interviewerId, date) =>
+    API.get(ENDPOINTS.calendarAvailability(interviewerId), {
       params: date ? { date } : {},
     }),
 
@@ -99,4 +66,9 @@ export const candidateBookingsApi = {
 
   getTokenSummary: () =>
     API.get(ENDPOINTS.tokenSummary),
+
+  rescheduleBooking: (bookingId, data) =>
+    API.post(`/api/bookings/bookings/${bookingId}/reschedule/`, data),
 };
+
+

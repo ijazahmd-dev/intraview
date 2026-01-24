@@ -1,4 +1,5 @@
 from django.shortcuts import render
+import logging
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
@@ -32,12 +33,12 @@ from interviewer_subscriptions.services.entitlement_service import InterviewerEn
 from .serializers import (
     CandidateInterviewerListSerializer,
     CandidateAvailabilitySerializer,
-    InterviewerCancelBookingSerializer,
     CandidatePastInterviewSerializer,
     CandidateUpcomingInterviewSerializer,
     CreateInterviewBookingSerializer, 
     CandidateInterviewerDetailSerializer,
     BookingDetailSerializer,
+    CandidateRescheduleSerializer
 )
 
 
@@ -49,6 +50,7 @@ from .serializers import (
 
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class CandidateInterviewerListAPIView(APIView):
@@ -132,9 +134,12 @@ class CandidateInterviewerAvailabilityAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, interviewer_id):
+        print(f"🔍 DEBUG: interviewer_id={interviewer_id}")
         today = timezone.localdate()
         date_filter = request.query_params.get("date")
+        print(f"🔍 DEBUG: today={today}, date_filter={date_filter}")
 
+        # ✅ FIXED: Correct relation path (use your actual model structure)
         interviewer = get_object_or_404(
             CustomUser,
             id=interviewer_id,
@@ -142,30 +147,34 @@ class CandidateInterviewerAvailabilityAPIView(APIView):
             interviewer_status=InterviewerStatus.ACTIVE,
             interviewer_profile__is_profile_public=True,
             interviewer_profile__is_accepting_bookings=True,
-
-            # ✅ FIX HERE (Correct relation)
-            verification__status="APPROVED",
+            verification__status="APPROVED",  
         )
+        print(f"🔍 DEBUG: interviewer found={interviewer.username}")
 
-        # ✅ FIX: correct entitlement check (interviewer subscription)
         if not InterviewerEntitlementService.has_active_subscription(interviewer):
+            print("🔍 DEBUG: No active subscription")
             return Response([], status=200)
 
+        # ✅ FIXED: No remaining_capacity__gt=0 (method, not field)
         qs = InterviewerAvailability.objects.filter(
             interviewer=interviewer,
             is_active=True,
             date__gte=today,
-        )
-        print("availability list",qs)
+        ).order_by("date", "start_time")
+        print(f"🔍 DEBUG: RAW QS COUNT={qs.count()}")
 
         if date_filter:
             qs = qs.filter(date=date_filter)
-
-        qs = qs.order_by("date", "start_time")
+        print(f"🔍 DEBUG: FINAL QS COUNT={qs.count()}")    
 
         serializer = CandidateAvailabilitySerializer(qs, many=True)
-        return Response(serializer.data)
-    
+
+        
+        # ✅ FIXED: Filter AFTER serialization
+        data = [slot for slot in serializer.data if slot["remaining_capacity"] > 0]
+
+        print(f"🔍 DEBUG: SERIALIZED {len(data)} slots")
+        return Response(data)
 
 
 
@@ -368,6 +377,7 @@ class CancelInterviewBookingAPIView(APIView):
             status=status.HTTP_200_OK,
         )
     
+
 
 
 
@@ -597,92 +607,180 @@ class CandidateTokenBalanceAPIView(APIView):
 
 
 
-############################################Interviewer Api ##########################################################
+
+
+class CandidateRescheduleInterviewApiView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def get(self, request, booking_id):
+        booking = get_object_or_404(InterviewBooking, id=booking_id)
+        availability_id = request.query_params.get("availability_id")
+        if not availability_id:
+            return Response(
+                {"detail":"availability id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            ) 
+        availability = get_object_or_404(InterviewerAvailability, id=availability_id)
+        if availability.candidate != request.user:
+            return Response(
+                {"detail":"Not allowed"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        if booking.candidate != request.user:
+            return Response(
+                {"detail":"Not allowed"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        booking.availability = availability
+        booking.save(update_fields=["availability", 'updated_at'])
+
+        return Response(
+            {
+                "detail":"Availability updated"
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 
 
 
-class InterviewerCancelBookingAPIView(APIView):
-    authentication_classes = [InterviewerCookieJWTAuthentication]
-    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+
+
+
+
+
+
+RESCHEDULE_LIMIT_HOURS = 3
+TOKEN_COST = 10
+
+
+
+class CandidateRescheduleBookingView(APIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, booking_id):
-        serializer = InterviewerCancelBookingSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
 
-        reason = serializer.validated_data["reason"]
-
-        try:
-            with transaction.atomic():
-                # 🔒 Lock booking
+            # 🔒 Lock booking row
+            try:
                 booking = (
                     InterviewBooking.objects
                     .select_for_update()
-                    .select_related("candidate", "interviewer", "availability")
-                    .get(id=booking_id)
-                )
-
-                # 🔐 Ownership check
-                if booking.interviewer != request.user:
-                    return Response(
-                        {"detail": "You are not allowed to cancel this booking."},
-                        status=status.HTTP_403_FORBIDDEN,
+                    .select_related("availability", "interviewer", "candidate")
+                    .get(
+                        id=booking_id,
+                        candidate=request.user,
+                        status=InterviewBooking.Status.CONFIRMED,
                     )
-
-                # 🔁 Idempotency
-                if booking.status != InterviewBooking.Status.CONFIRMED:
-                    return Response(
-                        {"detail": "Only confirmed bookings can be cancelled."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # ⏱ Time gate
-                if booking.start_datetime <= timezone.now():
-                    return Response(
-                        {"detail": "Cannot cancel a started or completed session."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # 🔒 Lock candidate wallet
-                candidate_wallet = TokenService.get_or_create_wallet(
-                    booking.candidate
                 )
-                candidate_wallet = TokenWallet.objects.select_for_update().get(
-                    id=candidate_wallet.id
+            except InterviewBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found or access denied."},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
-                # 🔓 Unlock tokens back to candidate
-                TokenService.unlock_tokens(
-                    wallet=candidate_wallet,
-                    amount=booking.token_cost,
-                    transaction_type="BOOKING_CANCEL_INTERVIEWER",
-                    reference_id=f"booking_{booking.id}",
-                    note="Booking cancelled by interviewer",
+            now = timezone.now()
+
+            # ✅ Snapshot time gate
+            if booking.start_datetime <= now:
+                return Response(
+                    {"detail": "Cannot reschedule past or ongoing sessions."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-                # 📝 Update booking
-                booking.status = InterviewBooking.Status.CANCELLED_BY_INTERVIEWER
-                booking.cancellation_reason = reason
-                booking.cancelled_at = timezone.now()
-                booking.save(
-                    update_fields=[
-                        "status",
-                        "cancellation_reason",
-                        "cancelled_at",
-                    ]
+            # ✅ 3 hour rule
+            if booking.start_datetime - now < timedelta(hours=RESCHEDULE_LIMIT_HOURS):
+                return Response(
+                    {"detail": f"Cannot reschedule within {RESCHEDULE_LIMIT_HOURS} hours of session."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        except InterviewBooking.DoesNotExist:
-            return Response(
-                {"detail": "Booking not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            # ✅ Keep old slot for logging
+            old_availability = booking.availability
+
+            serializer = CandidateRescheduleSerializer(
+                data=request.data,
+                context={"booking": booking},
+            )
+            serializer.is_valid(raise_exception=True)
+
+            new_availability = serializer.validated_data["new_availability"]
+            reason = serializer.validated_data.get("reason", "").strip()[:500]
+
+            # 🔒 Lock new availability row
+            new_avail_locked = (
+                InterviewerAvailability.objects
+                .select_for_update()
+                .get(id=new_availability.id)
+            )
+
+            # ✅ Commit-time re-check
+            if not new_avail_locked.is_active:
+                return Response(
+                    {"detail": "Selected slot deactivated."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            if new_avail_locked.remaining_capacity() <= 0:
+                return Response(
+                    {"detail": "No capacity left in selected slot."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            # ✅ Save aware datetimes
+            start_dt_aware = timezone.make_aware(
+                datetime.combine(new_avail_locked.date, new_avail_locked.start_time)
+            )
+            end_dt_aware = timezone.make_aware(
+                datetime.combine(new_avail_locked.date, new_avail_locked.end_time)
+            )
+
+            booking.availability = new_avail_locked
+            booking.start_datetime = start_dt_aware
+            booking.end_datetime = end_dt_aware
+            booking.rescheduled_at = now
+            booking.reschedule_reason = reason
+            booking.reschedule_count += 1
+
+            booking.save(update_fields=[
+                "availability",  # ✅ FIXED
+                "start_datetime",
+                "end_datetime",
+                "rescheduled_at",
+                "reschedule_reason",
+                "reschedule_count",
+                "updated_at",
+            ])
+
+            logger.info(
+                "Booking %s rescheduled by candidate=%s from availability=%s to availability=%s",
+                booking.id,
+                request.user.id,
+                old_availability.id,
+                new_avail_locked.id,
             )
 
         return Response(
             {
-                "message": "Booking cancelled successfully.",
-                "tokens_refunded": booking.token_cost,
+                "message": "Booking rescheduled successfully!",
+                "booking_id": booking.id,
+                "status": booking.status,
+                "new_slot": {
+                    "availability_id": new_avail_locked.id,
+                    "date": new_avail_locked.date,
+                    "start_time": new_avail_locked.start_time,
+                    "end_time": new_avail_locked.end_time,
+                    "timezone": new_avail_locked.timezone,
+                    "start_datetime": start_dt_aware.isoformat(),
+                    "end_datetime": end_dt_aware.isoformat(),
+                },
+                "reschedule_count": booking.reschedule_count,
+                "tokens_locked": TOKEN_COST,
             },
             status=status.HTTP_200_OK,
         )
+
+

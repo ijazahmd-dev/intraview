@@ -198,6 +198,9 @@ class InterviewerAvailability(models.Model):
     )
     # 🔒 NEW — Soft delete
     is_active = models.BooleanField(default=True)
+    rescheduled_at = models.DateTimeField(null=True, blank=True)
+    reschedule_reason = models.TextField(blank=True, max_length=500)
+    reschedule_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["date", "start_time"]

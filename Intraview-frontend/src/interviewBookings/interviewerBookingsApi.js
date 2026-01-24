@@ -6,6 +6,7 @@ const ENDPOINTS = {
   completedSessions: '/api/bookings/dashboard/interviewer/history/',
   bookingDetail: (bookingId) => `/api/bookings/dashboard/interviewer/bookings/${bookingId}/`,
   cancelBooking: (bookingId) => `/api/bookings/bookings/${bookingId}/cancel-by-interviewer/`,
+
 };
 
 export const interviewerBookingsApi = {
@@ -14,4 +15,5 @@ export const interviewerBookingsApi = {
   getBookingDetail: (bookingId) => API.get(ENDPOINTS.bookingDetail(bookingId)),
   cancelBooking: (bookingId, reason) => 
     API.post(ENDPOINTS.cancelBooking(bookingId), { reason }),
+
 };
