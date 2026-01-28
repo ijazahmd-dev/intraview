@@ -11,6 +11,7 @@ import interviewerWalletReducer from './wallets/interviewerWalletSlice';
 import adminSubscriptionReducer from './subscriptions/adminSubscriptionSlice';
 import adminInterviewerSubscriptionReducer from './subscriptions/adminInterviewerSubscriptionSlice';
 import adminTokenPackReducer from './token_bundles/adminTokenPackSlice';
+import profileReducer from './candidateProfile/profileSlice';
 
 export const store = configureStore({
   reducer: {
@@ -27,5 +28,6 @@ export const store = configureStore({
     adminSubscription: adminSubscriptionReducer,
     adminInterviewerSubscription: adminInterviewerSubscriptionReducer,
     adminTokenPack: adminTokenPackReducer,
+    profile: profileReducer,
   },
 });
