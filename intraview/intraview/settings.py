@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'subscriptions',
     'interviewer_subscriptions',
     'bookings',
+    'candidates',
 
     'rest_framework',
     'corsheaders',

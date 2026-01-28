@@ -4,6 +4,7 @@ from subscriptions.models import UserSubscription
 
 
 
+
 class InterviewerStatus(models.TextChoices):
     NOT_APPLIED = "NOT_APPLIED", "Not Applied"
     PENDING_APPROVAL = "PENDING_APPROVAL", "Pending Approval"
@@ -29,6 +30,8 @@ class CustomUser(AbstractUser):
 
 
     email = models.EmailField(unique=True, db_index=True)
+    first_name = models.CharField(max_length=100, blank=True, null=True)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES,default='user')
     interviewer_status = models.CharField(max_length=30,choices=InterviewerStatus.choices,default=InterviewerStatus.NOT_APPLIED,)
     profile_picture_url = models.URLField(blank=True, null=True)
@@ -64,6 +67,17 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.username
     
+
+
+
+
+
+
+
+
+
+
+
 
 
 
