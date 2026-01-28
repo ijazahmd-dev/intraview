@@ -299,6 +299,14 @@ class ResumeSerializer(serializers.ModelSerializer):
     
     resume_file_url = serializers.SerializerMethodField()
     has_resume = serializers.SerializerMethodField()
+    upload_status = serializers.CharField(
+        source='resume_upload_status',
+        read_only=True
+    )
+    uploaded_at = serializers.DateTimeField(
+        source='resume_uploaded_at',
+        read_only=True
+    )
     
     class Meta:
         model = CandidateProfile
@@ -307,12 +315,20 @@ class ResumeSerializer(serializers.ModelSerializer):
             'resume_file',
             'resume_file_url',
             'resume_url',
-            'has_resume'
+            'has_resume',
+            'upload_status',
+            'uploaded_at'
         ]
-        read_only_fields = ['id', 'has_resume', 'resume_file_url']
+        read_only_fields = [
+            'id',
+            'has_resume',
+            'resume_file_url',
+            'upload_status',
+            'uploaded_at'
+        ]
     
     def get_resume_file_url(self, obj):
-
+       
         if obj.resume_file:
             request = self.context.get('request')
             if request:
@@ -327,18 +343,15 @@ class ResumeSerializer(serializers.ModelSerializer):
         return has_file or has_url
     
     def validate_resume_file(self, value):
-
+        
         if value:
             # Check file size (max 5MB)
             if value.size > 5 * 1024 * 1024:
                 raise ValidationError("Resume file size cannot exceed 5MB")
             
-            # Check file extension
-            if not value.name.lower().endswith( (".pdf", ".doc", ".docx")):
+            #Check MIME type (not extension)
+            if value.content_type != "application/pdf":
                 raise ValidationError("Only PDF files are allowed")
-            
-            # if value.content_type != "application/pdf":
-            #     raise ValidationError("Only PDF files are allowed")
         
         return value
     
@@ -346,7 +359,7 @@ class ResumeSerializer(serializers.ModelSerializer):
 
         if value and not value.startswith("https://"):
             raise ValidationError("Resume URL must start with https://")
-        return value 
+        return value
 
 
 

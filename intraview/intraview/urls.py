@@ -32,6 +32,7 @@ urlpatterns = [
     path("api/wallet/", include("wallet.urls")),
     path("api/payments/", include("payments.urls")),
     path("api/bookings/", include("bookings.urls")),
+    path('api/candidate/', include('candidates.urls')),
 
 ]
 
