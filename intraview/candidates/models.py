@@ -26,6 +26,13 @@ class DifficultyLevel(models.TextChoices):
     INTERMEDIATE = "INTERMEDIATE", "Intermediate" 
     ADVANCED = "ADVANCED", "Advanced"
 
+
+
+
+
+
+
+
 class CandidateProfile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

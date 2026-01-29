@@ -17,7 +17,7 @@ import API from "../utils/axiosClient";
  * Fetch current user's full profile
  */
 export const getMyProfile = () => {
-  return API.get('/candidate/profile/me/');
+  return API.get('api/candidate/profile/me/');
 };
 
 /**
@@ -49,7 +49,7 @@ export const getMyProfile = () => {
  * }
  */
 export const updateProfile = (data) => {
-  return API.patch('/candidate/profile/me/', data);
+  return API.patch('api/candidate/profile/me/', data);
 };
 
 /**
@@ -57,7 +57,7 @@ export const updateProfile = (data) => {
  * Get profile completion percentage & missing fields
  */
 export const getProfileCompletion = () => {
-  return API.get('/candidate/profile/completion/');
+  return API.get('api/candidate/profile/completion/');
 };
 
 // ============================================
@@ -74,7 +74,7 @@ export const uploadResume = (file) => {
   const formData = new FormData();
   formData.append('resume_file', file);
   
-  return API.post('/candidate/profile/resume/upload/', formData, {
+  return API.post('api/candidate/profile/resume/upload/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -86,7 +86,7 @@ export const uploadResume = (file) => {
  * Get current resume status & URL
  */
 export const getResumeStatus = () => {
-  return API.get('/candidate/profile/resume/status/');
+  return API.get('api/candidate/profile/resume/status/');
 };
 
 /**
@@ -94,7 +94,7 @@ export const getResumeStatus = () => {
  * Delete uploaded resume
  */
 export const deleteResume = () => {
-  return API.delete('/candidate/profile/resume/delete/');
+  return API.delete('api/candidate/profile/resume/delete/');
 };
 
 // ============================================
@@ -111,7 +111,7 @@ export const uploadProfilePicture = (file) => {
   const formData = new FormData();
   formData.append('profile_picture', file);
   
-  return API.post('/candidate/profile/picture/upload/', formData, {
+  return API.post('api/candidate/profile/picture/upload/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

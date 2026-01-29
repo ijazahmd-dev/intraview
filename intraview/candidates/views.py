@@ -72,21 +72,41 @@ class CandidateProfileViewSet(viewsets.ModelViewSet):
     # GET ENDPOINTS
     # ============================================
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(
+    detail=False,
+    methods=['get', 'patch'],  # ✅ Both methods
+    permission_classes=[IsAuthenticated],
+    url_path='me'
+)
     def me(self, request):
-        """
-        GET /api/candidate/profile/me/
-        Get current user's full profile
-        """
+        """Handle both GET and PATCH for /api/candidate/profile/me/"""
         try:
             profile = CandidateProfile.objects.get(user=request.user)
-            serializer = self.get_serializer(profile)
-            return Response(serializer.data)
         except CandidateProfile.DoesNotExist:
             return Response(
                 {"error": "Profile not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
+        
+        if request.method == 'GET':
+            serializer = DetailedCandidateProfileSerializer(profile)
+            return Response(serializer.data)
+        
+        elif request.method == 'PATCH':
+            serializer = UpdateCandidateProfileSerializer(
+                profile, 
+                data=request.data, 
+                partial=True,
+                context={'request': request}
+            )
+            if serializer.is_valid():
+                serializer.save()
+                return Response({
+                    "message": "Profile updated successfully",
+                    "data": DetailedCandidateProfileSerializer(profile).data
+                })
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def completion(self, request):
@@ -146,48 +166,48 @@ class CandidateProfileViewSet(viewsets.ModelViewSet):
     # UPDATE ENDPOINTS
     # ============================================
     
-    @action(
-        detail=False,
-        methods=['patch'],
-        permission_classes=[IsAuthenticated],
-        url_path='me'
-    )
-    def update_me(self, request):
-        """
-        PATCH /api/candidate/profile/me/
-        Update current user's profile
+    # @action(
+    #     detail=False,
+    #     methods=['patch'],
+    #     permission_classes=[IsAuthenticated],
+    #     url_path='me'
+    # )
+    # def update_me(self, request):
+    #     """
+    #     PATCH /api/candidate/profile/me/
+    #     Update current user's profile
         
-        Allowed fields:
-        - user_first_name, user_last_name
-        - full_name, phone, location, timezone
-        - current_status, current_role, target_role
-        - experience_level, years_experience, skills
-        - preferred_interview_types, preferred_difficulty, preferred_duration
-        - interviewer_notes
-        - linkedin_url, github_url, portfolio_url
-        """
-        try:
-            profile = CandidateProfile.objects.get(user=request.user)
-        except CandidateProfile.DoesNotExist:
-            return Response(
-                {"error": "Profile not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+    #     Allowed fields:
+    #     - user_first_name, user_last_name
+    #     - full_name, phone, location, timezone
+    #     - current_status, current_role, target_role
+    #     - experience_level, years_experience, skills
+    #     - preferred_interview_types, preferred_difficulty, preferred_duration
+    #     - interviewer_notes
+    #     - linkedin_url, github_url, portfolio_url
+    #     """
+    #     try:
+    #         profile = CandidateProfile.objects.get(user=request.user)
+    #     except CandidateProfile.DoesNotExist:
+    #         return Response(
+    #             {"error": "Profile not found"},
+    #             status=status.HTTP_404_NOT_FOUND
+    #         )
         
-        serializer = UpdateCandidateProfileSerializer(
-            profile, 
-            data=request.data, 
-            partial=True,
-            context={'request': request}
-        )
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Profile updated successfully",
-                "data": DetailedCandidateProfileSerializer(profile).data
-            })
+    #     serializer = UpdateCandidateProfileSerializer(
+    #         profile, 
+    #         data=request.data, 
+    #         partial=True,
+    #         context={'request': request}
+    #     )
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response({
+    #             "message": "Profile updated successfully",
+    #             "data": DetailedCandidateProfileSerializer(profile).data
+    #         })
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     # ✅ REMOVED: Generic update endpoint (security issue)
     # Users can only update their own profile via /me/

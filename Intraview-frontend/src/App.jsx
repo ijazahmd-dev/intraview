@@ -58,6 +58,9 @@ import AdminSubscriptionPlansPage from "./subscriptions/admin/pages/AdminSubscri
 import AdminInterviewerSubscriptionPlansPage from "./subscriptions/admin/pages/AdminInterviewerSubscriptionPlansPage";
 import AdminTokenPacksPage from "./token_bundles/admin/pages/AdminTokenPacksPage";
 import InterviewerCalendarBookingPage from "./interviewBookings/user/pages/InterviewerCalendarBookingPage";
+import ProfilePage from "./candidateProfile/candidate/pages/ProfilePage";
+import ResumePage from "./candidateProfile/candidate/pages/ResumePage";
+import SettingsPage from "./candidateProfile/candidate/pages/SettingsPage";
 
 
 
@@ -113,7 +116,15 @@ function AppInner() {
                     <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
                     <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
                     <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
-                    <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />                 
+                    <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />    
+
+
+
+                    <Route path="/candidate">
+                      <Route path="profile" element={<ProfilePage />} />
+                      <Route path="resume" element={<ResumePage />} />
+                      <Route path="settings" element={<SettingsPage />} /> 
+                    </Route>             
 
 
 
