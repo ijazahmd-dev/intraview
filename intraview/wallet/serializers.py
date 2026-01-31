@@ -244,15 +244,6 @@ class PayoutRequestSerializer(serializers.ModelSerializer):
         from .models import TokenWallet, PayoutRequestStatus
         
         interviewer = self.context['request'].user
-        active_payout = PayoutRequest.objects.filter(
-            interviewer=interviewer,
-            status__in=[PayoutRequestStatus.REQUESTED, PayoutRequestStatus.APPROVED]
-        ).exists()
-        
-        if active_payout:
-            raise serializers.ValidationError(
-                "You already have an active payout request. Please wait for it to be processed."
-            )
         
         # Check wallet balance
         try:
