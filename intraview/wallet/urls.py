@@ -17,10 +17,18 @@ urlpatterns = [
     path("interviewer/transactions/", views_interviewer.InterviewerWalletTransactionsAPIView.as_view()),
     path("interviewer/stats/", views_interviewer.InterviewerWalletStatsAPIView.as_view()),
     path("interviewer/earnings/", views_interviewer.InterviewerEarningsAPIView.as_view()),
-    path(
-        "interviewer/earnings/transactions/",
-        views_interviewer.InterviewerEarningTransactionsAPIView.as_view()
-    ),
+    path("interviewer/earnings/transactions/",views_interviewer.InterviewerEarningTransactionsAPIView.as_view()),
+
+    path('wallet-payouts/request/',views_interviewer.InterviewerPayoutRequestCreateAPIView.as_view(),name='payout-request-create'),
+    
+    # Payout list and detail
+    path('wallet-payouts/',views_interviewer.InterviewerPayoutListAPIView.as_view(),name='payout-list'),
+    path('wallet-payouts/<int:payout_id>/',views_interviewer.InterviewerPayoutDetailAPIView.as_view(),name='payout-detail'),
+    
+    # Utility endpoints
+    path('wallet-payouts/stats/',views_interviewer.InterviewerPayoutStatsAPIView.as_view(),name='payout-stats'),
+    path('wallet-payouts/eligibility/',views_interviewer.InterviewerPayoutEligibilityCheckAPIView.as_view(),name='payout-eligibility'),
+
 
 
     #Admin urls
