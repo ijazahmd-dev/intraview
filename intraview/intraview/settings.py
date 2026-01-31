@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import timedelta
 import os
 from dotenv import load_dotenv
+from decimal import Decimal
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
@@ -346,3 +347,14 @@ LOGGING = {
 
 
 
+
+
+
+# Minimum tokens to request payout
+PAYOUT_MIN_TOKENS = 50
+
+# Rate per token (in INR)
+PAYOUT_RATE_PER_TOKEN = Decimal("10.00")
+
+# Reference number prefix
+PAYOUT_REFERENCE_PREFIX = "PAY"

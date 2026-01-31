@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import TokenTransaction,TokenWallet
+from .models import TokenTransaction,TokenWallet, PayoutRequest, PayoutRequestStatus
 import django_filters
+from decimal import Decimal
 
 
 
@@ -85,6 +86,196 @@ class InterviewerEarningsSerializer(serializers.Serializer):
     earnings_last_7_days = serializers.IntegerField()
     earnings_last_30_days = serializers.IntegerField()
     completed_sessions_count = serializers.IntegerField()
+
+
+
+
+
+
+
+
+
+
+
+class PayoutRequestSerializer(serializers.ModelSerializer):
+    """
+    Universal serializer for create, list, detail operations.
+    Handles validation intelligently based on context.
+    """
+    
+    interviewer_name = serializers.CharField(
+        source='interviewer.interviewer_profile.display_name',
+        read_only=True
+    )
+    interviewer_username = serializers.CharField(
+        source='interviewer.username',
+        read_only=True
+    )
+    masked_account = serializers.SerializerMethodField(read_only=True)
+    status_display = serializers.CharField(
+        source='get_status_display',
+        read_only=True
+    )
+    is_pending = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = PayoutRequest
+        fields = [
+            'id',
+            'reference_number',
+            'interviewer',
+            'interviewer_name',
+            'interviewer_username',
+            'tokens_requested',
+            'amount_inr',
+            'token_rate_snapshot',
+            'bank_account_number',
+            'ifsc_code',
+            'account_holder_name',
+            'mobile_number',
+            'masked_account',
+            'status',
+            'status_display',
+            'is_pending',
+            'admin_notes',
+            'rejection_reason',
+            'requested_at',
+            'updated_at',
+            'paid_at',
+        ]
+        read_only_fields = [
+            'id',
+            'reference_number',
+            'interviewer',
+            'amount_inr',
+            'token_rate_snapshot',
+            'requested_at',
+            'updated_at',
+            'paid_at',
+            'status',
+            'admin_notes',
+            'rejection_reason',
+        ]
+    
+    def get_masked_account(self, obj):
+        """Return masked account for security"""
+        return obj.masked_account
+    
+    # ====================================
+    # CREATION VALIDATIONS ONLY
+    # ====================================
+    
+    def validate_tokens_requested(self, value):
+        """Only validate on creation"""
+        if self.instance:  # Update case - skip
+            return value
+        
+        from django.conf import settings
+        min_tokens = getattr(settings, 'PAYOUT_MIN_TOKENS', 50)
+        
+        if value < min_tokens:
+            raise serializers.ValidationError(
+                f"Minimum {min_tokens} tokens required. You requested {value}."
+            )
+        
+        return value
+    
+    def validate_bank_account_number(self, value):
+        """Validate only on creation"""
+        if self.instance:
+            return value
+        
+        if not value.isdigit():
+            raise serializers.ValidationError(
+                "Account number must contain only digits"
+            )
+        
+        if not (9 <= len(value) <= 18):
+            raise serializers.ValidationError(
+                "Account number must be 9-18 digits"
+            )
+        
+        return value
+    
+    def validate_ifsc_code(self, value):
+        """Validate only on creation"""
+        if self.instance:
+            return value
+        
+        import re
+        if not re.match(r'^[A-Z]{4}0[A-Z0-9]{6}$', value):
+            raise serializers.ValidationError(
+                "Invalid IFSC format. Example: SBIN0001234"
+            )
+        
+        return value.upper()
+    
+    def validate_account_holder_name(self, value):
+        """Validate only on creation"""
+        if self.instance:
+            return value
+        
+        if len(value.strip()) < 3:
+            raise serializers.ValidationError(
+                "Account holder name must be at least 3 characters"
+            )
+        
+        return value.strip()
+    
+    def validate_mobile_number(self, value):
+        """Validate only on creation"""
+        if self.instance:
+            return value
+        
+        import re
+        if not re.match(r'^[6-9]\d{9}$', value):
+            raise serializers.ValidationError(
+                "Invalid 10-digit mobile number"
+            )
+        
+        return value
+    
+    def validate(self, data):
+        """Cross-field validation on creation"""
+        if self.instance:
+            return data
+        
+        # Check if interviewer already has active payout
+        from .models import TokenWallet, PayoutRequestStatus
+        
+        interviewer = self.context['request'].user
+        active_payout = PayoutRequest.objects.filter(
+            interviewer=interviewer,
+            status__in=[PayoutRequestStatus.REQUESTED, PayoutRequestStatus.APPROVED]
+        ).exists()
+        
+        if active_payout:
+            raise serializers.ValidationError(
+                "You already have an active payout request. Please wait for it to be processed."
+            )
+        
+        # Check wallet balance
+        try:
+            wallet = interviewer.token_wallet
+        except TokenWallet.DoesNotExist:
+            raise serializers.ValidationError(
+                "Wallet not found. Please contact support."
+            )
+        
+        available = wallet.balance - wallet.locked_balance
+        tokens_needed = data.get('tokens_requested', 0)
+        
+        if available < tokens_needed:
+            raise serializers.ValidationError(
+                f"Insufficient balance. Available: {available}, Requested: {tokens_needed}"
+            )
+        
+        return data
+
+
+
+
+
 
 
 

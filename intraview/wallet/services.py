@@ -54,6 +54,10 @@ class TokenService:
         return wallet  
     
 
+    @staticmethod
+    def get_available_balance(wallet):
+        return wallet.balance - wallet.locked_balance
+
 
 
 
@@ -279,6 +283,49 @@ class TokenService:
             locked_balance_after=locked_to.locked_balance,
             reference_id=reference_id,
             note=note or "Session completed - tokens earned",
+        )
+
+
+
+
+
+
+    @staticmethod
+    @transaction.atomic
+    def finalize_locked_tokens(
+        *,
+        wallet: TokenWallet,
+        amount: int,
+        transaction_type: str,
+        reference_id: str,
+        note: str = "",
+    ):
+        """
+        Permanently remove previously locked tokens.
+        Used when payout is completed.
+        """
+
+        wallet = TokenWallet.objects.select_for_update().get(pk=wallet.pk)
+
+        TokenService._ensure_positive(amount, "Finalize")
+
+        if wallet.locked_balance < amount:
+            raise InvalidTokenOperationError(
+                f"Not enough locked tokens to finalize. "
+                f"Locked: {wallet.locked_balance}, requested: {amount}."
+            )
+
+        wallet.locked_balance -= amount
+        wallet.save(update_fields=["locked_balance", "updated_at"])
+
+        return TokenTransaction.objects.create(
+            wallet=wallet,
+            transaction_type=transaction_type,
+            amount=0,  # no change to balance
+            balance_after=wallet.balance,
+            locked_balance_after=wallet.locked_balance,
+            reference_id=reference_id,
+            note=note,
         )
 
 
