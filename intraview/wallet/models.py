@@ -275,10 +275,10 @@ class PayoutRequest(models.Model):
                 check=models.Q(tokens_requested__gte=50),
                 name='min_50_tokens'
             ),
-            models.CheckConstraint(
-                check=models.Q(amount_inr__gt=0),
-                name='amount_positive'
-            ),
+            # models.CheckConstraint(
+            #     check=models.Q(amount_inr__gt=0),
+            #     name='amount_positive'
+            # ),
             models.UniqueConstraint(
             fields=['interviewer'],
             condition=Q(status__in=[PayoutRequestStatus.REQUESTED, PayoutRequestStatus.APPROVED]),
