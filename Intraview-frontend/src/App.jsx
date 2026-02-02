@@ -61,6 +61,9 @@ import InterviewerCalendarBookingPage from "./interviewBookings/user/pages/Inter
 import ProfilePage from "./candidateProfile/candidate/pages/ProfilePage";
 import ResumePage from "./candidateProfile/candidate/pages/ResumePage";
 import SettingsPage from "./candidateProfile/candidate/pages/SettingsPage";
+import PayoutRequestPage from "./interviewerPayout/interviewer/page/PayoutRequestPage";
+import PayoutHistoryPage from "./interviewerPayout/interviewer/page/PayoutHistoryPage";
+import PayoutDetailPage from "./interviewerPayout/interviewer/page/PayoutDetailPage";
 
 
 
@@ -172,6 +175,10 @@ function AppInner() {
                     <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
                     <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
                     <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
+
+                    <Route path="/interviewer/payout/request" element={<PayoutRequestPage />} />
+                    <Route path="/interviewer/payout/history" element={<PayoutHistoryPage />} />
+                    <Route path="/interviewer/payout/:id" element={<PayoutDetailPage />} />
 
                     
 
