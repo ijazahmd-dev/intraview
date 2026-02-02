@@ -5,7 +5,7 @@ import {
   approvePayout,
   rejectPayout,
   markPayoutPaid,
-} from '../../interviewerPayoutApi';
+} from '../../adminPayoutApi';
 
 export const useAdminPayoutDetail = (payoutId) => {
   const [payout, setPayout] = useState(null);

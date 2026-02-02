@@ -64,6 +64,9 @@ import SettingsPage from "./candidateProfile/candidate/pages/SettingsPage";
 import PayoutRequestPage from "./interviewerPayout/interviewer/page/PayoutRequestPage";
 import PayoutHistoryPage from "./interviewerPayout/interviewer/page/PayoutHistoryPage";
 import PayoutDetailPage from "./interviewerPayout/interviewer/page/PayoutDetailPage";
+import AdminPayoutQueuePage from "./interviewerPayout/admin/pages/AdminPayoutQueuePage";
+import AdminPayoutDetailPage from "./interviewerPayout/admin/pages/AdminPayoutDetailPage";
+import AdminPayoutHistoryPage from "./interviewerPayout/admin/pages/AdminPayoutHistoryPage";
 
 
 
@@ -226,6 +229,10 @@ function AppInner() {
                     <Route path="/admin/interviewer-subscription-plans" element={ <AdminProtectedRoute><AdminInterviewerSubscriptionPlansPage /></AdminProtectedRoute> } />
 
                     <Route path="/admin/token-packs" element={ <AdminProtectedRoute><AdminTokenPacksPage /></AdminProtectedRoute>   } />
+
+                    <Route path="/admin/payout/queue" element={ <AdminProtectedRoute> <AdminPayoutQueuePage /> </AdminProtectedRoute> } />
+                    <Route path="/admin/payout/:id" element={ <AdminProtectedRoute> <AdminPayoutDetailPage /> </AdminProtectedRoute> } />
+                    <Route path="/admin/payout/history" element={ <AdminProtectedRoute> <AdminPayoutHistoryPage /> </AdminProtectedRoute> } />
                     
 
       </Routes>

@@ -27,6 +27,8 @@ const PayoutRequestPage = () => {
     refetch: refetchEligibility 
   } = usePayoutEligibility();
 
+  console.log("🔥 ELIGIBILITY:", eligibility);
+
   const { 
     stats, 
     loading: statsLoading, 

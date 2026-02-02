@@ -1,6 +1,6 @@
 // src/hooks/useAdminPayoutList.js
 import { useState, useEffect, useCallback } from 'react';
-import { getAdminPayoutQueue, getAdminPayoutHistory } from '../../interviewerPayoutApi';
+import { getAdminPayoutQueue, getAdminPayoutHistory } from '../../adminPayoutApi';
 
 export const useAdminPayoutList = (mode = 'queue', initialFilters = {}) => {
   const [items, setItems] = useState([]);

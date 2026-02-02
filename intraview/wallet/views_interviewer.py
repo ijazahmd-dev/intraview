@@ -614,7 +614,7 @@ class InterviewerPayoutEligibilityCheckAPIView(APIView):
         
         # Check verification
         try:
-            verification_status = request.user.interviewer_profile.verification.status
+            verification_status = request.user.verification.status
         except:
             verification_status = "UNKNOWN"
         

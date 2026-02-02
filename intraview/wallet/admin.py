@@ -1,11 +1,12 @@
 from django.contrib import admin
-from .models import TokenWallet, TokenTransaction
+from .models import TokenWallet, TokenTransaction, PayoutRequest
 from django.http import HttpResponseRedirect
 
 # Register your models here.
 
 admin.site.register(TokenWallet)
 admin.site.register(TokenTransaction)
+admin.site.register(PayoutRequest)
 
 # @admin.register(TokenWallet)
 # class TokenWalletAdmin(admin.ModelAdmin):

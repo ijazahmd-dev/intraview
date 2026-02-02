@@ -111,6 +111,10 @@ class PayoutRequestSerializer(serializers.ModelSerializer):
         source='interviewer.username',
         read_only=True
     )
+    interviewer_email = serializers.CharField(
+        source='interviewer.email',
+        read_only=True
+    )
     masked_account = serializers.SerializerMethodField(read_only=True)
     status_display = serializers.CharField(
         source='get_status_display',
@@ -126,6 +130,7 @@ class PayoutRequestSerializer(serializers.ModelSerializer):
             'interviewer',
             'interviewer_name',
             'interviewer_username',
+            'interviewer_email',
             'tokens_requested',
             'amount_inr',
             'token_rate_snapshot',

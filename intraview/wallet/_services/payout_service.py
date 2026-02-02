@@ -75,7 +75,7 @@ class PayoutService:
         Returns: (bool, str or None, verification_data or None)
         """
         try:
-            verification = interviewer.interviewer_profile.verification
+            verification = interviewer.verification
             
             if verification.status != 'APPROVED':
                 return False, f"Verification status: {verification.status}. Must be APPROVED.", None

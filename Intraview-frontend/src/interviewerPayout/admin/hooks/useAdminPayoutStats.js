@@ -1,6 +1,6 @@
 // src/hooks/useAdminPayoutStats.js
 import { useState, useEffect, useCallback } from 'react';
-import { getAdminPayoutStats } from '../../interviewerPayoutApi';
+import { getAdminPayoutStats } from '../../adminPayoutApi';
 
 export const useAdminPayoutStats = () => {
   const [stats, setStats] = useState(null);
