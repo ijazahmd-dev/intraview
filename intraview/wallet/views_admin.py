@@ -1,5 +1,6 @@
 import csv
 from django.http import HttpResponse
+from django.db import models
 
 from rest_framework import generics, filters
 from django_filters.rest_framework import DjangoFilterBackend
@@ -721,7 +722,7 @@ class AdminPayoutHistoryAPIView(APIView):
     """
     
     authentication_classes = [AdminCookieJWTAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdminRole]
     
     def get(self, request):
         """
