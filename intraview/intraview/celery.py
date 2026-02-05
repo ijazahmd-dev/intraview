@@ -23,6 +23,10 @@ app.conf.beat_schedule = {
         "task": "interviewer_subscriptions.tasks.expiry.expire_interviewer_subscriptions",
         "schedule": crontab(hour=2, minute=10),  # 10 min after users
     },
+    'cleanup-stale-sessions': {
+        'task': 'realtime.tasks.cleanup_stale_sessions',
+        'schedule': 60.0,  # Every 60 seconds
+    },
 }
 
 

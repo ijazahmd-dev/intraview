@@ -12,12 +12,14 @@ User = settings.AUTH_USER_MODEL
 
 class InterviewBooking(models.Model):
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending"
-        CONFIRMED = "CONFIRMED", "Confirmed"
-        COMPLETED = "COMPLETED", "Completed"
-        CANCELLED = "CANCELLED", "Cancelled"
-        CANCELLED_BY_CANDIDATE = "CANCELLED_BY_CANDIDATE"
-        CANCELLED_BY_INTERVIEWER = "CANCELLED_BY_INTERVIEWER"
+        PENDING = "PENDING", "Pending"                # Created but not confirmed
+        CONFIRMED = "CONFIRMED", "Confirmed"          # Accepted and scheduled
+        LIVE = "LIVE", "Live"                        # Session started
+        COMPLETED = "COMPLETED", "Completed"         # Session ended normally
+        CANCELLED = "CANCELLED", "Cancelled"         # Cancelled before start
+        CANCELLED_BY_CANDIDATE = "CANCELLED_BY_CANDIDATE", "Cancelled by Candidate"
+        CANCELLED_BY_INTERVIEWER = "CANCELLED_BY_INTERVIEWER", "Cancelled by Interviewer"
+        NO_SHOW = "NO_SHOW", "No Show"               # Nobody joined
 
     candidate = models.ForeignKey(
         User,
