@@ -26,11 +26,11 @@ class InterviewerApplicationCreateSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
 
         # Only allow one application
-        # if hasattr(user, "interviewer_application"):
-        #     raise serializers.ValidationError({
-        #     "code": "APPLICATION_EXISTS",
-        #     "message": "You have already submitted an interviewer application."
-        # })
+        if hasattr(user, "interviewer_application"):
+            raise serializers.ValidationError({
+            "code": "APPLICATION_EXISTS",
+            "message": "You have already submitted an interviewer application."
+        })
 
         return attrs
 

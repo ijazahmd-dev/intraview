@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'candidates',
 
     'rest_framework',
+    "channels",
     'corsheaders',
     'django_celery_results',
     "django_celery_beat",
@@ -85,6 +86,22 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     
+}
+
+
+
+
+ASGI_APPLICATION = "intraview.asgi.application"
+
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
 }
 
 

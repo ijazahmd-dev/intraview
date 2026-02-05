@@ -4,7 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from datetime import timedelta
+from datetime import timedelta, datetime
+
+
 
 from authentication.models import InterviewerStatus
 from .models import InterviewerApplication,InterviewerProfile,InterviewerAvailability,InterviewerVerification,VerificationStatus
@@ -25,6 +27,7 @@ from authentication.authentication import InterviewerCookieJWTAuthentication
 from interviewer_subscriptions.services.entitlement_service import (
     InterviewerEntitlementService,
 )
+from bookings.models import InterviewBooking
 
 
 # ------------------------------------------ User-facing APIs --------------------------------------------------
@@ -71,7 +74,6 @@ class InterviewerApplicationStatusView(APIView):
     Returns current user's interviewer-application status.
     """
 
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
@@ -248,7 +250,7 @@ class AdminReviewInterviewerApplicationView(APIView):
 
 
 class InterviewerApplicationEligibilityView(APIView):
-    permission_classes = [IsAuthenticated]
+    
 
     def get(self, request):
         try:
@@ -629,8 +631,7 @@ class InterviewerOnboardingStatusView(APIView):
 
 
 
-
-
+from django.db.models import Q, Count, Avg, Sum
 
 
 
@@ -638,100 +639,317 @@ class InterviewerOnboardingStatusView(APIView):
 class InterviewerDashboardSummaryView(APIView):
     """
     GET /api/interviewer/dashboard/
-    Static/placeholder summary for interviewer dashboard widgets.
+    Real data for interviewer dashboard from actual models.
     """
     authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes = [IsAuthenticated, IsActiveInterviewer]
 
     def get(self, request):
-        # Dummy data for now; later you will compute from Interview model
+        user = request.user
+        
+        # Get basic info
+        profile = user.interviewer_profile if hasattr(user, 'interviewer_profile') else None
+        wallet = user.token_wallet if hasattr(user, 'token_wallet') else None
+
+        # ============================================
+        # 1. TOTAL INTERVIEWS & STATS
+        # ============================================
+        all_bookings = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED
+        )
+        
+        total_interviews = all_bookings.count()
+        
+        # Get this month's interviews
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        interviews_this_month = all_bookings.filter(
+            created_at__gte=month_start
+        ).count()
+        
+        # Calculate change percentage
+        if total_interviews > 0:
+            interviews_change = f"+{int((interviews_this_month / max(total_interviews, 1)) * 100)}% this month"
+        else:
+            interviews_change = "No interviews yet"
+
+        # ============================================
+        # 2. AVERAGE RATING (from completed bookings)
+        # ============================================
+        # Assuming you have a rating field in InterviewBooking
+        
+        avg_rating = 0.0
+        avg_rating = round(avg_rating, 1)
+        
+        # Last month average for comparison
+        last_month_start = month_start - timedelta(days=30)
+        last_month_bookings = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED,
+            created_at__gte=last_month_start,
+            created_at__lt=month_start
+        )
+        
+        last_month_avg = 0.0
+        rating_change = f"+{round(avg_rating - last_month_avg, 1)} from last month" if avg_rating >= last_month_avg else f"{round(avg_rating - last_month_avg, 1)} from last month"
+
+        # ============================================
+        # 3. COMPLETION RATE
+        # ============================================
+        total_confirmed_or_completed = InterviewBooking.objects.filter(
+            interviewer=user,
+            status__in=[
+                InterviewBooking.Status.COMPLETED,
+                InterviewBooking.Status.CONFIRMED,
+                InterviewBooking.Status.PENDING
+            ]
+        ).count()
+        
+        completion_rate = (total_interviews / max(total_confirmed_or_completed, 1)) if total_confirmed_or_completed > 0 else 0
+        
+        # Compare with last month
+        last_month_total = InterviewBooking.objects.filter(
+            interviewer=user,
+            status__in=[
+                InterviewBooking.Status.COMPLETED,
+                InterviewBooking.Status.CONFIRMED,
+                InterviewBooking.Status.PENDING
+            ],
+            created_at__gte=last_month_start,
+            created_at__lt=month_start
+        ).count()
+        
+        last_month_completed = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED,
+            created_at__gte=last_month_start,
+            created_at__lt=month_start
+        ).count()
+        
+        last_month_rate = (last_month_completed / max(last_month_total, 1)) if last_month_total > 0 else 0
+        
+        completion_rate_note = "Same as last month" if abs(completion_rate - last_month_rate) < 0.01 else f"{'↑' if completion_rate > last_month_rate else '↓'} from last month"
+
+        # ============================================
+        # 4. TOTAL EARNINGS (from completed sessions)
+        # ============================================
+        # Sum of token_cost from completed bookings
+        total_tokens_earned = all_bookings.aggregate(Sum('token_cost'))['token_cost__sum'] or 0
+        
+        # If you have a token rate, multiply to get INR
+        # For now, assuming 1 token = ₹1 for display (adjust based on your rate)
+        total_earnings = total_tokens_earned
+        
+        # This month earnings
+        earnings_this_month = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED,
+            created_at__gte=month_start
+        ).aggregate(Sum('token_cost'))['token_cost__sum'] or 0
+        
+        earnings_change = f"+{int((earnings_this_month / max(total_earnings, 1)) * 100)}% this month" if total_earnings > 0 else "No earnings yet"
+
+        # ============================================
+        # 5. UPCOMING INTERVIEWS
+        # ============================================
+        now = timezone.now()
+        upcoming_bookings = InterviewBooking.objects.filter(
+            interviewer=user,
+            status__in=[
+                InterviewBooking.Status.PENDING,
+                InterviewBooking.Status.CONFIRMED
+            ],
+            start_datetime__gte=now
+        ).order_by('start_datetime')[:5]
+
+        upcoming_interviews = [
+            {
+                "id": booking.id,
+                "candidate_name": booking.candidate.get_full_name() or booking.candidate.email,
+                "type": "Interview",  # You may have an interview_type field
+                "status": booking.status,
+                "date": booking.start_datetime.strftime('%Y-%m-%d'),
+                "time": booking.start_datetime.strftime('%H:%M'),
+                "timezone": profile.timezone if profile else "UTC",
+                "mode": "Live",
+            }
+            for booking in upcoming_bookings
+        ]
+
+        # ============================================
+        # 6. NOTIFICATIONS (from system events)
+        # ============================================
+        # This is a placeholder - expand based on your notification system
+        notifications = []
+        
+        # Check for pending bookings
+        pending_count = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.PENDING
+        ).count()
+        
+        if pending_count > 0:
+            notifications.append({
+                "id": 1,
+                "title": f"{pending_count} New Session Request{'s' if pending_count > 1 else ''}",
+                "description": f"You have {pending_count} pending interview request(s).",
+                "type": "info",
+                "created_at": timezone.now().isoformat(),
+            })
+        
+        # Check for interviews starting soon (next 24 hours)
+        next_24h = now + timedelta(hours=24)
+        starting_soon = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.CONFIRMED,
+            start_datetime__gte=now,
+            start_datetime__lte=next_24h
+        ).count()
+        
+        if starting_soon > 0:
+            notifications.append({
+                "id": 2,
+                "title": f"Session{'s' if starting_soon > 1 else ''} Starting Soon",
+                "description": f"{starting_soon} session(s) start(s) in the next 24 hours.",
+                "type": "warning",
+                "created_at": timezone.now().isoformat(),
+            })
+
+        # ============================================
+        # 7. PERFORMANCE TRENDS (last 6 months)
+        # ============================================
+        performance_months = []
+        performance_interviews = []
+        
+        for i in range(5, -1, -1):  # Last 6 months
+            month_date = now - timedelta(days=30*i)
+            month_start_iter = month_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_end_iter = (month_start_iter + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+            
+            count = InterviewBooking.objects.filter(
+                interviewer=user,
+                status=InterviewBooking.Status.COMPLETED,
+                created_at__gte=month_start_iter,
+                created_at__lte=month_end_iter
+            ).count()
+            
+            performance_months.append(month_date.strftime('%b'))
+            performance_interviews.append(count)
+
+        # ============================================
+        # 8. SESSION BREAKDOWN
+        # ============================================
+        # This depends on how you categorize interviews
+        total_completed = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED
+        ).count()
+        
+        # Placeholder: you'll need to add interview_type to BookingModel
+        human_interviews = total_completed  # Adjust based on actual type
+        peer_reviews = 0  # Add if you have this data
+        ai_assisted = 0   # Add if you have this data
+
+        # ============================================
+        # 9. AVAILABILITY THIS WEEK
+        # ============================================
+        week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_end = week_start + timedelta(days=7)
+        
+        week_availabilities = InterviewerAvailability.objects.filter(
+            interviewer=user,
+            is_active=True,
+            date__gte=week_start.date(),
+            date__lt=week_end.date()
+        )
+        
+        # Calculate total available hours
+        total_available_hours = 0
+        for avail in week_availabilities:
+            start = datetime.combine(avail.date, avail.start_time)
+            end = datetime.combine(avail.date, avail.end_time)
+            hours = (end - start).total_seconds() / 3600
+            total_available_hours += hours
+        
+        # Calculate booked hours
+        booked_hours = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.CONFIRMED,
+            start_datetime__gte=week_start,
+            start_datetime__lt=week_end
+        ).aggregate(
+            total_duration=Sum('token_cost')  # Or calculate from start_datetime and end_datetime
+        )['total_duration'] or 0
+        
+        # Convert token_cost to hours (depends on your conversion)
+        booked_hours_formatted = int(booked_hours / 60)  # Adjust conversion
+        
+        open_slots = int(total_available_hours) - booked_hours_formatted
+
+        # ============================================
+        # 10. AVERAGE SESSION DURATION
+        # ============================================
+        completed_bookings = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED
+        )
+        
+        # Calculate duration from start and end times
+        total_duration_seconds = 0
+        count = 0
+        for booking in completed_bookings:
+            if hasattr(booking, 'start_datetime') and hasattr(booking, 'end_datetime'):
+                duration = (booking.end_datetime - booking.start_datetime).total_seconds() / 60
+                total_duration_seconds += duration
+                count += 1
+        
+        overall_avg = int(total_duration_seconds / max(count, 1))
+        
+        # You can categorize by type if you have that info
+        technical_avg = overall_avg  # Placeholder
+        behavioral_avg = overall_avg  # Placeholder
+
+        # ============================================
+        # FINAL RESPONSE
+        # ============================================
         data = {
             "header": {
-                "name": request.user.interviewer_profile.display_name
-                if hasattr(request.user, "interviewer_profile")
-                else request.user.get_full_name() or request.user.email,
+                "name": profile.display_name if profile else user.get_full_name() or user.email,
             },
             "stats": {
-                "total_interviews": 128,
-                "total_interviews_change": "+12% this month",
-                "average_rating": 4.8,
-                "average_rating_change": "+0.3 from last month",
-                "completion_rate": 0.96,
-                "completion_rate_note": "Same as last month",
-                "total_earnings": 3840,
-                "total_earnings_change": "+18% this month",
+                "total_interviews": total_interviews,
+                "total_interviews_change": interviews_change,
+                "average_rating": avg_rating,
+                "average_rating_change": rating_change,
+                "completion_rate": completion_rate,
+                "completion_rate_note": completion_rate_note,
+                "total_earnings": total_earnings,
+                "total_earnings_change": earnings_change,
             },
-            "upcoming_interviews": [
-                {
-                    "id": 1,
-                    "candidate_name": "Sarah Johnson",
-                    "type": "System Design",
-                    "status": "Confirmed",
-                    "date": "2025-10-17",
-                    "time": "14:00",
-                    "timezone": "IST",
-                    "mode": "Live",
-                },
-                {
-                    "id": 2,
-                    "candidate_name": "Michael Chen",
-                    "type": "Backend",
-                    "status": "Confirmed",
-                    "date": "2025-10-18",
-                    "time": "10:30",
-                    "timezone": "IST",
-                    "mode": "Live",
-                },
-                {
-                    "id": 3,
-                    "candidate_name": "Emily Rodriguez",
-                    "type": "Behavioral",
-                    "status": "Pending",
-                    "date": "2025-10-19",
-                    "time": "16:00",
-                    "timezone": "IST",
-                    "mode": "Live",
-                },
-            ],
-            "notifications": [
-                {
-                    "id": 1,
-                    "title": "New Session Request",
-                    "description": "A new mock interview request has arrived.",
-                    "type": "info",
-                    "created_at": "2025-10-17T10:00:00Z",
-                },
-                {
-                    "id": 2,
-                    "title": "Session Starting Soon",
-                    "description": "Your next session starts in 30 minutes.",
-                    "type": "warning",
-                    "created_at": "2025-10-17T10:30:00Z",
-                },
-            ],
+            "upcoming_interviews": upcoming_interviews,
+            "notifications": notifications,
             "performance": {
-                "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-                "interviews": [10, 14, 13, 18, 22, 26],
+                "months": performance_months,
+                "interviews": performance_interviews,
             },
             "session_breakdown": {
-                "human_interviews": 78,
-                "peer_reviews": 32,
-                "ai_assisted": 18,
+                "human_interviews": human_interviews,
+                "peer_reviews": peer_reviews,
+                "ai_assisted": ai_assisted,
             },
             "availability_this_week": {
-                "available_hours": 24,
-                "booked_hours": 16,
-                "open_slots": 8,
+                "available_hours": int(total_available_hours),
+                "booked_hours": booked_hours_formatted,
+                "open_slots": max(0, open_slots),
             },
             "average_session_duration": {
-                "technical": 45,
-                "behavioral": 35,
-                "overall": 42,
+                "technical": technical_avg,
+                "behavioral": behavioral_avg,
+                "overall": overall_avg,
             },
         }
         return Response(data)
-
-
 
 
 

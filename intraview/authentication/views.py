@@ -179,11 +179,11 @@ class LoginView(APIView):
 
         user = serializer.validated_data["user"]
 
-        if user.role != "user":
-            return Response(
-                {"error": "This account is not an user account"},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        # if user.role != "user":
+        #     return Response(
+        #         {"error": "This account is not an user account"},
+        #         status=status.HTTP_403_FORBIDDEN,
+        #     )
 
         refresh = RefreshToken.for_user(user)
         access = refresh.access_token
