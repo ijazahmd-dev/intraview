@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'interviewer_subscriptions',
     'bookings',
     'candidates',
+    'realtime',
 
     'rest_framework',
     "channels",
@@ -297,7 +298,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=50),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,

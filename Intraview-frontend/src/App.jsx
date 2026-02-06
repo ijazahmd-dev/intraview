@@ -34,6 +34,7 @@ import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux"; 
 import { fetchUser } from "./authentication/authSlice";  
 import { fetchAdmin } from "./authentication/adminAuthSlice";  
+import { fetchInterviewer } from "./authentication/interviewerAuthSlice";
 import AdminInterviewerVerificationsPage from "./interviewerProfile/admin/pages/AdminInterviewerVerificationsPage";
 import InterviewerVerificationPage from "./interviewerProfile/interviewer/pages/InterviewerVerificationPage";
 import UserSubscriptionsPage from "./subscriptions/user/pages/UserSubscriptionsPage";
@@ -67,6 +68,7 @@ import PayoutDetailPage from "./interviewerPayout/interviewer/page/PayoutDetailP
 import AdminPayoutQueuePage from "./interviewerPayout/admin/pages/AdminPayoutQueuePage";
 import AdminPayoutDetailPage from "./interviewerPayout/admin/pages/AdminPayoutDetailPage";
 import AdminPayoutHistoryPage from "./interviewerPayout/admin/pages/AdminPayoutHistoryPage";
+import InterviewRoom from "./webRTC/interviewer/components/InterviewRoom";
 
 
 
@@ -82,6 +84,7 @@ function AppInner() {
   useEffect(() => {
     dispatch(fetchUser());
     dispatch(fetchAdmin());
+    dispatch(fetchInterviewer());
   }, [dispatch]);
 
   // Show loading until auth is bootstrapped
@@ -233,6 +236,17 @@ function AppInner() {
                     <Route path="/admin/payout/queue" element={ <AdminProtectedRoute> <AdminPayoutQueuePage /> </AdminProtectedRoute> } />
                     <Route path="/admin/payout/:id" element={ <AdminProtectedRoute> <AdminPayoutDetailPage /> </AdminProtectedRoute> } />
                     <Route path="/admin/payout/history" element={ <AdminProtectedRoute> <AdminPayoutHistoryPage /> </AdminProtectedRoute> } />
+
+
+
+
+
+
+
+
+
+                    {/* webRTC routes */}
+                    <Route path="/interview/room/:bookingId"  element={<InterviewRoom />} />
                     
 
       </Routes>

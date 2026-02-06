@@ -1,6 +1,10 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
+from rest_framework.authentication import BaseAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth import get_user_model
+
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
         header = self.get_header(request)
@@ -58,3 +62,49 @@ class InterviewerCookieJWTAuthentication(JWTAuthentication):
             return None
 
         return user, validated_token
+
+
+
+
+
+
+
+
+
+class MultiRoleJWTAuthentication(BaseAuthentication):
+    """
+    Handles JWT auth for candidate, interviewer, and admin.
+    Tries multiple cookie names and authentication classes.
+    """
+    
+    def authenticate(self, request):
+        User = get_user_model()
+        
+        # Try different cookie names
+        cookie_names = [
+            'access_token',           # Candidate
+            'interviewer_access_token',  # Interviewer
+            'admin_access_token',     # Admin
+        ]
+        
+        headers = request.META
+        
+        for cookie_name in cookie_names:
+            token_value = request.COOKIES.get(cookie_name)
+            if not token_value:
+                continue
+                
+            try:
+                # Validate token
+                token = AccessToken(token_value)
+                user_id = token.payload.get('user_id')
+                
+                if user_id:
+                    user = User.objects.get(id=user_id)
+                    return (user, token)
+                    
+            except Exception as e:
+                print(f"Token validation failed for {cookie_name}: {e}")
+                continue
+        
+        return None

@@ -16,6 +16,22 @@ export const loginInterviewer = createAsyncThunk(
   }
 );
 
+
+export const fetchInterviewer = createAsyncThunk(
+  "interviewerAuth/fetchInterviewer",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await api.getCurrentInterviewer();
+      return res.data;
+    } catch (err) {
+      if (err.response?.status === 401) {
+        return null; // not logged in
+      }
+      return rejectWithValue(err.response?.data || "Failed to load interviewer");
+    }
+  }
+);
+
     export const logoutInterviewer = createAsyncThunk(
     "interviewerAuth/logout",
     async (_, { rejectWithValue }) => {
@@ -55,6 +71,18 @@ const interviewerAuthSlice = createSlice({
         state.loading = false;
         state.error = action.payload || { message: "Login failed" };
       })
+
+      .addCase(fetchInterviewer.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchInterviewer.fulfilled, (state, action) => {
+        state.loading = false;
+        state.interviewerStatus = action.payload;
+      })
+      .addCase(fetchInterviewer.rejected, (state, action) => {
+        state.loading = false;
+      })
+      
       .addCase(logoutInterviewer.fulfilled, (state) => {
         state.loading = false;
         state.error = null;

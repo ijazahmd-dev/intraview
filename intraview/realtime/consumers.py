@@ -165,6 +165,11 @@ from bookings.models import InterviewBooking
 from realtime.services.session_service import SessionService
 from django.utils import timezone
 from datetime import timedelta
+from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import AccessToken
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +203,7 @@ class InterviewConsumer(AsyncWebsocketConsumer):
         self.room_group_name = f"interview_{self.booking_id}"
 
         # 🔐 Step 1: Authentication check
-        if not self.user.is_authenticated:
+        if not self.user or not self.user.is_authenticated:
             logger.warning(
                 f"Unauthenticated connection attempt for booking {self.booking_id}"
             )
@@ -420,6 +425,63 @@ class InterviewConsumer(AsyncWebsocketConsumer):
     # ========================================
     # Session Service Integration
     # ========================================
+
+    @database_sync_to_async
+    def authenticate_from_cookies(self):
+        """
+        Extract JWT from HTTP-only cookie and authenticate user.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        # Get cookies from headers
+        headers = dict(self.scope.get("headers", []))
+        cookie_header = headers.get(b"cookie", b"").decode()
+
+        if not cookie_header:
+            logger.warning("No cookie header in WebSocket request")
+            return AnonymousUser()
+
+        # Parse cookies
+        cookies = {}
+        for cookie in cookie_header.split("; "):
+            if "=" in cookie:
+                key, value = cookie.split("=", 1)
+                cookies[key] = value
+
+        # Get access token from cookie (adjust name if different)
+        access_token = (
+            cookies.get("access_token") or 
+            cookies.get("interviewer_access_token") 
+        )  # Change to your cookie name
+
+        if not access_token:
+            logger.warning("No access_token cookie found")
+            return AnonymousUser()
+
+        try:
+            # Validate token
+            token = AccessToken(access_token)
+            user_id = token.payload.get("user_id")
+
+            if not user_id:
+                logger.warning("No user_id in token payload")
+                return AnonymousUser()
+
+            # Get user from database
+            user = User.objects.get(id=user_id)
+            logger.info(f"User {user.id} authenticated via cookie")
+            return user
+
+        except TokenError as e:
+            logger.warning(f"Invalid token: {e}")
+            return AnonymousUser()
+        except User.DoesNotExist:
+            logger.warning(f"User {user_id} not found")
+            return AnonymousUser()
+        except Exception as e:
+            logger.error(f"Authentication error: {e}")
+            return AnonymousUser()
 
     @database_sync_to_async
     def handle_session_connect(self):

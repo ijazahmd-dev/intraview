@@ -225,12 +225,12 @@ class CreateInterviewBookingAPIView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
             
-            today = timezone.localdate()
-            if availability.date <= today:
-                return Response(
-                    {"detail": "You can only book sessions from tomorrow onwards."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # today = timezone.localdate()
+            # if availability.date <= today:
+            #     return Response(
+            #         {"detail": "You can only book sessions from tomorrow onwards."},
+            #         status=status.HTTP_400_BAD_REQUEST,
+            #     )
 
 
             if availability.remaining_capacity() <= 0:
@@ -782,5 +782,99 @@ class CandidateRescheduleBookingView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+    
 
 
+
+
+
+
+
+
+
+############################################Video Call Bokings Code for authenticating the user############################################
+
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from bookings.models import InterviewBooking
+import logging
+from authentication.authentication import MultiRoleJWTAuthentication
+
+logger = logging.getLogger(__name__)
+
+class BookingDetailsView(APIView):
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    
+
+    def get(self, request, booking_id):
+        logger.info(f"get_booking_details called - user: {request.user}, authenticated: {request.user.is_authenticated}, booking_id: {booking_id}")
+        
+        try:
+            booking = InterviewBooking.objects.select_related(
+                'candidate',
+                'interviewer'
+            ).get(id=booking_id)
+        except InterviewBooking.DoesNotExist:
+            logger.error(f"Booking {booking_id} not found")
+            return Response(
+                {"detail": "Booking not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get user_id safely (handles AnonymousUser)
+        user_id = request.user.id if request.user.is_authenticated else None
+        logger.info(f"User ID: {user_id}, Candidate ID: {booking.candidate_id}, Interviewer ID: {booking.interviewer_id}")
+        print("user_id:", user_id)
+
+        # ✅ Authorization check (skips for AnonymousUser or unauthenticated)
+        if user_id and user_id not in [booking.candidate_id, booking.interviewer_id]:
+            logger.warning(f"User {user_id} not authorized for booking {booking.id}")
+            return Response(
+                {"detail": "You are not authorized to view this booking"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ✅ Status validation
+        allowed_statuses = ['CONFIRMED', 'LIVE']
+        if booking.status not in allowed_statuses:
+            return Response(
+                {
+                    "detail": f"Interview is {booking.status.lower()} and cannot be accessed",
+                    "status": booking.status
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ✅ Determine user's role (default to 'viewer' for anonymous)
+        user_role = "viewer"
+        if user_id:
+            user_role = "candidate" if user_id == booking.candidate_id else "interviewer"
+
+        # ✅ Return booking data
+        return Response({
+            "id": booking.id,
+            "status": booking.status,
+            "start_datetime": booking.start_datetime,
+            "user_role": user_role,
+            "candidate": {
+                "id": booking.candidate.id,
+                "name": booking.candidate.get_full_name() or booking.candidate.email,
+                "email": booking.candidate.email,
+            },
+            "interviewer": {
+                "id": booking.interviewer.id,
+                "name": booking.interviewer.get_full_name() or booking.interviewer.email,
+                "email": booking.interviewer.email,
+            },
+        }, status=status.HTTP_200_OK)

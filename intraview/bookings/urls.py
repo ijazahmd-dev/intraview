@@ -36,4 +36,13 @@ urlpatterns = [
     #Admin urls################################
     path("admin/bookings/",views_admin.AdminInterviewBookingListAPIView.as_view(),name="admin-bookings-list",),
     path("admin/bookings/<int:booking_id>/",views_admin.AdminBookingDetailAPIView.as_view(),name="admin-booking-detail",),
+
+
+
+
+
+
+    #Video call Authentication Booking
+    path('bookings/<int:booking_id>/', views.BookingDetailsView.as_view(), name='booking-details'),
+
 ]
