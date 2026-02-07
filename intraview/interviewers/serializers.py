@@ -22,15 +22,35 @@ class InterviewerApplicationCreateSerializer(serializers.ModelSerializer):
         model = InterviewerApplication
         exclude = ("user", "status", "reviewed_at", "reviewed_by", "rejection_reason", "created_at")
 
+    # def validate(self, attrs):
+    #     user = self.context["request"].user
+
+    #     # Only allow one application
+    #     if hasattr(user, "interviewer_application"):
+    #         raise serializers.ValidationError({
+    #         "code": "APPLICATION_EXISTS",
+    #         "message": "You have already submitted an interviewer application."
+    #     })
+
+    #     return attrs
+
     def validate(self, attrs):
         user = self.context["request"].user
 
-        # Only allow one application
-        if hasattr(user, "interviewer_application"):
-            raise serializers.ValidationError({
-            "code": "APPLICATION_EXISTS",
-            "message": "You have already submitted an interviewer application."
-        })
+        # ✅ FIXED: Check if user can apply
+        existing_app = getattr(user, "interviewer_application", None)
+        if existing_app:
+            if existing_app.status == InterviewerApplication.STATUS_PENDING:
+                raise serializers.ValidationError({
+                    "code": "APPLICATION_PENDING",
+                    "message": "You already have a pending application. Please wait for review."
+                })
+            elif existing_app.status == InterviewerApplication.STATUS_APPROVED:
+                raise serializers.ValidationError({
+                    "code": "ALREADY_APPROVED",
+                    "message": "You are already an approved interviewer."
+                })
+            # ✅ ALLOW if REJECTED - user can reapply
 
         return attrs
 

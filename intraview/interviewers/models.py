@@ -104,6 +104,24 @@ class InterviewerApplication(models.Model):
         )
         ]
 
+    
+    @classmethod
+    def can_user_apply(cls, user):
+        """
+        Check if user is allowed to submit new application
+        """
+        try:
+            app = user.interviewer_application
+            if app.status == cls.STATUS_REJECTED:
+                return True, "Previous application was rejected. Can reapply."
+            elif app.status == cls.STATUS_PENDING:
+                return False, "Pending application exists."
+            elif app.status == cls.STATUS_APPROVED:
+                return False, "Already approved interviewer."
+        except cls.DoesNotExist:
+            return True, "No previous application."
+        return False, "Unknown status."
+    
     def __str__(self):
         return f"{self.user.email} - {self.status}"
     

@@ -68,7 +68,7 @@ import PayoutDetailPage from "./interviewerPayout/interviewer/page/PayoutDetailP
 import AdminPayoutQueuePage from "./interviewerPayout/admin/pages/AdminPayoutQueuePage";
 import AdminPayoutDetailPage from "./interviewerPayout/admin/pages/AdminPayoutDetailPage";
 import AdminPayoutHistoryPage from "./interviewerPayout/admin/pages/AdminPayoutHistoryPage";
-import InterviewRoom from "./webRTC/interviewer/components/InterviewRoom";
+
 
 
 
@@ -245,8 +245,7 @@ function AppInner() {
 
 
 
-                    {/* webRTC routes */}
-                    <Route path="/interview/room/:bookingId"  element={<InterviewRoom />} />
+             
                     
 
       </Routes>

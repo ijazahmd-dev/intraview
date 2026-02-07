@@ -44,6 +44,20 @@ class InterviewerApplicationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        user = request.user
+
+        try:
+            existing_app = user.interviewer_application
+            if existing_app.status == InterviewerApplication.STATUS_REJECTED:
+                print(f"🗑️ Deleting old rejected application for {user.email}")
+                existing_app.delete()
+            elif existing_app.status in [InterviewerApplication.STATUS_PENDING, InterviewerApplication.STATUS_APPROVED]:
+                return Response({
+                    "error": "Cannot apply. You have a pending or approved application."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except InterviewerApplication.DoesNotExist:
+            pass
+
         serializer = InterviewerApplicationCreateSerializer(
             data=request.data,
             context={"request": request},
