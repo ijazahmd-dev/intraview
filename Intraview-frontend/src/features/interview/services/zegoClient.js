@@ -1,4 +1,4 @@
-// // src/zego/zegoClient.js
+
 
 // import { ZegoExpressEngine } from "zego-express-engine-webrtc";
 
@@ -29,18 +29,23 @@
 
 //   const zg = getEngine(app_id);
 
-//   // Optional but recommended: browser capability check.[web:171]
+//   // 1) Capability check
 //   const sysReq = await zg.checkSystemRequirements();
 //   if (!sysReq.webRTC) {
 //     throw new Error("Current browser does not support WebRTC.");
 //   }
 
-//   // --- Remote stream management
+//   // 2) Remote stream management
 //   const remoteVideos = new Map();
+
+//   let publishStreamID = `stream_${user_id}_${room_id}`;
 
 //   const handleRoomStreamUpdate = async (roomID, updateType, streamList) => {
 //     if (updateType === "ADD") {
 //       for (const stream of streamList) {
+//         // Don't subscribe to our own published stream
+//         if (stream.streamID === publishStreamID) continue;
+
 //         try {
 //           const remoteStream = await zg.startPlayingStream(stream.streamID);
 //           const video = document.createElement("video");
@@ -52,7 +57,10 @@
 //           video.style.objectFit = "cover";
 //           remoteContainer.appendChild(video);
 
-//           remoteVideos.set(stream.streamID, { stream: remoteStream, videoEl: video });
+//           remoteVideos.set(stream.streamID, {
+//             stream: remoteStream,
+//             videoEl: video,
+//           });
 //         } catch (err) {
 //           console.error("Failed to play remote stream", err);
 //         }
@@ -77,7 +85,7 @@
 
 //   zg.on("roomStreamUpdate", handleRoomStreamUpdate);
 
-//   // --- Login room with token
+//   // 3) Login room with token (room join ≠ camera)
 //   const loginResult = await zg.loginRoom(
 //     room_id,
 //     token,
@@ -90,38 +98,60 @@
 //     }
 //   );
 
-//   if (loginResult !== true) {
+//   // Handle both boolean and object return styles
+//   const loginOk =
+//     loginResult === true ||
+//     (typeof loginResult === "object" && loginResult.errorCode === 0);
+
+//   if (!loginOk) {
 //     zg.off("roomStreamUpdate", handleRoomStreamUpdate);
 //     throw new Error("Failed to login to Zego room.");
 //   }
 
-//   // --- Local stream
-//   const localStream = await zg.createStream({
-//     camera: true,
-//     microphone: true,
-//   });
+//   // 4) Try to get local camera/mic, but DON'T fail the room if this breaks
+//   let localStream = null;
+//   let localVideoEl = null;
+//   let cameraError = null;
 
-//   const localVideo = document.createElement("video");
-//   localVideo.srcObject = localStream;
-//   localVideo.autoplay = true;
-//   localVideo.playsInline = true;
-//   localVideo.muted = true; // avoid echo locally
-//   localVideo.style.width = "100%";
-//   localVideo.style.height = "100%";
-//   localVideo.style.objectFit = "cover";
+//   try {
+//     localStream = await zg.createStream({
+//       camera: true,
+//       microphone: true,
+//     });
 
-//   localContainer.appendChild(localVideo);
+//     localVideoEl = document.createElement("video");
+//     localVideoEl.srcObject = localStream;
+//     localVideoEl.autoplay = true;
+//     localVideoEl.playsInline = true;
+//     localVideoEl.muted = true; // avoid echo
+//     localVideoEl.style.width = "100%";
+//     localVideoEl.style.height = "100%";
+//     localVideoEl.style.objectFit = "cover";
 
-//   const publishStreamID = `stream_${user_id}_${room_id}`;
-//   await zg.startPublishingStream(publishStreamID, localStream);
+//     localContainer.appendChild(localVideoEl);
 
-//   // Context object for cleanup / future controls
+//     await zg.startPublishingStream(publishStreamID, localStream);
+//   } catch (err) {
+//     console.warn("Camera / microphone access failed:", err);
+//     // Typical when device is already in use or blocked.[web:285]
+//     cameraError =
+//       "Camera or microphone is unavailable (already in use or blocked). " +
+//       "You are connected to the room with remote video only.";
+
+//     // Important: do NOT throw here. Room is already joined.
+//     localStream = null;
+//     localVideoEl = null;
+//     publishStreamID = null;
+//   }
+
+//   // 5) Context object for cleanup / future controls
 //   return {
 //     zg,
 //     roomID: room_id,
 //     localStream,
-//     localVideoEl: localVideo,
+//     localVideoEl,
 //     publishStreamID,
+//     cameraError,
 //     cleanupRemote: () => {
 //       zg.off("roomStreamUpdate", handleRoomStreamUpdate);
 //       remoteVideos.forEach((item, streamID) => {
@@ -147,7 +177,14 @@
 // export async function leaveRoom(ctx) {
 //   if (!ctx) return;
 
-//   const { zg, roomID, localStream, localVideoEl, publishStreamID, cleanupRemote } = ctx;
+//   const {
+//     zg,
+//     roomID,
+//     localStream,
+//     localVideoEl,
+//     publishStreamID,
+//     cleanupRemote,
+//   } = ctx;
 
 //   try {
 //     if (publishStreamID && zg) {
@@ -200,6 +237,11 @@
 
 
 
+
+
+
+
+
 // src/zego/zegoClient.js
 
 import { ZegoExpressEngine } from "zego-express-engine-webrtc";
@@ -219,11 +261,19 @@ export function getEngine(appID) {
  * @param {object} tokenData - { app_id, token, room_id, user_id } from backend
  * @param {HTMLElement} localContainer - DOM node for local video
  * @param {HTMLElement} remoteContainer - DOM node for remote videos
+ * @param {object} [callbacks] - optional callbacks:
+ *   - onRoomStateUpdate({ roomID, state, errorCode })
  *
- * @returns {object} context - to be passed later to leaveRoom()
+ * @returns {object} context - to be passed later to leaveRoom(), setMicMuted(), setCameraOn()
  */
-export async function joinRoom(tokenData, localContainer, remoteContainer) {
+export async function joinRoom(
+  tokenData,
+  localContainer,
+  remoteContainer,
+  callbacks = {}
+) {
   const { app_id, token, room_id, user_id } = tokenData;
+  const { onRoomStateUpdate } = callbacks;
 
   if (!localContainer || !remoteContainer) {
     throw new Error("Video containers not ready.");
@@ -239,13 +289,12 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
 
   // 2) Remote stream management
   const remoteVideos = new Map();
-
   let publishStreamID = `stream_${user_id}_${room_id}`;
 
   const handleRoomStreamUpdate = async (roomID, updateType, streamList) => {
     if (updateType === "ADD") {
       for (const stream of streamList) {
-        // Don't subscribe to our own published stream
+        // Don't subscribe to our own stream
         if (stream.streamID === publishStreamID) continue;
 
         try {
@@ -285,7 +334,14 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
     }
   };
 
+  const handleRoomStateUpdate = (roomID, state, errorCode, extendedData) => {
+    if (onRoomStateUpdate) {
+      onRoomStateUpdate({ roomID, state, errorCode, extendedData });
+    }
+  };
+
   zg.on("roomStreamUpdate", handleRoomStreamUpdate);
+  zg.on("roomStateUpdate", handleRoomStateUpdate);
 
   // 3) Login room with token (room join ≠ camera)
   const loginResult = await zg.loginRoom(
@@ -307,6 +363,7 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
 
   if (!loginOk) {
     zg.off("roomStreamUpdate", handleRoomStreamUpdate);
+    zg.off("roomStateUpdate", handleRoomStateUpdate);
     throw new Error("Failed to login to Zego room.");
   }
 
@@ -335,7 +392,7 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
     await zg.startPublishingStream(publishStreamID, localStream);
   } catch (err) {
     console.warn("Camera / microphone access failed:", err);
-    // Typical when device is already in use or blocked.[web:285]
+    // Typical when another tab/app already holds the device.[web:285][web:294]
     cameraError =
       "Camera or microphone is unavailable (already in use or blocked). " +
       "You are connected to the room with remote video only.";
@@ -347,15 +404,18 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
   }
 
   // 5) Context object for cleanup / future controls
-  return {
+  const ctx = {
     zg,
     roomID: room_id,
     localStream,
     localVideoEl,
     publishStreamID,
     cameraError,
-    cleanupRemote: () => {
+    micMuted: false,
+    cameraOn: !!localStream,
+    cleanupEventsAndRemote: () => {
       zg.off("roomStreamUpdate", handleRoomStreamUpdate);
+      zg.off("roomStateUpdate", handleRoomStateUpdate);
       remoteVideos.forEach((item, streamID) => {
         try {
           zg.stopPlayingStream(streamID);
@@ -369,6 +429,36 @@ export async function joinRoom(tokenData, localContainer, remoteContainer) {
       remoteVideos.clear();
     },
   };
+
+  return ctx;
+}
+
+/**
+ * Mute/unmute microphone by toggling audio tracks on the local MediaStream.
+ * This is the standard WebRTC pattern.[web:305]
+ */
+export function setMicMuted(ctx, muted) {
+  if (!ctx || !ctx.localStream) return;
+
+  ctx.localStream.getAudioTracks().forEach((track) => {
+    track.enabled = !muted;
+  });
+
+  ctx.micMuted = muted;
+}
+
+/**
+ * Turn camera on/off by toggling video tracks on the local MediaStream.[web:302]
+ * Remote side keeps the same stream; video frames pause/black out when off.
+ */
+export function setCameraOn(ctx, on) {
+  if (!ctx || !ctx.localStream) return;
+
+  ctx.localStream.getVideoTracks().forEach((track) => {
+    track.enabled = on;
+  });
+
+  ctx.cameraOn = on;
 }
 
 /**
@@ -385,7 +475,7 @@ export async function leaveRoom(ctx) {
     localStream,
     localVideoEl,
     publishStreamID,
-    cleanupRemote,
+    cleanupEventsAndRemote,
   } = ctx;
 
   try {
@@ -409,8 +499,8 @@ export async function leaveRoom(ctx) {
   }
 
   try {
-    if (cleanupRemote) {
-      cleanupRemote();
+    if (cleanupEventsAndRemote) {
+      cleanupEventsAndRemote();
     }
   } catch (e) {
     console.error("Error cleaning up remote streams", e);
