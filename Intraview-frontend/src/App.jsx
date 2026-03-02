@@ -68,6 +68,7 @@ import PayoutDetailPage from "./interviewerPayout/interviewer/page/PayoutDetailP
 import AdminPayoutQueuePage from "./interviewerPayout/admin/pages/AdminPayoutQueuePage";
 import AdminPayoutDetailPage from "./interviewerPayout/admin/pages/AdminPayoutDetailPage";
 import AdminPayoutHistoryPage from "./interviewerPayout/admin/pages/AdminPayoutHistoryPage";
+import InterviewRoom from "./features/interview/components/InterviewRoom";
 
 
 
@@ -133,7 +134,9 @@ function AppInner() {
                       <Route path="profile" element={<ProfilePage />} />
                       <Route path="resume" element={<ResumePage />} />
                       <Route path="settings" element={<SettingsPage />} /> 
-                    </Route>             
+                    </Route>   
+
+                    <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />          
 
 
 

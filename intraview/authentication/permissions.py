@@ -49,6 +49,34 @@ class IsOnboardingInterviewer(BasePermission):
 
 
 
+class IsInterviewParticipant(BasePermission):
+    """
+    Allows access to:
+
+    - Authenticated candidate
+    - Active interviewer
+    """
+
+    def has_permission(self, request, view):
+
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        # Candidate allowed
+        if not hasattr(user, "interviewer_profile"):
+            return True
+
+        # Interviewer must be active
+        return IsActiveInterviewer().has_permission(request, view)
+
+
+
+
+
+
+
 class IsVerifiedInterviewer(BasePermission):
     """
     Only verified interviewers can accept interviews

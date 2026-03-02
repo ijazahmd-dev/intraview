@@ -7,11 +7,14 @@ from rest_framework.response import Response
 from bookings.models import InterviewBooking
 from realtime.services.zego_token_service import ZegoTokenService
 from realtime.services.session_service import SessionService
+from authentication.permissions import IsInterviewParticipant
+from authentication.authentication import MultiRoleJWTAuthentication
 
 
 class ZegoTokenAPIView(APIView):
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsInterviewParticipant]
+    authentication_classes = [MultiRoleJWTAuthentication]
 
     def get(self, request, booking_id):
 
