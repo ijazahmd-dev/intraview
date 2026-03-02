@@ -48,31 +48,64 @@ function InterviewRoom() {
   }, [bookingId]);
 
   // 2) Join button handler
+  // async function handleJoin() {
+  //   if (!tokenData || joined) return;
+
+  //   try {
+  //     setJoinInProgress(true);
+  //     setError(null);
+
+  //     const localContainer = localContainerRef.current;
+  //     const remoteContainer = remoteContainerRef.current;
+
+  //     if (!localContainer || !remoteContainer) {
+  //       throw new Error("Video containers are not ready.");
+  //     }
+
+  //     // Join Zego room and setup streams
+  //     const ctx = await joinRoom(tokenData, localContainer, remoteContainer);
+  //     zegoContextRef.current = ctx;
+  //     setJoined(true);
+  //   } catch (e) {
+  //     console.error(e);
+  //     setError(e.message || "Failed to join interview.");
+  //   } finally {
+  //     setJoinInProgress(false);
+  //   }
+  // }
+
   async function handleJoin() {
-    if (!tokenData || joined) return;
+  if (!tokenData || joined) return;
 
-    try {
-      setJoinInProgress(true);
-      setError(null);
+  try {
+    setJoinInProgress(true);
+    setError(null);
 
-      const localContainer = localContainerRef.current;
-      const remoteContainer = remoteContainerRef.current;
+    const localContainer = localContainerRef.current;
+    const remoteContainer = remoteContainerRef.current;
 
-      if (!localContainer || !remoteContainer) {
-        throw new Error("Video containers are not ready.");
-      }
-
-      // Join Zego room and setup streams
-      const ctx = await joinRoom(tokenData, localContainer, remoteContainer);
-      zegoContextRef.current = ctx;
-      setJoined(true);
-    } catch (e) {
-      console.error(e);
-      setError(e.message || "Failed to join interview.");
-    } finally {
-      setJoinInProgress(false);
+    if (!localContainer || !remoteContainer) {
+      throw new Error("Video containers are not ready.");
     }
+
+    // Join Zego room and setup streams
+    const ctx = await joinRoom(tokenData, localContainer, remoteContainer);
+    zegoContextRef.current = ctx;
+    setJoined(true);
+
+    // If camera failed, show it as a non-fatal warning
+    if (ctx.cameraError) {
+      setError(ctx.cameraError);
+    }
+  } catch (e) {
+    console.error(e);
+    setError(e.message || "Failed to join interview.");
+  } finally {
+    setJoinInProgress(false);
   }
+}
+
+
 
   // 3) Leave button handler
   async function handleLeave() {
