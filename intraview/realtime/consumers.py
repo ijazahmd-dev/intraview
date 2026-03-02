@@ -370,3 +370,26 @@ class InterviewConsumer(AsyncWebsocketConsumer):
             "candidate",
             "interviewer"
         ).get(id=self.booking_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class TestConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.accept()
+        print("Connected!")
+
+    async def receive(self, text_data):
+        await self.send(text_data="Echo: " + text_data)

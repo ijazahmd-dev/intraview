@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'bookings',
     'candidates',
     'realtime',
+    'feedbacks',
 
     'rest_framework',
     "channels",
@@ -376,3 +377,18 @@ PAYOUT_RATE_PER_TOKEN = Decimal("10.00")
 
 # Reference number prefix
 PAYOUT_REFERENCE_PREFIX = "PAY"
+
+
+
+
+ZEGO_APP_ID = int(os.getenv("ZEGO_APP_ID"))
+
+ZEGO_SERVER_SECRET = os.getenv("ZEGO_SERVER_SECRET")
+
+ZEGO_TOKEN_EXPIRY_SECONDS = int(
+    os.getenv("ZEGO_TOKEN_EXPIRY_SECONDS", 7200)
+)
+
+ZEGO_EARLY_JOIN_MINUTES = int(
+    os.getenv("ZEGO_EARLY_JOIN_MINUTES", 10)
+)
