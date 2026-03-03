@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import models
+import pytz
 
 
 from authentication.models import CustomUser, InterviewerStatus
@@ -258,23 +259,28 @@ class CreateInterviewBookingAPIView(APIView):
                 note="Interview booking lock",
             )
 
+            slot_tz = pytz.timezone(availability.timezone)
+
+            start_naive = datetime.combine(
+                availability.date,
+                availability.start_time,
+            )
+
+            end_naive = datetime.combine(
+                availability.date,
+                availability.end_time,
+            )
+
+            start_aware = slot_tz.localize(start_naive)
+            end_aware = slot_tz.localize(end_naive)
+
             # Create booking
             booking = InterviewBooking.objects.create(
                 candidate=candidate,
                 interviewer=interviewer,
                 availability=availability,
-                start_datetime=timezone.make_aware(
-                    datetime.combine(
-                        availability.date,
-                        availability.start_time,
-                    )
-                ),
-                end_datetime=timezone.make_aware(
-                    datetime.combine(
-                        availability.date,
-                        availability.end_time,
-                    )
-                ),
+                start_datetime=start_aware,
+                end_datetime=end_aware,
                 token_cost=TOKEN_COST,
                 status=InterviewBooking.Status.CONFIRMED,
             )

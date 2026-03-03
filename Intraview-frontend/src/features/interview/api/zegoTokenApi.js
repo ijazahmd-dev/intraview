@@ -25,3 +25,18 @@ export async function fetchZegoToken(bookingId) {
     throw new Error(message);
   }
 }
+
+
+
+export async function notifyDisconnect(bookingId) {
+  try {
+    const resp = await API.post(
+      `/api/realtime/zego/disconnect/${bookingId}/`
+    );
+    return resp.data;
+  } catch (err) {
+    // best-effort; log but don't break UI
+    console.error("Disconnect API failed:", err);
+    return null;
+  }
+}
