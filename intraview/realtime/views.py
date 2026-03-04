@@ -101,6 +101,8 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from bookings.models import InterviewBooking
+from realtime.models import InterviewerNote
+from realtime.serializers import InterviewerNoteSerializer
 from realtime.services.zego_token_service import ZegoTokenService
 from realtime.services.session_service import SessionService
 from authentication.permissions import IsInterviewParticipant
@@ -249,3 +251,112 @@ class ZegoDisconnectAPIView(APIView):
                 "reconnect_count": stats["reconnect_count"],
             }
         )
+
+
+
+
+
+
+
+
+
+class InterviewerNoteAPIView(APIView):
+    """
+    GET:    Retrieve interviewer note for a booking (interviewer only).
+    PUT/PATCH: Create or update note content.
+    """
+
+    permission_classes = [IsAuthenticated, IsInterviewParticipant]
+    authentication_classes = [MultiRoleJWTAuthentication]
+
+    def get_booking_and_check_interviewer(self, request, booking_id):
+        """
+        Helper: fetch booking and ensure current user is the interviewer.
+        Raises Response with 403 if not allowed.
+        """
+        user = request.user
+
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+        )
+
+        if user.id != booking.interviewer_id:
+            # Candidate or unrelated user trying to access notes.
+            return None, Response(
+                {
+                    "detail": "Only the interviewer can access notes for this interview.",
+                    "code": "NOTES_FORBIDDEN",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return booking, None
+
+    def get(self, request, booking_id):
+        booking, error_response = self.get_booking_and_check_interviewer(
+            request, booking_id
+        )
+        if error_response:
+            return error_response
+
+        try:
+            note = booking.interviewer_note
+        except InterviewerNote.DoesNotExist:
+            # Return empty note instead of 404 so frontend can treat it as blank.
+            return Response(
+                {
+                    "booking": booking.id,
+                    "interviewer": request.user.id,
+                    "content": "",
+                    "updated_at": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = InterviewerNoteSerializer(note)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, booking_id):
+        """
+        Full update: expects { "content": "..." }.
+        Creates note if missing.
+        """
+        return self._create_or_update(request, booking_id, partial=False)
+
+    def patch(self, request, booking_id):
+        """
+        Partial update: also accepts { "content": "..." }.
+        Creates note if missing.
+        """
+        return self._create_or_update(request, booking_id, partial=True)
+
+    def _create_or_update(self, request, booking_id, partial=False):
+        booking, error_response = self.get_booking_and_check_interviewer(
+            request, booking_id
+        )
+        if error_response:
+            return error_response
+
+        # Get or create note
+        note, created = InterviewerNote.objects.get_or_create(
+            booking=booking,
+            defaults={
+                "interviewer": request.user,
+                "content": request.data.get("content", "") or "",
+            },
+        )
+
+        if not created:
+            # Update existing note
+            serializer = InterviewerNoteSerializer(
+                note,
+                data=request.data,
+                partial=partial,
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        else:
+            serializer = InterviewerNoteSerializer(note)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)

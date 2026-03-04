@@ -64,3 +64,38 @@ class InterviewSession(models.Model):
         if self.started_at and self.ended_at:
             return int((self.ended_at - self.started_at).total_seconds())
         return 0
+
+
+
+
+
+
+
+
+
+class InterviewerNote(models.Model):
+    """
+    Per-booking notes written by the interviewer only.
+    One note per interview booking.
+    """
+
+    booking = models.OneToOneField(
+        InterviewBooking,
+        on_delete=models.CASCADE,
+        related_name="interviewer_note",
+    )
+    interviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="interviewer_notes",
+    )
+    content = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "realtime_interviewer_note"
+        verbose_name = "Interviewer Note"
+        verbose_name_plural = "Interviewer Notes"
+
+    def __str__(self):
+        return f"Note for booking {self.booking_id} by user {self.interviewer_id}"

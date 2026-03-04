@@ -12,5 +12,10 @@ urlpatterns = [
         views.ZegoDisconnectAPIView.as_view(),
         name="zego-disconnect",
     ),
+    path(
+        "interviewer-notes/<int:booking_id>/",
+        views.InterviewerNoteAPIView.as_view(),
+        name="interviewer-notes",
+    ),
 
 ]

@@ -40,3 +40,32 @@ export async function notifyDisconnect(bookingId) {
     return null;
   }
 }
+
+
+
+
+export async function fetchInterviewerNotes(bookingId) {
+  try {
+    const res = await API.get(`/api/realtime/interviewer-notes/${bookingId}/`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 403) {
+      // Candidate tried to access notes - just return empty
+      return { content: "", updated_at: null };
+    }
+    console.error("Failed to fetch interviewer notes:", err);
+    return { content: "", updated_at: null };
+  }
+}
+
+export async function saveInterviewerNotes(bookingId, content) {
+  try {
+    const res = await API.put(`/api/realtime/interviewer-notes/${bookingId}/`, {
+      content: content || "",
+    });
+    return res.data;
+  } catch (err) {
+    console.error("Failed to save interviewer notes:", err);
+    throw err;
+  }
+}
