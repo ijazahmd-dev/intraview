@@ -183,7 +183,6 @@ class InterviewerReview(models.Model):
     )
 
     was_interviewer_prepared = models.BooleanField()
-    was_feedback_helpful = models.BooleanField()
     was_professional = models.BooleanField(default=True)
     would_recommend = models.BooleanField()
 

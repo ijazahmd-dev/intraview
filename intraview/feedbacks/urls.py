@@ -15,6 +15,7 @@ urlpatterns = [
     path("interviewer/evaluations/bookings/<int:booking_id>/submit/",interviewer_views.SubmitCandidateEvaluationAPIView.as_view(),name="submit-evaluation"),
     path("interviewer/evaluations/",interviewer_views.InterviewerEvaluationListAPIView.as_view(),name="evaluation-list"),
     path("interviewer/evaluations/<int:evaluation_id>/",interviewer_views.InterviewerEvaluationDetailAPIView.as_view(),name="evaluation-detail"),
+    path('interviewer/evaluations/bookings/<int:booking_id>/status/',interviewer_views.EvaluationStatusAPIView.as_view(),name='evaluation-booking-status'),
 
 ]
 

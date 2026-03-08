@@ -69,6 +69,10 @@ import AdminPayoutQueuePage from "./interviewerPayout/admin/pages/AdminPayoutQue
 import AdminPayoutDetailPage from "./interviewerPayout/admin/pages/AdminPayoutDetailPage";
 import AdminPayoutHistoryPage from "./interviewerPayout/admin/pages/AdminPayoutHistoryPage";
 import InterviewRoom from "./features/interview/components/InterviewRoom";
+import EvaluationsDashboard from "./features/feedback/interviewer/pages/EvaluationsDashboard"
+import FeedbackDetail from "./features/feedback/interviewer/pages/FeedbackDetail"
+import SubmitEvaluationWrapper from "./features/feedback/interviewer/components/SubmitEvaluationWrapper";
+
 
 
 
@@ -189,6 +193,11 @@ function AppInner() {
                     <Route path="/interviewer/payout/history" element={<PayoutHistoryPage />} />
                     <Route path="/interviewer/payout/:id" element={<PayoutDetailPage />} />
 
+                    {/* feedback routes */}
+                    <Route path="/interviewer/evaluations" element={< EvaluationsDashboard />} />
+                    <Route path="/interviewer/evaluations/:evaluationId" element={< FeedbackDetail />} />
+                    <Route path="/interviewer/bookings/:bookingId/evaluate" element={< SubmitEvaluationWrapper />} />
+
                     
 
                     
@@ -272,6 +281,14 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
 
 
 

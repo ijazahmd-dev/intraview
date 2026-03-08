@@ -82,8 +82,6 @@ class InterviewerReviewCreateSerializer(serializers.ModelSerializer):
 
             "was_interviewer_prepared",
 
-            "was_feedback_helpful",
-
             "was_professional",
 
             "would_recommend",
