@@ -13,6 +13,7 @@ import adminInterviewerSubscriptionReducer from './subscriptions/adminInterviewe
 import adminTokenPackReducer from './token_bundles/adminTokenPackSlice';
 import profileReducer from './candidateProfile/profileSlice';
 import feedbackReducer from './features/feedback/interviewer/interviewerFeedbackSlice';
+import candidateFeedbackReducer from './features/feedback/candidate/candidateFeedbackSlice';
 
 export const store = configureStore({
   reducer: {
@@ -31,5 +32,6 @@ export const store = configureStore({
     adminTokenPack: adminTokenPackReducer,
     profile: profileReducer,
     feedback: feedbackReducer,
+    candidateFeedback: candidateFeedbackReducer,
   },
 });

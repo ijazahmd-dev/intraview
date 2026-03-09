@@ -72,6 +72,9 @@ import InterviewRoom from "./features/interview/components/InterviewRoom";
 import EvaluationsDashboard from "./features/feedback/interviewer/pages/EvaluationsDashboard"
 import FeedbackDetail from "./features/feedback/interviewer/pages/FeedbackDetail"
 import SubmitEvaluationWrapper from "./features/feedback/interviewer/components/SubmitEvaluationWrapper";
+import SubmitInterviewerReviewPage from "./features/feedback/candidate/pages/SubmitInterviewerReviewPage";
+import CandidateFeedbackListPage from "./features/feedback/candidate/pages/CandidateFeedbackListPage";
+import CandidateFeedbackDetailPage from "./features/feedback/candidate/pages/CandidateFeedbackDetailPage";
 
 
 
@@ -197,6 +200,9 @@ function AppInner() {
                     <Route path="/interviewer/evaluations" element={< EvaluationsDashboard />} />
                     <Route path="/interviewer/evaluations/:evaluationId" element={< FeedbackDetail />} />
                     <Route path="/interviewer/bookings/:bookingId/evaluate" element={< SubmitEvaluationWrapper />} />
+                    <Route path="/candidate/bookings/:bookingId/review" element={ <SubmitInterviewerReviewPage />} />
+                    <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
+                    <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
 
                     
 
