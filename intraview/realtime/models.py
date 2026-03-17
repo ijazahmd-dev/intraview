@@ -16,6 +16,7 @@ class SessionStatus(models.TextChoices):
     NO_SHOW = "NO_SHOW", "No Show"
 
 
+
 class InterviewSession(models.Model):
     """
     Persistent record of a real-time interview session.

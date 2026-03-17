@@ -19,7 +19,9 @@ class InterviewBooking(models.Model):
         CANCELLED = "CANCELLED", "Cancelled"         # Cancelled before start
         CANCELLED_BY_CANDIDATE = "CANCELLED_BY_CANDIDATE", "Cancelled by Candidate"
         CANCELLED_BY_INTERVIEWER = "CANCELLED_BY_INTERVIEWER", "Cancelled by Interviewer"
-        NO_SHOW = "NO_SHOW", "No Show"               # Nobody joined
+        CANDIDATE_NO_SHOW = "CANDIDATE_NO_SHOW", "Candidate No Show"
+        INTERVIEWER_NO_SHOW = "INTERVIEWER_NO_SHOW", "Interviewer No Show"
+
 
     candidate = models.ForeignKey(
         User,
@@ -49,6 +51,16 @@ class InterviewBooking(models.Model):
         choices=Status.choices,
         default=Status.PENDING,
     )
+
+    payment_status = models.CharField(
+    max_length=100,
+    choices=[
+        ("PENDING", "Pending"),
+        ("PAID_TO_INTERVIEWER", "Paid to Interviewer"),
+        ("REFUNDED_TO_CANDIDATE", "Refunded to Candidate"),
+    ],
+    default="PENDING"
+)
 
     cancellation_reason = models.TextField(blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
