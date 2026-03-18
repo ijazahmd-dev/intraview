@@ -17,5 +17,14 @@ urlpatterns = [
         views.InterviewerNoteAPIView.as_view(),
         name="interviewer-notes",
     ),
+    path(
+        "interview/finish/<int:booking_id>/",
+        views.FinishInterviewAPIView.as_view(),
+        name="finish-interview",
+    ),
+
+    
+
+
 
 ]

@@ -44,6 +44,31 @@ export async function notifyDisconnect(bookingId) {
 
 
 
+export async function finishInterview(bookingId) {
+  try {
+    const res = await API.post(`/api/realtime/interview/finish/${bookingId}/`);
+    return res.data;
+  } catch (err) {
+    let message = "Failed to finish interview.";
+
+    if (err.response) {
+      const { data } = err.response;
+      if (data?.error || data?.detail) {
+        message = data.error || data.detail;
+      }
+      // Optional: expose backend code to caller
+      const e = new Error(message);
+      e.code = data?.code;
+      throw e;
+    }
+
+    throw new Error(err.message || message);
+  }
+}
+
+
+
+
 export async function fetchInterviewerNotes(bookingId) {
   try {
     const res = await API.get(`/api/realtime/interviewer-notes/${bookingId}/`);

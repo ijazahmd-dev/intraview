@@ -75,6 +75,7 @@ import SubmitEvaluationWrapper from "./features/feedback/interviewer/components/
 import SubmitInterviewerReviewPage from "./features/feedback/candidate/pages/SubmitInterviewerReviewPage";
 import CandidateFeedbackListPage from "./features/feedback/candidate/pages/CandidateFeedbackListPage";
 import CandidateFeedbackDetailPage from "./features/feedback/candidate/pages/CandidateFeedbackDetailPage";
+import InterviewCompleted from "./features/interview/components/InterviewCompleted";
 
 
 
@@ -143,7 +144,8 @@ function AppInner() {
                       <Route path="settings" element={<SettingsPage />} /> 
                     </Route>   
 
-                    <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />          
+                    <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />   
+                    <Route path="/interview/completed/:bookingId" element={<InterviewCompleted />}/>       
 
 
 

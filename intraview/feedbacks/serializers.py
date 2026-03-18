@@ -135,12 +135,12 @@ class InterviewerReviewCreateSerializer(serializers.ModelSerializer):
             )
 
 
-        # Booking status validation
-        if booking.status != InterviewBooking.Status.COMPLETED:
+        # # Booking status validation
+        # if booking.status != InterviewBooking.Status.COMPLETED:
 
-            raise serializers.ValidationError(
-                "Interview must be completed before review."
-            )
+        #     raise serializers.ValidationError(
+        #         "Interview must be completed before review."
+        #     )
 
 
         # Duplicate prevention

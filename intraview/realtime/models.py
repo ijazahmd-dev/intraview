@@ -43,6 +43,9 @@ class InterviewSession(models.Model):
     candidate_disconnected_at = models.DateTimeField(null=True, blank=True)
     interviewer_disconnected_at = models.DateTimeField(null=True, blank=True)
 
+    candidate_finished = models.BooleanField(default=False)
+    interviewer_finished = models.BooleanField(default=False)
+
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
