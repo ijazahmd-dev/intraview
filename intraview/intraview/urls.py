@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/candidate/', include('candidates.urls')),
     path('api/feedback/', include('feedbacks.urls')),
     path("api/realtime/", include("realtime.urls")),
+    path("api/", include("notifications.urls")),
 
 
 ]

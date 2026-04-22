@@ -1,3 +1,6 @@
+# intervewers models.py
+
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -34,6 +37,7 @@ class InterviewerApplication(models.Model):
     timezone = models.CharField(max_length=100)
 
     # Professional info
+    company_name = models.CharField(max_length=200,blank=True,help_text="Current or most recent company the applicant works/worked at.",)
     years_of_experience = models.PositiveIntegerField()
     years_of_interview_experience = models.PositiveIntegerField(default=0)
     education = models.CharField(max_length=255, blank=True)

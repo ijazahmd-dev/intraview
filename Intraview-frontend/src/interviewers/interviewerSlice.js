@@ -1,9 +1,128 @@
+// // Intraview-frontend/src/interviewers/interviewerSlice.js
+
+
+
+// import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+// import interviewerApi from "../api/interviewerApi";
+
+
+
+// /* ------------------ THUNKS ------------------ */
+
+// export const fetchInterviewerStatus = createAsyncThunk(
+//   "interviewer/status",
+//   async (_, thunkAPI) => {
+//     try {
+//       return await interviewerApi.getStatus();
+//     } catch (err) {
+//       return thunkAPI.rejectWithValue(err.response?.data);
+//     }
+//   }
+// );
+
+// export const submitInterviewerApplication = createAsyncThunk(
+//   "interviewer/apply",
+//   async (formData, thunkAPI) => {
+//     try {
+//       return await interviewerApi.apply(formData);
+//     } catch (err) {
+//       return thunkAPI.rejectWithValue(err.response?.data);
+//     }
+//   }
+// );
+
+// export const fetchEligibility = createAsyncThunk(
+//   "interviewer/eligibility",
+//   async (_, thunkAPI) => {
+//     try {
+//       return await interviewerApi.getEligibility();
+//     } catch (err) {
+//       return thunkAPI.rejectWithValue(err.response?.data);
+//     }
+//   }
+// );
+
+// /* ------------------ SLICE ------------------ */
+
+// const interviewerSlice = createSlice({
+//   name: "interviewer",
+//   initialState: {
+//     eligibility: null, // {can_apply, status?, previous_rejection_reason?}
+//     loadingEligibility: false,
+//     status: "IDLE", // NOT_APPLIED | PENDING | APPROVED_NOT_ONBOARDED | ACTIVE | REJECTED
+//     loading: false,
+//     error: null,
+//     rejection_reason: null,
+//     submitted_at: null,
+//     application_id: null,
+//   },
+//   reducers: {},
+//   extraReducers: (builder) => {
+//     builder
+//       .addCase(fetchInterviewerStatus.pending, (state) => {
+//         state.loading = true;
+//       })
+//       .addCase(fetchInterviewerStatus.fulfilled, (state, action) => {
+//         state.loading = false;
+//         state.status = action.payload.status;
+//         state.rejection_reason = action.payload.rejection_reason || null;
+//         state.submitted_at = action.payload.submitted_at || null;
+//         state.application_id = action.payload.application_id || null;
+//       })
+//       .addCase(fetchInterviewerStatus.rejected, (state, action) => {
+//         state.loading = false;
+//         state.status = "NOT_APPLIED";
+//       })
+//       .addCase(submitInterviewerApplication.pending, (state) => {
+//         state.loading = true;
+//       })
+//       .addCase(submitInterviewerApplication.fulfilled, (state) => {
+//         state.loading = false;
+//         state.status = "PENDING";
+//       })
+//       .addCase(submitInterviewerApplication.rejected, (state, action) => {
+//         state.loading = false;
+//         state.error = action.payload;
+//       })
+//       .addCase(fetchEligibility.pending, (state) => {
+//         state.loadingEligibility = true;
+//       })
+//       .addCase(fetchEligibility.fulfilled, (state, action) => {
+//         state.loadingEligibility = false;
+//         state.eligibility = action.payload;
+//       })
+//       .addCase(fetchEligibility.rejected, (state) => {
+//         state.loadingEligibility = false;
+//         state.eligibility = null;
+//       });
+//   },
+// });
+
+// export default interviewerSlice.reducer;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// src/interviewers/interviewerSlice.js
+
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import interviewerApi from "../api/interviewerApi";
 
-
-
-/* ------------------ THUNKS ------------------ */
+/* ─── Thunks ─────────────────────────────────────────────────────────────── */
 
 export const fetchInterviewerStatus = createAsyncThunk(
   "interviewer/status",
@@ -11,6 +130,24 @@ export const fetchInterviewerStatus = createAsyncThunk(
     try {
       return await interviewerApi.getStatus();
     } catch (err) {
+      return thunkAPI.rejectWithValue(err.response?.data);
+    }
+  }
+);
+
+/**
+ * Fetch the user's existing application data.
+ * Used to pre-populate the re-apply form when the previous application was rejected.
+ * Resolves to null (not an error) if no application exists yet.
+ */
+export const fetchExistingApplication = createAsyncThunk(
+  "interviewer/fetchExistingApplication",
+  async (_, thunkAPI) => {
+    try {
+      return await interviewerApi.getApplication();
+    } catch (err) {
+      // 404 simply means no application yet — not an error state
+      if (err.response?.status === 404) return null;
       return thunkAPI.rejectWithValue(err.response?.data);
     }
   }
@@ -38,60 +175,88 @@ export const fetchEligibility = createAsyncThunk(
   }
 );
 
-/* ------------------ SLICE ------------------ */
+/* ─── Slice ──────────────────────────────────────────────────────────────── */
 
 const interviewerSlice = createSlice({
   name: "interviewer",
   initialState: {
-    eligibility: null, // {can_apply, status?, previous_rejection_reason?}
-    loadingEligibility: false,
-    status: "IDLE", // NOT_APPLIED | PENDING | APPROVED_NOT_ONBOARDED | ACTIVE | REJECTED
-    loading: false,
-    error: null,
-    rejection_reason: null,
-    submitted_at: null,
-    application_id: null,
+    eligibility:          null,
+    loadingEligibility:   false,
+    status:               "IDLE",
+    loading:              false,
+    error:                null,
+    rejection_reason:     null,
+    submitted_at:         null,
+    application_id:       null,
+
+    // Existing application data (null = not yet fetched or no application)
+    existingApplication:        null,
+    loadingExistingApplication: false,
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
+
+      // ── fetchInterviewerStatus ────────────────────────────────────────────
       .addCase(fetchInterviewerStatus.pending, (state) => {
         state.loading = true;
       })
       .addCase(fetchInterviewerStatus.fulfilled, (state, action) => {
-        state.loading = false;
-        state.status = action.payload.status;
+        state.loading         = false;
+        state.status          = action.payload.status;
         state.rejection_reason = action.payload.rejection_reason || null;
-        state.submitted_at = action.payload.submitted_at || null;
-        state.application_id = action.payload.application_id || null;
+        state.submitted_at    = action.payload.submitted_at || null;
+        state.application_id  = action.payload.application_id || null;
       })
-      .addCase(fetchInterviewerStatus.rejected, (state, action) => {
+      .addCase(fetchInterviewerStatus.rejected, (state) => {
         state.loading = false;
-        state.status = "NOT_APPLIED";
+        state.status  = "NOT_APPLIED";
       })
+
+      // ── fetchExistingApplication ──────────────────────────────────────────
+      .addCase(fetchExistingApplication.pending, (state) => {
+        state.loadingExistingApplication = true;
+      })
+      .addCase(fetchExistingApplication.fulfilled, (state, action) => {
+        state.loadingExistingApplication = false;
+        state.existingApplication        = action.payload; // null if 404
+      })
+      .addCase(fetchExistingApplication.rejected, (state) => {
+        state.loadingExistingApplication = false;
+        state.existingApplication        = null;
+      })
+
+      // ── submitInterviewerApplication ──────────────────────────────────────
       .addCase(submitInterviewerApplication.pending, (state) => {
         state.loading = true;
+        state.error   = null;
       })
       .addCase(submitInterviewerApplication.fulfilled, (state) => {
         state.loading = false;
-        state.status = "PENDING";
+        state.status  = "PENDING";
       })
       .addCase(submitInterviewerApplication.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error   = action.payload;
       })
+
+      // ── fetchEligibility ──────────────────────────────────────────────────
       .addCase(fetchEligibility.pending, (state) => {
         state.loadingEligibility = true;
       })
       .addCase(fetchEligibility.fulfilled, (state, action) => {
         state.loadingEligibility = false;
-        state.eligibility = action.payload;
+        state.eligibility        = action.payload;
       })
       .addCase(fetchEligibility.rejected, (state) => {
         state.loadingEligibility = false;
-        state.eligibility = null;
+        state.eligibility        = null;
       });
   },
 });
 
 export default interviewerSlice.reducer;
+
+
+
+

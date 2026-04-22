@@ -138,6 +138,7 @@ import { useEffect, useState } from "react";
 import { fetchDashboardSummary } from "../interviewerDashboardApi";
 import { logoutInterviewer } from "../../authentication/interviewerAuthSlice";
 import { useDispatch } from "react-redux";
+import NotificationBell from "../../features/notification/user/components/NotificationBell";
 
 const navItems = [
   { 
@@ -444,6 +445,8 @@ export default function InterviewerDashboardLayout() {
               </p>
             </div>
           </div>
+
+          <NotificationBell />
 
           <div className="flex items-center gap-3">
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all shadow-sm">

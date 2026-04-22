@@ -1,4 +1,4 @@
-
+#realtime/services/session_service.py
 
 """
 Session Service - Manages interview session lifecycle and state transitions.
@@ -133,11 +133,27 @@ class SessionService:
         now = timezone.now()
 
         if role == "candidate":
+            if session.candidate_connected_at:
+                elapsed = int((now - session.candidate_connected_at).total_seconds())
+                session.candidate_total_seconds += max(0, elapsed)
             session.candidate_disconnected_at = now
-            logger.info(f"Candidate disconnected from session {session.id}")
+            logger.info(
+                f"Candidate disconnected session={session.id} "
+                f"total_seconds={session.candidate_total_seconds}"
+            )
         elif role == "interviewer":
+            if session.interviewer_connected_at:
+                elapsed = int((now - session.interviewer_connected_at).total_seconds())
+                session.interviewer_total_seconds += max(0, elapsed)
             session.interviewer_disconnected_at = now
-            logger.info(f"Interviewer disconnected from session {session.id}")
+            logger.info(
+                f"Interviewer disconnected session={session.id} "
+                f"total_seconds={session.interviewer_total_seconds}"
+            )
+
+
+        print("the total time the candidate was in the interview was :",session.candidate_total_seconds)    
+        print("the total time the interivewer was in the interview was :",session.interviewer_total_seconds)
 
         # ── IMPORTANT: Do NOT end the session here. ──────────────────────────
         # Both users may reconnect freely until booking.end_datetime.
@@ -229,37 +245,56 @@ class SessionService:
     @staticmethod
     @transaction.atomic
     def check_session_end_by_time(session: InterviewSession) -> bool:
-        """
-        End a LIVE session if its scheduled end time has been reached.
-
-        Called every minute by cleanup_stale_sessions().
-
-        Returns:
-            True  — session was ended now
-            False — not time yet, or already in terminal state
-        """
         if session.status != SessionStatus.LIVE:
             return False
-
-        now = timezone.now()
+ 
+        now         = timezone.now()
         booking_end = session.booking.end_datetime
-
+ 
         if now < booking_end:
-            return False   # Still within the scheduled window
+            return False
+ 
+        # Flush presence for still-connected participants
+        if session.candidate_connected_at and not session.candidate_disconnected_at:
+            elapsed = int((now - session.candidate_connected_at).total_seconds())
+            session.candidate_total_seconds += max(0, elapsed)
+ 
+        if session.interviewer_connected_at and not session.interviewer_disconnected_at:
+            elapsed = int((now - session.interviewer_connected_at).total_seconds())
+            session.interviewer_total_seconds += max(0, elapsed)
 
-        # Time is up — end the session
-        session.status = SessionStatus.ENDED
+
+        print(" This is important the total time the candidate was in the interview was :",session.candidate_total_seconds)    
+        print(" This is important the total time the interivewer was in the interview was :",session.interviewer_total_seconds)    
+ 
+        session.status   = SessionStatus.ENDED
         session.ended_at = now
-        session.save(update_fields=["status", "ended_at"])
-
-        booking = session.booking
+        session.save(update_fields=[
+            "status", "ended_at",
+            "candidate_total_seconds", "interviewer_total_seconds",
+        ])
+ 
+        booking        = session.booking
         booking.status = InterviewBooking.Status.COMPLETED
         booking.save(update_fields=["status", "updated_at"])
-
+ 
         logger.info(
-            f"Session {session.id} ended by scheduled time "
-            f"(booking {booking.id}, duration: {session.duration_seconds}s)"
+            f"Session {session.id} ENDED by scheduled time "
+            f"(booking {booking.id}, "
+            f"candidate={session.candidate_total_seconds}s, "
+            f"interviewer={session.interviewer_total_seconds}s)"
         )
+ 
+        # Settle payment (either immediate refund or open evaluation window)
+        from realtime.services.session_payment_service import SessionPaymentService
+        try:
+            SessionPaymentService.settle_session_payment(session=session, booking=booking)
+        except Exception as e:
+            logger.error(
+                f"Payment settlement FAILED for session {session.id}: {e}",
+                exc_info=True,
+            )
+ 
         return True
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -335,6 +370,20 @@ class SessionService:
 
         session.booking.status = booking_no_show_status
         session.booking.save(update_fields=["status", "updated_at"])
+
+
+        from realtime.services.session_payment_service import SessionPaymentService
+        try:
+            SessionPaymentService.handle_no_show_refund(
+                session=session,
+                booking=session.booking,
+                no_show_status=booking_no_show_status,
+            )
+        except Exception as e:
+            logger.error(
+                f"No-show refund FAILED for session {session.id}: {e}",
+                exc_info=True,
+            )
 
         return True
 
@@ -419,6 +468,7 @@ class SessionService:
         Returns dict with counts for monitoring.
         """
         from django.db.models import Q
+        from realtime.services.session_payment_service import SessionPaymentService
 
         print("cleanup_stale_sessions started")
 
@@ -452,16 +502,27 @@ class SessionService:
             # if SessionService.check_grace_period_expiry(session):
             #     grace_expired_count += 1
 
-        logger.info(
-            f"Session cleanup — ended_by_time: {ended_by_time_count}, "
-            f"no_shows: {no_show_count}, grace_expired: {grace_expired_count}"
-        )
 
+        expired_refund_count = 0
+        try:
+            expired_refund_count = SessionPaymentService.refund_expired_deadlines()
+        except Exception as e:
+            logger.error(f"refund_expired_deadlines failed: {e}", exc_info=True)
+ 
+        logger.info(
+            f"Cleanup — ended_by_time={ended_by_time_count} "
+            f"no_shows={no_show_count} grace_expired={grace_expired_count} "
+            f"evaluation_deadline_refunds={expired_refund_count}"
+        )
+ 
         return {
-            "ended_by_time_count":  ended_by_time_count,
-            "no_show_count":        no_show_count,
-            "grace_expired_count":  grace_expired_count,
-        }
+            "ended_by_time_count":           ended_by_time_count,
+            "no_show_count":                 no_show_count,
+            "grace_expired_count":           grace_expired_count,
+            "evaluation_deadline_refunds":   expired_refund_count,
+        }    
+
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS
@@ -480,13 +541,17 @@ class SessionService:
     @staticmethod
     def get_session_stats(session: InterviewSession) -> dict:
         return {
-            "session_id":              session.id,
-            "booking_id":              session.booking_id,
-            "status":                  session.status,
-            "duration_seconds":        session.duration_seconds,
-            "reconnect_count":         session.reconnect_count,
-            "candidate_connected_at":  session.candidate_connected_at,
+            "session_id":               session.id,
+            "booking_id":               session.booking_id,
+            "status":                   session.status,
+            "duration_seconds":         session.duration_seconds,
+            "reconnect_count":          session.reconnect_count,
+            "candidate_total_seconds":  session.candidate_total_seconds,
+            "interviewer_total_seconds": session.interviewer_total_seconds,
+            "candidate_connected_at":   session.candidate_connected_at,
             "interviewer_connected_at": session.interviewer_connected_at,
-            "started_at":              session.started_at,
-            "ended_at":                session.ended_at,
+            "candidate_finished":       session.candidate_finished,
+            "interviewer_finished":     session.interviewer_finished,
+            "started_at":               session.started_at,
+            "ended_at":                 session.ended_at,
         }

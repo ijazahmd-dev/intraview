@@ -1,3 +1,5 @@
+# interviewers views.py
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -17,7 +19,9 @@ from .serializers import (
     InterviewerAvailabilityCreateSerializer,
     InterviewerVerificationSubmitSerializer,
     InterviewerVerificationDetailSerializer,
-    InterviewerProfilePictureSerializer
+    InterviewerProfilePictureSerializer,
+    InterviewerApplicationReadSerializer,
+    InterviewerApplicationUpdateSerializer
 )
 from authentication.permissions import IsAdminRole  # adjust import
 from authentication.authentication import AdminCookieJWTAuthentication
@@ -35,51 +39,171 @@ from bookings.models import InterviewBooking
 
 
 
+# class InterviewerApplicationCreateView(APIView):
+#     """
+#     POST /api/interviewer/apply/
+#     Authenticated normal user submits an application.
+#     """
+    
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         user = request.user
+
+#         try:
+#             existing_app = user.interviewer_application
+#             if existing_app.status == InterviewerApplication.STATUS_REJECTED:
+#                 print(f"🗑️ Deleting old rejected application for {user.email}")
+#                 existing_app.delete()
+#             elif existing_app.status in [InterviewerApplication.STATUS_PENDING, InterviewerApplication.STATUS_APPROVED]:
+#                 return Response({
+#                     "error": "Cannot apply. You have a pending or approved application."
+#                 }, status=status.HTTP_400_BAD_REQUEST)
+#         except InterviewerApplication.DoesNotExist:
+#             pass
+
+#         serializer = InterviewerApplicationCreateSerializer(
+#             data=request.data,
+#             context={"request": request},
+#         )
+#         if serializer.is_valid():
+#             serializer.save(user=request.user)
+
+#             user = request.user
+#             user.interviewer_status = InterviewerStatus.PENDING_APPROVAL
+#             user.save(update_fields=["interviewer_status"])
+
+
+#             send_application_submitted_email.delay(
+#                 request.user.email,
+#                 request.user.username,
+#             )
+#             return Response(
+#                 {"message": "Interviewer application submitted successfully."},
+#                 status=status.HTTP_201_CREATED,
+#             )
+#         print(serializer.errors)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+# ─── Application create / update ──────────────────────────────────────────────
+ 
 class InterviewerApplicationCreateView(APIView):
     """
+    GET  /api/interviewer/apply/
+        Returns the user's existing application data so the frontend can
+        pre-populate the re-apply form. Returns 404 if no application exists.
+ 
     POST /api/interviewer/apply/
-    Authenticated normal user submits an application.
+        • First-time applicants  → creates a new InterviewerApplication.
+        • Rejected applicants    → UPDATES the existing application in-place
+          (no delete/re-create). File fields are kept if no new file is sent.
+          Status is reset to PENDING automatically by the update serializer.
     """
-    
+ 
     permission_classes = [IsAuthenticated]
-
+ 
+    # ── GET — return existing application for pre-population ─────────────────
+    def get(self, request):
+        user = request.user
+ 
+        try:
+            app = user.interviewer_application
+        except InterviewerApplication.DoesNotExist:
+            return Response(
+                {"detail": "No application found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+ 
+        serializer = InterviewerApplicationReadSerializer(
+            app, context={"request": request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+ 
+    # ── POST — create (first time) or update (rejected) ──────────────────────
     def post(self, request):
         user = request.user
-
-        try:
-            existing_app = user.interviewer_application
-            if existing_app.status == InterviewerApplication.STATUS_REJECTED:
-                print(f"🗑️ Deleting old rejected application for {user.email}")
-                existing_app.delete()
-            elif existing_app.status in [InterviewerApplication.STATUS_PENDING, InterviewerApplication.STATUS_APPROVED]:
-                return Response({
-                    "error": "Cannot apply. You have a pending or approved application."
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except InterviewerApplication.DoesNotExist:
-            pass
-
+ 
+        existing_app = getattr(user, "interviewer_application", None)
+ 
+        # ── Rejected applicant: UPDATE existing application ───────────────────
+        if existing_app and existing_app.status == InterviewerApplication.STATUS_REJECTED:
+            serializer = InterviewerApplicationUpdateSerializer(
+                instance=existing_app,
+                data=request.data,
+                partial=True,                 # files are optional
+                context={"request": request},
+            )
+            if serializer.is_valid():
+                serializer.save()
+ 
+                # Interviewer status back to pending
+                user.interviewer_status = InterviewerStatus.PENDING_APPROVAL
+                user.save(update_fields=["interviewer_status"])
+ 
+                send_application_submitted_email.delay(
+                    user.email,
+                    user.username,
+                )
+                return Response(
+                    {"message": "Application re-submitted successfully."},
+                    status=status.HTTP_200_OK,
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+        # ── Pending / Approved: block ─────────────────────────────────────────
+        if existing_app and existing_app.status in [
+            InterviewerApplication.STATUS_PENDING,
+            InterviewerApplication.STATUS_APPROVED,
+        ]:
+            return Response(
+                {"error": "Cannot apply. You have a pending or approved application."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+ 
+        # ── First-time applicant: CREATE new application ──────────────────────
         serializer = InterviewerApplicationCreateSerializer(
             data=request.data,
             context={"request": request},
         )
         if serializer.is_valid():
-            serializer.save(user=request.user)
-
-            user = request.user
+            serializer.save(user=user)
+ 
             user.interviewer_status = InterviewerStatus.PENDING_APPROVAL
             user.save(update_fields=["interviewer_status"])
-
-
+ 
             send_application_submitted_email.delay(
-                request.user.email,
-                request.user.username,
+                user.email,
+                user.username,
             )
             return Response(
                 {"message": "Interviewer application submitted successfully."},
                 status=status.HTTP_201_CREATED,
             )
-        print(serializer.errors)
+ 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class InterviewerApplicationStatusView(APIView):
@@ -109,6 +233,7 @@ class InterviewerApplicationStatusView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 
 

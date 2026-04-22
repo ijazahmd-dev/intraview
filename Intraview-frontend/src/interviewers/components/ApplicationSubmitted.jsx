@@ -1,4 +1,4 @@
-// src/features/interviewer/components/ApplicationSubmitted.jsx
+//   src/interviewers/components/ApplicationSubmitted.jsx
 import { useNavigate } from "react-router-dom";
 
 export default function ApplicationSubmitted() {

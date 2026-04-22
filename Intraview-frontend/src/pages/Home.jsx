@@ -6,6 +6,7 @@ import { Play, Pause, SkipBack, SkipForward, RotateCcw, Settings, Maximize2, Mic
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../authentication/authSlice';
 import { Link } from "react-router-dom";
+import NotificationBell from '../features/notification/user/components/NotificationBell';
 
 
 export default function Home() {
@@ -127,6 +128,7 @@ export default function Home() {
                 </>
               )}
             </div>
+            <NotificationBell />
           </div>
         </div>
       </header>

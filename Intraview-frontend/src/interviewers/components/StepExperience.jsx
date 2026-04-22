@@ -1,4 +1,4 @@
-// src/features/interviewer/components/StepExperience.jsx
+//  src/interviewers/components/StepExperience.jsx
 const SPECIALIZATION_OPTIONS = [
   "Frontend",
   "Backend",

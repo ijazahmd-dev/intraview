@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'candidates',
     'realtime',
     'feedbacks',
+    'notifications',
 
     'rest_framework',
     "channels",
@@ -347,29 +348,6 @@ if SENTRY_DSN:
 
 
 
-
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-}
-
-
-
-
-
-
-
-
 # Minimum tokens to request payout
 PAYOUT_MIN_TOKENS = 50
 
@@ -393,3 +371,49 @@ ZEGO_TOKEN_EXPIRY_SECONDS = int(
 ZEGO_EARLY_JOIN_MINUTES = int(
     os.getenv("ZEGO_EARLY_JOIN_MINUTES", 10)
 )
+
+
+
+
+
+
+
+
+NOVU_SECRET_KEY = os.environ.get("NOVU_SECRET_KEY", "")
+
+
+# optional, if you ever need to override (defaults to https://api.novu.co in SDK)
+NOVU_API_URL = os.environ.get("NOVU_API_URL", "https://api.novu.co")
+
+# Map our internal EventType values to Novu workflow identifiers
+NOVU_WORKFLOW_IDS = {
+    # EventType.<NAME>.value : "workflowId in Novu"
+    "INTERVIEW_BOOKED": "interview-booked",
+    "PAYMENT_SUCCESS": "payment-success",
+    "PAYOUT_FAILED": "payout-failed",
+    "FEEDBACK_PENDING": "feedback-pending",
+    "INTERVIEW_REMINDER_30M": "interview-reminder-30m",
+}
+
+
+
+
+
+
+
+
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

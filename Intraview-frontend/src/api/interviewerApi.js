@@ -14,6 +14,12 @@ const interviewerApi = {
     return res.data;
   },
 
+  getApplication: async () => {
+    const res = await API.get("/api/interviewer/apply/");
+    return res.data;
+  },
+
+
   getEligibility: async () => {
     const res = await API.get("/api/interviewer/eligibility/");
     return res.data;

@@ -1,58 +1,212 @@
+# interviewers serializers.py
+
 from rest_framework import serializers
 from .models import InterviewerApplication, InterviewerProfile, InterviewerAvailability, InterviewerVerification, VerificationStatus
 
 
 
+# class InterviewerApplicationCreateSerializer(serializers.ModelSerializer):
+
+
+#     specializations = serializers.ListField(
+#         child=serializers.CharField(),
+#         allow_empty=False
+#     )
+
+#     languages = serializers.ListField(
+#         child=serializers.CharField(),
+#         allow_empty=False
+#     )
+
+
+
+#     class Meta:
+#         model = InterviewerApplication
+#         exclude = ("user", "status", "reviewed_at", "reviewed_by", "rejection_reason", "created_at")
+
+#     # def validate(self, attrs):
+#     #     user = self.context["request"].user
+
+#     #     # Only allow one application
+#     #     if hasattr(user, "interviewer_application"):
+#     #         raise serializers.ValidationError({
+#     #         "code": "APPLICATION_EXISTS",
+#     #         "message": "You have already submitted an interviewer application."
+#     #     })
+
+#     #     return attrs
+
+#     def validate(self, attrs):
+#         user = self.context["request"].user
+
+#         # ✅ FIXED: Check if user can apply
+#         existing_app = getattr(user, "interviewer_application", None)
+#         if existing_app:
+#             if existing_app.status == InterviewerApplication.STATUS_PENDING:
+#                 raise serializers.ValidationError({
+#                     "code": "APPLICATION_PENDING",
+#                     "message": "You already have a pending application. Please wait for review."
+#                 })
+#             elif existing_app.status == InterviewerApplication.STATUS_APPROVED:
+#                 raise serializers.ValidationError({
+#                     "code": "ALREADY_APPROVED",
+#                     "message": "You are already an approved interviewer."
+#                 })
+#             # ✅ ALLOW if REJECTED - user can reapply
+
+#         return attrs
+
+
+
+
+
+
+
+
+
+# ─── Application serializers ──────────────────────────────────────────────────
+ 
 class InterviewerApplicationCreateSerializer(serializers.ModelSerializer):
-
-
+    """
+    Used when a user submits their FIRST application.
+    Resume is required.
+    """
+ 
     specializations = serializers.ListField(
         child=serializers.CharField(),
-        allow_empty=False
+        allow_empty=False,
     )
-
     languages = serializers.ListField(
         child=serializers.CharField(),
-        allow_empty=False
+        allow_empty=False,
     )
-
-
-
+ 
     class Meta:
-        model = InterviewerApplication
-        exclude = ("user", "status", "reviewed_at", "reviewed_by", "rejection_reason", "created_at")
-
-    # def validate(self, attrs):
-    #     user = self.context["request"].user
-
-    #     # Only allow one application
-    #     if hasattr(user, "interviewer_application"):
-    #         raise serializers.ValidationError({
-    #         "code": "APPLICATION_EXISTS",
-    #         "message": "You have already submitted an interviewer application."
-    #     })
-
-    #     return attrs
-
+        model  = InterviewerApplication
+        exclude = (
+            "user", "status", "reviewed_at", "reviewed_by",
+            "rejection_reason", "created_at",
+        )
+ 
     def validate(self, attrs):
-        user = self.context["request"].user
-
-        # ✅ FIXED: Check if user can apply
+        user         = self.context["request"].user
         existing_app = getattr(user, "interviewer_application", None)
+ 
         if existing_app:
             if existing_app.status == InterviewerApplication.STATUS_PENDING:
                 raise serializers.ValidationError({
-                    "code": "APPLICATION_PENDING",
-                    "message": "You already have a pending application. Please wait for review."
+                    "code":    "APPLICATION_PENDING",
+                    "message": "You already have a pending application. Please wait for review.",
                 })
             elif existing_app.status == InterviewerApplication.STATUS_APPROVED:
                 raise serializers.ValidationError({
-                    "code": "ALREADY_APPROVED",
-                    "message": "You are already an approved interviewer."
+                    "code":    "ALREADY_APPROVED",
+                    "message": "You are already an approved interviewer.",
                 })
-            # ✅ ALLOW if REJECTED - user can reapply
-
+            # REJECTED — handled by the update path, should not reach here
+ 
         return attrs
+ 
+ 
+class InterviewerApplicationUpdateSerializer(serializers.ModelSerializer):
+    """
+    Used when a REJECTED applicant re-submits their application.
+ 
+    Key differences from the create serializer:
+      • resume / certifications / additional_docs are NOT required —
+        if the user doesn't upload a new file we keep the existing one.
+      • Status / admin fields are excluded as usual.
+    """
+ 
+    specializations = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+    languages = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False,
+    )
+ 
+    # Override file fields to make them optional on update
+    resume = serializers.FileField(required=False, allow_null=True)
+    certifications  = serializers.FileField(required=False, allow_null=True)
+    additional_docs = serializers.FileField(required=False, allow_null=True)
+ 
+    class Meta:
+        model  = InterviewerApplication
+        exclude = (
+            "user", "status", "reviewed_at", "reviewed_by",
+            "rejection_reason", "created_at",
+        )
+ 
+    def update(self, instance, validated_data):
+        # Only replace a file field if a new file was actually sent
+        for file_field in ("resume", "certifications", "additional_docs"):
+            if file_field not in validated_data or validated_data[file_field] is None:
+                validated_data.pop(file_field, None)   # keep the existing file
+ 
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+ 
+        # Reset admin-review state so the admin sees it as a fresh submission
+        instance.status         = InterviewerApplication.STATUS_PENDING
+        instance.rejection_reason = ""
+        instance.reviewed_at    = None
+        instance.reviewed_by    = None
+ 
+        instance.save()
+        return instance
+ 
+ 
+class InterviewerApplicationReadSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer — returns existing application data for pre-populating
+    the re-apply form. File fields return the URL/path, not the file object.
+    """
+ 
+    specializations = serializers.ListField(child=serializers.CharField())
+    languages       = serializers.ListField(child=serializers.CharField())
+ 
+    class Meta:
+        model  = InterviewerApplication
+        fields = (
+            "id",
+            "phone_number",
+            "location",
+            "timezone",
+            "linkedin_url",
+            "github_url",
+            "portfolio_url",
+            "company_name",
+            "years_of_experience",
+            "years_of_interview_experience",
+            "specializations",
+            "languages",
+            "education",
+            "expertise_summary",
+            "motivation",
+            "resume",
+            "certifications",
+            "additional_docs",
+            "status",
+            "rejection_reason",
+            "created_at",
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class InterviewerApplicationAdminSerializer(serializers.ModelSerializer):

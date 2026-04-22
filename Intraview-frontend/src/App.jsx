@@ -76,6 +76,7 @@ import SubmitInterviewerReviewPage from "./features/feedback/candidate/pages/Sub
 import CandidateFeedbackListPage from "./features/feedback/candidate/pages/CandidateFeedbackListPage";
 import CandidateFeedbackDetailPage from "./features/feedback/candidate/pages/CandidateFeedbackDetailPage";
 import InterviewCompleted from "./features/interview/components/InterviewCompleted";
+import NotificationsPage from "./features/notification/user/pages/NotificationsPage";
 
 
 
@@ -207,6 +208,8 @@ function AppInner() {
                     <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
 
                     
+
+                    <Route path="/notifications" element={< NotificationsPage />} />
 
                     
                                                 

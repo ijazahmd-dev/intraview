@@ -42,6 +42,10 @@ from .serializers import (
     CandidateRescheduleSerializer
 )
 
+from django.utils.timezone import localtime
+from notifications.events import emit_event
+from notifications.constants import EventType
+
 
 
 
@@ -284,6 +288,21 @@ class CreateInterviewBookingAPIView(APIView):
                 token_cost=TOKEN_COST,
                 status=InterviewBooking.Status.CONFIRMED,
             )
+
+            def emit_booking_event():
+                emit_event(
+                    EventType.INTERVIEW_BOOKED,
+                    actor_id=candidate.id,
+                    payload={
+                        "booking_id": booking.id,
+                        "candidate_id": candidate.id,
+                        "interviewer_id": interviewer.id,
+                        "start_time": localtime(booking.start_datetime).isoformat(),
+                    },
+                    correlation_id=f"booking:{booking.id}",
+                )
+
+            transaction.on_commit(emit_booking_event)
                                                                                             
         # -------------------------
         # Response

@@ -1,3 +1,8 @@
+# bookings/models.py
+
+
+
+
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -58,8 +63,14 @@ class InterviewBooking(models.Model):
         ("PENDING", "Pending"),
         ("PAID_TO_INTERVIEWER", "Paid to Interviewer"),
         ("REFUNDED_TO_CANDIDATE", "Refunded to Candidate"),
+        ("AWAITING_EVALUATION", "Awaiting Evaluation"),
     ],
     default="PENDING"
+)
+    evaluation_deadline = models.DateTimeField(
+    null=True,
+    blank=True,
+    help_text="Last datetime when evaluations/reviews can be submitted.",
 )
 
     cancellation_reason = models.TextField(blank=True)
@@ -86,6 +97,7 @@ class InterviewBooking(models.Model):
             models.Index(fields=["candidate", "status"]),
             models.Index(fields=["interviewer", "status"]),
             models.Index(fields=["availability", "status"]),
+            models.Index(fields=["status", "start_datetime"]),
         ]
         constraints = [
             models.CheckConstraint(

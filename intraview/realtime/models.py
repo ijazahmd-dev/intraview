@@ -49,6 +49,15 @@ class InterviewSession(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
 
+    candidate_total_seconds = models.PositiveIntegerField(default=0)
+    interviewer_total_seconds = models.PositiveIntegerField(default=0)
+
+    evaluation_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last datetime when evaluations/reviews can be submitted."
+    )
+
     reconnect_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)

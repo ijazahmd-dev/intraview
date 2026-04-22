@@ -27,6 +27,15 @@ app.conf.beat_schedule = {
         'task': 'realtime.tasks.cleanup_stale_sessions',
         'schedule': 60.0,  # Every 60 seconds
     },
+    "interview-start-reminders-5min": {
+        "task": "notifications.tasks.send_interview_start_reminders",
+        "schedule": 300.0,  # seconds
+    },
+    # Every hour: feedback reminders (tune to your needs)
+    "feedback-reminders-hourly": {
+        "task": "notifications.tasks.send_feedback_reminders",
+        "schedule": crontab(minute="0", hour="*"),
+    },
 }
 
 
