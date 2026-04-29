@@ -19,7 +19,7 @@ from authentication.models import CustomUser, InterviewerStatus
 from interviewers.models import InterviewerAvailability
 from authentication.authentication import InterviewerCookieJWTAuthentication,CookieJWTAuthentication
 from authentication.permissions import IsActiveInterviewer
-from .models import InterviewBooking
+from .models import InterviewBooking, RescheduleStatus
 from wallet.services import TokenService
 from wallet.models import TokenTransactionType, TokenWallet, TokenTransaction
 from subscriptions.services.entitlement_service import SubscriptionEntitlementService
@@ -39,7 +39,11 @@ from .serializers import (
     CreateInterviewBookingSerializer, 
     CandidateInterviewerDetailSerializer,
     BookingDetailSerializer,
-    CandidateRescheduleSerializer
+    CandidateRescheduleSerializer,
+    AvailableSlotSerializer, 
+    InterviewerRescheduleSerializer, 
+    RescheduleRequestSerializer,
+    NotifyInterviewerNewSlotSerializer
 )
 
 from django.utils.timezone import localtime
@@ -903,3 +907,399 @@ class BookingDetailsView(APIView):
                 "email": booking.interviewer.email,
             },
         }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+RESCHEDULE_MIN_HOURS_AHEAD = 2
+RESCHEDULE_LIMIT           = 2
+ 
+ 
+# ─── GET /api/bookings/<booking_id>/reschedule/options/ ──────────────────────
+ 
+class CandidateRescheduleOptionsView(APIView):
+    """
+    GET /api/bookings/<booking_id>/reschedule/options/
+ 
+    Returns the interviewer's available slots so the candidate can pick one,
+    OR tells the candidate there are no slots (open-preference request).
+ 
+    Response — Case A (slots exist):
+    {
+        "has_slots": true,
+        "available_slots": [ { ...slot... }, ... ],
+        "current_booking": {
+            "start_datetime": "...",
+            "end_datetime": "..."
+        },
+        "reschedule_count": 0,
+        "reschedule_limit": 2,
+        "can_request": true
+    }
+ 
+    Response — Case B (no slots):
+    {
+        "has_slots": false,
+        "message": "No slots available. You can still send a reschedule request.",
+        "available_slots": [],
+        ...
+    }
+    """
+ 
+    permission_classes     = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+ 
+    def get(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+            candidate=request.user,
+        )
+ 
+        now = timezone.now()
+ 
+        # ── Guard: booking must allow reschedule ──────────────────────────────
+        if booking.status not in [
+            InterviewBooking.Status.PENDING,
+            InterviewBooking.Status.CONFIRMED,
+        ]:
+            return Response(
+                {"detail": "Reschedule is not available for this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+ 
+        # ── Guard: reschedule limit ───────────────────────────────────────────
+        can_request = True
+        block_reason = None
+ 
+        if booking.reschedule_count >= RESCHEDULE_LIMIT:
+            can_request  = False
+            block_reason = f"Maximum of {RESCHEDULE_LIMIT} reschedules reached."
+ 
+        elif booking.reschedule_status == RescheduleStatus.PENDING:
+            can_request  = False
+            block_reason = "A reschedule request is already pending."
+ 
+        elif booking.start_datetime - now < timedelta(hours=RESCHEDULE_MIN_HOURS_AHEAD):
+            can_request  = False
+            block_reason = (
+                f"Cannot request reschedule within "
+                f"{RESCHEDULE_MIN_HOURS_AHEAD} hours of the session."
+            )
+ 
+        # ── Fetch available slots for this interviewer ────────────────────────
+        # Exclude:
+        #   • The booking's current slot
+        #   • Past slots
+        #   • Full slots (remaining_capacity == 0 handled in AvailableSlotSerializer)
+        future_cutoff = now + timedelta(hours=RESCHEDULE_MIN_HOURS_AHEAD)
+ 
+        candidate_slots = InterviewerAvailability.objects.filter(
+            interviewer=booking.interviewer,
+            is_active=True,
+            date__gte=future_cutoff.date(),
+        ).exclude(
+            id=booking.availability_id,
+        ).order_by("date", "start_time")
+ 
+        # Post-filter: only slots with capacity and strictly in the future
+        available = [
+            slot for slot in candidate_slots
+            if slot.remaining_capacity() > 0
+            and timezone.make_aware(
+                datetime.combine(slot.date, slot.start_time)
+            ) > future_cutoff
+        ]
+ 
+        serialized_slots = AvailableSlotSerializer(available, many=True).data
+        has_slots        = bool(serialized_slots)
+
+        if not has_slots and can_request:
+            can_request  = False
+            block_reason = (
+                "No slots are currently available. "
+                "You can notify the interviewer to open new time slots."
+            )
+ 
+        return Response({
+            "has_slots":     has_slots,
+            "available_slots": serialized_slots,
+            "message": (
+                None if has_slots
+                else "No slots available. You can notify the interviewer to open new time slots."
+            ),
+            "current_booking": {
+                "availability_id": booking.availability_id,
+                "start_datetime":  booking.start_datetime.isoformat(),
+                "end_datetime":    booking.end_datetime.isoformat(),
+            },
+            "reschedule_count": booking.reschedule_count,
+            "reschedule_limit": RESCHEDULE_LIMIT,
+            "can_request":  can_request,
+            "block_reason": block_reason,
+            # If there's already a pending request, expose it so the UI can
+            # show the candidate the current request state
+            "pending_request": (
+                {
+                    "reschedule_status":  booking.reschedule_status,
+                    "proposed_slot": (
+                        AvailableSlotSerializer(booking.proposed_availability).data
+                        if booking.proposed_availability else None
+                    ),
+                    "note": booking.reschedule_reason,
+                    "requested_at": booking.reschedule_requested_at,
+                }
+                if booking.reschedule_status == RescheduleStatus.PENDING
+                else None
+            ),
+        })
+ 
+ 
+# ─── POST /api/bookings/<booking_id>/reschedule/request/ ─────────────────────
+ 
+class CandidateRescheduleRequestView(APIView):
+    """
+    POST /api/bookings/<booking_id>/reschedule/request/
+ 
+    Candidate submits a reschedule request.
+ 
+    Case A — slot provided:
+        { "proposed_availability_id": 42, "note": "Prefer morning" }
+ 
+    Case B — no slot (open preference):
+        { "proposed_availability_id": null, "note": "Any evening this week" }
+ 
+    On success:
+        booking.reschedule_status       = PENDING
+        booking.rescheduled_by          = CANDIDATE
+        booking.proposed_availability   = <slot or null>
+        booking.reschedule_reason       = note
+        booking.reschedule_requested_at          = now()
+ 
+    booking.reschedule_count is NOT incremented here.
+    It is incremented only when the interviewer ACCEPTS the request.
+    """
+ 
+    permission_classes     = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+ 
+    def post(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+            candidate=request.user,
+        )
+ 
+        serializer = RescheduleRequestSerializer(
+            data=request.data,
+            context={"booking": booking},
+        )
+        serializer.is_valid(raise_exception=True)
+ 
+        data = serializer.validated_data
+        now  = timezone.now()
+ 
+        with transaction.atomic():
+            # Lock the booking row
+            booking = (
+                InterviewBooking.objects
+                .select_for_update()
+                .get(id=booking.id)
+            )
+ 
+            # Re-validate under lock (prevent race condition)
+            if booking.reschedule_status == RescheduleStatus.PENDING:
+                return Response(
+                    {"detail": "A reschedule request is already pending."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+ 
+            proposed_slot = data.get("proposed_availability")
+ 
+            # If a slot was proposed, lock it too and re-check capacity
+            if proposed_slot is not None:
+                locked_slot = (
+                    InterviewerAvailability.objects
+                    .select_for_update()
+                    .get(id=proposed_slot.id)
+                )
+ 
+                if not locked_slot.is_active:
+                    return Response(
+                        {"detail": "Proposed slot is no longer available."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+ 
+                if locked_slot.remaining_capacity() <= 0:
+                    return Response(
+                        {"detail": "Proposed slot is fully booked."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+ 
+                booking.proposed_availability = locked_slot
+            else:
+                booking.proposed_availability = None
+ 
+            booking.reschedule_status = RescheduleStatus.PENDING
+            booking.rescheduled_by    = "CANDIDATE"
+            booking.reschedule_reason = data.get("note", "")
+            booking.reschedule_requested_at    = now
+ 
+            booking.save(update_fields=[
+                "reschedule_status",
+                "rescheduled_by",
+                "proposed_availability",
+                "reschedule_reason",
+                "reschedule_requested_at",
+                "updated_at",
+            ])
+ 
+        logger.info(
+            "Reschedule request created: booking=%s candidate=%s proposed_slot=%s",
+            booking.id,
+            request.user.id,
+            booking.proposed_availability_id,
+        )
+ 
+        # TODO: send notification to interviewer
+        # notify_reschedule_request.delay(booking.id)
+ 
+        proposed_slot_data = (
+            AvailableSlotSerializer(booking.proposed_availability).data
+            if booking.proposed_availability else None
+        )
+ 
+        return Response(
+            {
+                "message":        "Reschedule request sent to the interviewer.",
+                "reschedule_status": booking.reschedule_status,
+                "proposed_slot":  proposed_slot_data,
+                "note":           booking.reschedule_reason,
+                "requested_at":   booking.reschedule_requested_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+ 
+
+
+
+
+
+
+
+
+ # bookings/views.py (candidate notify section)
+
+from notifications.events import emit_event
+from notifications.constants import EventType
+from django.utils.timezone import localtime
+
+class CandidateNotifyInterviewerForNewSlotView(APIView):
+    """
+    POST /api/bookings/<booking_id>/reschedule/notify-interviewer/
+
+    Used when there are no available slots.
+    Sends a notification to the interviewer with the candidate's
+    preferred time window, but does NOT create a reschedule request.
+    """
+
+    permission_classes     = [IsAuthenticated]
+    authentication_classes = [CookieJWTAuthentication]
+
+    def post(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+            candidate=request.user,
+        )
+
+        now = timezone.now()
+
+        if booking.status not in [
+            InterviewBooking.Status.PENDING,
+            InterviewBooking.Status.CONFIRMED,
+        ]:
+            return Response(
+                {"detail": "This booking cannot be rescheduled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if booking.start_datetime - now < timedelta(hours=RESCHEDULE_MIN_HOURS_AHEAD):
+            return Response(
+                {"detail": f"Cannot request new slots within {RESCHEDULE_MIN_HOURS_AHEAD} hours of the session."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # If a real reschedule request is already pending, no need to notify again
+        if booking.reschedule_status == RescheduleStatus.PENDING:
+            return Response(
+                {"detail": "A reschedule request is already pending for this booking."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = NotifyInterviewerNewSlotSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        preferred_window = serializer.validated_data["preferred_window"]
+
+        candidate   = request.user
+        interviewer = booking.interviewer
+
+        def emit_reschedule_slot_event():
+            emit_event(
+                EventType.RESCHEDULE_SLOT_REQUESTED,
+                actor_id=candidate.id,
+                payload={
+                    "booking_id":     booking.id,
+                    "candidate_id":   candidate.id,
+                    "interviewer_id": interviewer.id,
+                    "preferred_window": preferred_window,
+                    "start_time":     localtime(booking.start_datetime).isoformat(),
+                },
+                correlation_id=f"booking:{booking.id}:reschedule-slot-request",
+            )
+
+        transaction.on_commit(emit_reschedule_slot_event)
+
+        logger.info(
+            "Candidate notified interviewer to open new slots: booking=%s candidate=%s preferred_window=%s",
+            booking.id,
+            candidate.id,
+            preferred_window,
+        )
+
+        return Response(
+            {
+                "status":  "ok",
+                "message": "Interviewer will be notified to open new time slots.",
+            },
+            status=status.HTTP_200_OK,
+        )

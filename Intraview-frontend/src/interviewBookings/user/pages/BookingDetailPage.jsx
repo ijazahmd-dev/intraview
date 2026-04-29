@@ -1,17 +1,33 @@
+
+
 // import React, { useEffect, useState } from 'react';
-// import { useParams, useNavigate } from 'react-router-dom';
+// import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 // import { toast } from 'sonner';
+// import { X, ArrowLeft, Clock, Calendar, CheckCircle } from 'lucide-react';
 // import { candidateBookingsApi } from '../../candidateBookingsApi';
+// import CalendarComponent from '../components/CalendarComponent'; 
 
 // const BookingDetailPage = () => {
 //   const { bookingId } = useParams();
 //   const navigate = useNavigate();
+//   const [searchParams] = useSearchParams();
   
 //   const [booking, setBooking] = useState(null);
 //   const [loading, setLoading] = useState(true);
 //   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+//   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
 //   const [cancelReason, setCancelReason] = useState('');
+//   const [selectedNewSlot, setSelectedNewSlot] = useState(null);
 //   const [cancelLoading, setCancelLoading] = useState(false);
+//   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+//   const [timeLeft, setTimeLeft] = useState('');
+
+//   // Check if reschedule modal should open from dashboard
+//   useEffect(() => {
+//     if (searchParams.get('action') === 'reschedule') {
+//       setRescheduleModalOpen(true);
+//     }
+//   }, [searchParams]);
 
 //   // Fetch booking details
 //   useEffect(() => {
@@ -31,6 +47,37 @@
 //     fetchBooking();
 //   }, [bookingId, navigate]);
 
+//   // 🔥 LIVE COUNTDOWN TIMER
+//   useEffect(() => {
+//     if (!booking) return;
+
+//     const startTime = new Date(booking.start_datetime);
+//     const endTime = booking.end_datetime ? 
+//       new Date(booking.end_datetime) : 
+//       new Date(startTime.getTime() + 30 * 60 * 1000);
+
+//     const updateTimer = () => {
+//       const now = new Date();
+//       const diffToStart = startTime - now;
+//       const diffToEnd = endTime - now;
+
+//       if (diffToStart <= 0 && diffToEnd > 0) {
+//         setTimeLeft('LIVE NOW');
+//       } else if (diffToEnd <= 0) {
+//         setTimeLeft('SESSION COMPLETED');
+//       } else {
+//         const hours = Math.floor(diffToStart / (1000 * 60 * 60));
+//         const minutes = Math.floor((diffToStart / (1000 * 60)) % 60);
+//         const seconds = Math.floor((diffToStart / 1000) % 60);
+//         setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+//       }
+//     };
+
+//     const interval = setInterval(updateTimer, 1000);
+//     updateTimer();
+//     return () => clearInterval(interval);
+//   }, [booking]);
+
 //   // Cancel booking
 //   const handleCancelBooking = async () => {
 //     if (!cancelReason.trim()) {
@@ -40,7 +87,7 @@
 
 //     try {
 //       setCancelLoading(true);
-//       await candidateBookingsApi.cancelBooking(bookingId, {cancellation_reason:cancelReason});
+//       await candidateBookingsApi.cancelBooking(bookingId, { cancellation_reason: cancelReason });
 //       toast.success('Booking cancelled successfully. Tokens unlocked.');
 //       navigate('/candidate/dashboard/upcoming');
 //     } catch (error) {
@@ -50,6 +97,39 @@
 //       setCancelModalOpen(false);
 //     }
 //   };
+
+//   // 🔥 RESCHEDULE HANDLER
+//   const handleRescheduleConfirm = async () => {
+//     if (!selectedNewSlot) {
+//       toast.error('Please select a new time slot');
+//       return;
+//     }
+
+//     try {
+//       setRescheduleLoading(true);
+//       await candidateBookingsApi.rescheduleBooking(bookingId, {
+//         new_availability_id: selectedNewSlot.id,
+//         reason: 'Rescheduled via dashboard'
+//       });
+//       toast.success('✅ Booking rescheduled successfully!');
+//       setRescheduleModalOpen(false);
+//       setSelectedNewSlot(null);
+      
+//       // Refresh booking data
+//       const res = await candidateBookingsApi.getBookingDetail(bookingId);
+//       setBooking(res.data);
+//     } catch (error) {
+//       toast.error(error.response?.data?.detail || 'Reschedule failed');
+//     } finally {
+//       setRescheduleLoading(false);
+//     }
+//   };
+
+//   const canCancel = booking?.status === 'CONFIRMED' && 
+//                    new Date(booking?.start_datetime) > new Date();
+//   const canReschedule = booking?.status === 'CONFIRMED' && 
+//                        new Date(booking?.start_datetime) > new Date();
+//   const isLive = timeLeft === 'LIVE NOW';
 
 //   if (loading) {
 //     return (
@@ -78,9 +158,6 @@
 //     );
 //   }
 
-//   const canCancel = booking.status === 'CONFIRMED' && 
-//                    new Date(booking.start_datetime) > new Date();
-
 //   const StatusBadge = ({ status }) => {
 //     const config = {
 //       CONFIRMED: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
@@ -97,6 +174,14 @@
 //     );
 //   };
 
+//   const handleJoinSession = () => {
+//     if (booking.meeting_url) {
+//       window.open(booking.meeting_url, '_blank');
+//     } else {
+//       toast.info('Meeting link will be available closer to the session time');
+//     }
+//   };
+
 //   return (
 //     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-12 px-4">
 //       <div className="max-w-4xl mx-auto">
@@ -106,9 +191,7 @@
 //             onClick={() => navigate('/candidate/dashboard/upcoming')}
 //             className="inline-flex items-center gap-2 text-lg font-semibold text-slate-700 hover:text-slate-900 transition-colors"
 //           >
-//             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-//             </svg>
+//             <ArrowLeft className="w-6 h-6" />
 //             Back to Dashboard
 //           </button>
 //         </div>
@@ -128,6 +211,27 @@
 //               </div>
 //             </div>
 
+//             {/* 🔥 LIVE TIMER */}
+//             {canReschedule && (
+//               <div className="mb-8 p-6 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-3xl border-2 border-emerald-200">
+//                 <div className="flex items-center justify-between">
+//                   <span className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+//                     <Clock className="w-5 h-5" />
+//                     Session Status
+//                   </span>
+//                   <span className={`font-mono font-bold text-2xl px-4 py-2 rounded-xl shadow-lg ${
+//                     isLive 
+//                       ? 'bg-emerald-500 text-white animate-pulse' 
+//                       : timeLeft.includes('h') 
+//                         ? 'bg-blue-500 text-white' 
+//                         : 'bg-amber-500 text-white'
+//                   }`}>
+//                     {timeLeft}
+//                   </span>
+//                 </div>
+//               </div>
+//             )}
+
 //             <div className="grid lg:grid-cols-2 gap-12 mb-12">
 //               {/* Session Details */}
 //               <div>
@@ -137,9 +241,7 @@
 //                   {/* Date & Time */}
 //                   <div className="flex items-start gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-3xl border-2 border-blue-100">
 //                     <div className="w-12 h-12 bg-blue-500 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1">
-//                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-//                       </svg>
+//                       <Calendar className="w-6 h-6 text-white" />
 //                     </div>
 //                     <div>
 //                       <h3 className="font-semibold text-slate-900 mb-2">Date & Time</h3>
@@ -193,52 +295,31 @@
 //               {/* Sidebar: Actions & Status */}
 //               <div className="lg:sticky lg:top-12 lg:self-start">
 //                 <div className="bg-slate-50/80 p-8 rounded-3xl border border-slate-200">
-//                   <h3 className="text-xl font-bold text-slate-900 mb-6">Session Status</h3>
+//                   <h3 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h3>
                   
-//                   {/* Status Timeline */}
-//                   <div className="space-y-4 mb-8">
-//                     <div className="flex items-center">
-//                       <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-//                         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-//                         </svg>
-//                       </div>
-//                       <div className="ml-4 flex-1">
-//                         <p className="font-semibold text-slate-900">Booked</p>
-//                         <p className="text-sm text-slate-600">{new Date(booking.created_at).toLocaleDateString()}</p>
-//                       </div>
-//                     </div>
-
-//                     <div className={`flex items-center ${booking.status === 'CONFIRMED' ? 'opacity-100' : 'opacity-50'}`}>
-//                       <div className={`w-8 h-8 border-2 border-slate-300 rounded-full flex items-center justify-center ${booking.status === 'CONFIRMED' ? 'bg-emerald-500 border-emerald-500' : ''}`}>
-//                         {booking.status === 'CONFIRMED' ? (
-//                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-//                           </svg>
-//                         ) : (
-//                           <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-//                         )}
-//                       </div>
-//                       <div className="ml-4 flex-1">
-//                         <p className="font-semibold text-slate-900">Confirmed</p>
-//                         <p className="text-sm text-slate-600">Tokens locked</p>
-//                       </div>
-//                     </div>
-
-//                     {booking.status === 'COMPLETED' && (
-//                       <div className="flex items-center">
-//                         <div className="w-8 h-8 bg-slate-500 rounded-full flex items-center justify-center">
-//                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-//                           </svg>
-//                         </div>
-//                         <div className="ml-4 flex-1">
-//                           <p className="font-semibold text-slate-900">Completed</p>
-//                           <p className="text-sm text-slate-600">Tokens transferred</p>
-//                         </div>
-//                       </div>
-//                     )}
-//                   </div>
+//                   {/* 🔥 JOIN SESSION BUTTON */}
+//                   {canReschedule && (
+//                     <button
+//                       onClick={handleJoinSession}
+//                       className={`w-full mb-3 font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-3 text-lg ${
+//                         isLive
+//                           ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
+//                           : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white'
+//                       }`}
+//                     >
+//                       {isLive ? (
+//                         <>
+//                           <CheckCircle className="w-6 h-6 animate-pulse" />
+//                           JOIN SESSION NOW
+//                         </>
+//                       ) : (
+//                         <>
+//                           <Clock className="w-6 h-6" />
+//                           Join Session
+//                         </>
+//                       )}
+//                     </button>
+//                   )}
 
 //                   {/* Action Buttons */}
 //                   <div className="space-y-3">
@@ -251,6 +332,18 @@
 //                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 //                         </svg>
 //                         Cancel Booking
+//                       </button>
+//                     )}
+
+//                     {canReschedule && (
+//                       <button
+//                         onClick={() => setRescheduleModalOpen(true)}
+//                         className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-lg"
+//                       >
+//                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+//                         </svg>
+//                         Reschedule
 //                       </button>
 //                     )}
                     
@@ -269,16 +362,16 @@
 //             </div>
 
 //             {booking.status === 'CANCELLED' && booking.cancellation_reason && (
-//                 <div className="p-6 bg-rose-50 rounded-3xl border-2 border-rose-200 mt-8">
-//                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-//                     <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-//                     </svg>
-//                     Cancellation Reason
-//                     </h3>
-//                     <p className="text-slate-700">{booking.cancellation_reason}</p>
-//                 </div>
-//                 )}
+//               <div className="p-6 bg-rose-50 rounded-3xl border-2 border-rose-200 mt-8">
+//                 <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+//                   <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+//                   </svg>
+//                   Cancellation Reason
+//                 </h3>
+//                 <p className="text-slate-700">{booking.cancellation_reason}</p>
+//               </div>
+//             )}
 
 //             {/* Additional Info */}
 //             {booking.notes && (
@@ -291,7 +384,7 @@
 //         </div>
 //       </div>
 
-//       {/* Cancel Modal */}
+//       {/* 🔥 CANCEL MODAL */}
 //       {canCancel && (
 //         <CancelBookingModal
 //           isOpen={cancelModalOpen}
@@ -299,29 +392,42 @@
 //           onConfirm={handleCancelBooking}
 //           loading={cancelLoading}
 //           tokenCost={booking.token_cost}
-//           reason={cancelReason}           // ✅ ADD THIS
+//           reason={cancelReason}
 //           onReasonChange={setCancelReason}
+//         />
+//       )}
+
+//       {/* 🔥 RESCHEDULE MODAL */}
+//       {canReschedule && (
+//         <RescheduleModal
+//           isOpen={rescheduleModalOpen}
+//           booking={booking}
+//           selectedSlot={selectedNewSlot}
+//           onSlotSelect={setSelectedNewSlot}
+//           onClose={() => {
+//             setRescheduleModalOpen(false);
+//             setSelectedNewSlot(null);
+//           }}
+//           onConfirm={handleRescheduleConfirm}
+//           loading={rescheduleLoading}
 //         />
 //       )}
 //     </div>
 //   );
 // };
 
-// // Cancel Modal Component
+// // 🔥 CANCEL MODAL COMPONENT (unchanged)
 // const CancelBookingModal = ({ isOpen, onClose, onConfirm, loading, tokenCost, reason, onReasonChange }) => {
 //   if (!isOpen) return null;
 
 //   return (
 //     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
 //       <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full shadow-2xl border border-white/50">
-//         {/* Header - SAME */}
 //         <div className="p-8 pb-6 border-b border-slate-200">
 //           <div className="flex items-center justify-between mb-6">
 //             <h2 className="text-2xl font-bold text-slate-900">Cancel Booking</h2>
 //             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-2xl transition-all duration-200" disabled={loading}>
-//               <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-//               </svg>
+//               <X className="w-6 h-6 text-slate-500" />
 //             </button>
 //           </div>
           
@@ -338,15 +444,14 @@
 //           </div>
 //         </div>
 
-//         {/* Reason Form - FIXED */}
 //         <div className="p-8">
 //           <div className="mb-6">
 //             <label className="block text-sm font-semibold text-slate-900 mb-2">
 //               Cancellation Reason <span className="text-rose-500">*</span>
 //             </label>
 //             <textarea
-//               value={reason}                    // ✅ Uses parent cancelReason
-//               onChange={(e) => onReasonChange(e.target.value)}  // ✅ Updates parent cancelReason
+//               value={reason}
+//               onChange={(e) => onReasonChange(e.target.value)}
 //               placeholder="Please explain why you're cancelling..."
 //               rows={4}
 //               className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-rose-200 focus:border-rose-500 resize-vertical"
@@ -355,7 +460,6 @@
 //           </div>
 //         </div>
 
-//         {/* Actions */}
 //         <div className="p-8 pt-0 border-t border-slate-200 bg-slate-50/50 rounded-b-3xl">
 //           <div className="flex flex-col sm:flex-row gap-3">
 //             <button
@@ -367,7 +471,7 @@
 //             </button>
 //             <button
 //               onClick={onConfirm}
-//               disabled={!reason.trim() || loading}  // ✅ Uses parent reason
+//               disabled={!reason.trim() || loading}
 //               className="flex-1 py-4 px-6 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
 //             >
 //               {loading ? (
@@ -386,6 +490,96 @@
 //   );
 // };
 
+// // 🔥 RESCHEDULE MODAL COMPONENT
+// const RescheduleModal = ({ 
+//   isOpen, 
+//   booking, 
+//   selectedSlot, 
+//   onSlotSelect, 
+//   onClose, 
+//   onConfirm, 
+//   loading 
+// }) => {
+//   if (!isOpen || !booking) return null;
+
+//   return (
+//     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[1000] flex items-center justify-center p-6">
+//       <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/50">
+//         <div className="p-8 pb-6 border-b bg-gradient-to-r from-slate-50 to-white/50">
+//           <div className="flex items-center justify-between mb-6">
+//             <h2 className="text-3xl font-black bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text text-transparent">
+//               Reschedule Booking #{booking.id}
+//             </h2>
+//             <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
+//               <X className="w-7 h-7 text-slate-500" />
+//             </button>
+//           </div>
+          
+//           <div className="grid md:grid-cols-2 gap-8 mb-8 p-6 bg-gradient-to-r from-orange-50 to-amber-50 rounded-3xl border-2 border-orange-200">
+//             <div>
+//               <h3 className="font-bold text-xl mb-2 text-slate-900 flex items-center gap-2">
+//                 <Clock className="w-5 h-5" />
+//                 Current Slot
+//               </h3>
+//               <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 line-through">
+//                 <div className="font-black text-lg">{booking.start_time} - {booking.end_time}</div>
+//                 <div className="text-sm text-rose-700 mt-1">{booking.date}</div>
+//               </div>
+//             </div>
+//             {selectedSlot && (
+//               <div>
+//                 <h3 className="font-bold text-xl mb-2 text-slate-900 flex items-center gap-2">
+//                   <CheckCircle className="w-5 h-5 text-emerald-500" />
+//                   New Slot ✓
+//                 </h3>
+//                 <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-200 shadow-lg">
+//                   <div className="font-black text-lg">{selectedSlot.start_time} - {selectedSlot.end_time}</div>
+//                   <div className="text-sm text-emerald-700 mt-1">{selectedSlot.date}</div>
+//                 </div>
+//               </div>
+//             )}
+//           </div>
+//         </div>
+
+//         {/* 🔥 REAL CALENDAR COMPONENT */}
+//           <div className="p-8 border-b bg-gradient-to-r from-slate-50 to-white/50">
+//             <CalendarComponent 
+//               interviewerId={booking.interviewer_id}
+//               excludeSlotId={booking.availability_id}
+//               minDate={new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}
+//               onSlotSelect={onSlotSelect}
+//             />
+//           </div>
+
+//         <div className="p-8 pt-0 border-t bg-gradient-to-r from-slate-50 to-white/50">
+//           <div className="flex gap-4">
+//             <button 
+//               onClick={onClose} 
+//               disabled={loading}
+//               className="flex-1 py-5 px-8 border-2 border-slate-300 rounded-3xl font-black text-lg hover:bg-slate-50 hover:shadow-xl transition-all shadow-lg text-slate-800"
+//             >
+//               Cancel
+//             </button>
+//             <button 
+//               onClick={onConfirm} 
+//               disabled={!selectedSlot || loading}
+//               className="flex-1 py-5 px-8 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-black text-lg rounded-3xl shadow-2xl hover:shadow-3xl hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+//             >
+//               {loading ? (
+//                 <>
+//                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+//                   Rescheduling...
+//                 </>
+//               ) : (
+//                 '✅ Confirm New Time'
+//               )}
+//             </button>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 // export default BookingDetailPage;
 
@@ -416,12 +610,18 @@
 
 
 
+
+
+
+
+// src/pages/candidate/BookingDetailPage.jsx
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { X, ArrowLeft, Clock, Calendar, CheckCircle } from 'lucide-react';
 import { candidateBookingsApi } from '../../candidateBookingsApi';
-import CalendarComponent from '../components/CalendarComponent'; 
+import RescheduleRequestModal from '../components/RescheduleRequestModal'; // NEW import
 
 const BookingDetailPage = () => {
   const { bookingId } = useParams();
@@ -433,12 +633,10 @@ const BookingDetailPage = () => {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-  const [selectedNewSlot, setSelectedNewSlot] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
 
-  // Check if reschedule modal should open from dashboard
+  // Open reschedule modal directly from dashboard when ?action=reschedule
   useEffect(() => {
     if (searchParams.get('action') === 'reschedule') {
       setRescheduleModalOpen(true);
@@ -446,20 +644,20 @@ const BookingDetailPage = () => {
   }, [searchParams]);
 
   // Fetch booking details
-  useEffect(() => {
-    const fetchBooking = async () => {
-      try {
-        setLoading(true);
-        const res = await candidateBookingsApi.getBookingDetail(bookingId);
-        setBooking(res.data);
-      } catch (error) {
-        toast.error(error.response?.data?.detail || 'Booking not found');
-        navigate('/candidate/dashboard/upcoming');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchBooking = async () => {
+    try {
+      setLoading(true);
+      const res = await candidateBookingsApi.getBookingDetail(bookingId);
+      setBooking(res.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Booking not found');
+      navigate('/candidate/dashboard/upcoming');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchBooking();
   }, [bookingId, navigate]);
 
@@ -468,9 +666,9 @@ const BookingDetailPage = () => {
     if (!booking) return;
 
     const startTime = new Date(booking.start_datetime);
-    const endTime = booking.end_datetime ? 
-      new Date(booking.end_datetime) : 
-      new Date(startTime.getTime() + 30 * 60 * 1000);
+    const endTime = booking.end_datetime
+      ? new Date(booking.end_datetime)
+      : new Date(startTime.getTime() + 30 * 60 * 1000);
 
     const updateTimer = () => {
       const now = new Date();
@@ -503,48 +701,34 @@ const BookingDetailPage = () => {
 
     try {
       setCancelLoading(true);
-      await candidateBookingsApi.cancelBooking(bookingId, { cancellation_reason: cancelReason });
+      await candidateBookingsApi.cancelBooking(bookingId, {
+        cancellation_reason: cancelReason,
+      });
       toast.success('Booking cancelled successfully. Tokens unlocked.');
       navigate('/candidate/dashboard/upcoming');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to cancel booking');
+      toast.error(
+        error.response?.data?.detail || 'Failed to cancel booking',
+      );
     } finally {
       setCancelLoading(false);
       setCancelModalOpen(false);
     }
   };
 
-  // 🔥 RESCHEDULE HANDLER
-  const handleRescheduleConfirm = async () => {
-    if (!selectedNewSlot) {
-      toast.error('Please select a new time slot');
-      return;
-    }
+  const now = new Date();
+  const canCancel =
+    booking?.status === 'CONFIRMED' &&
+    new Date(booking?.start_datetime) > now;
 
-    try {
-      setRescheduleLoading(true);
-      await candidateBookingsApi.rescheduleBooking(bookingId, {
-        new_availability_id: selectedNewSlot.id,
-        reason: 'Rescheduled via dashboard'
-      });
-      toast.success('✅ Booking rescheduled successfully!');
-      setRescheduleModalOpen(false);
-      setSelectedNewSlot(null);
-      
-      // Refresh booking data
-      const res = await candidateBookingsApi.getBookingDetail(bookingId);
-      setBooking(res.data);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Reschedule failed');
-    } finally {
-      setRescheduleLoading(false);
-    }
-  };
+  const hasPendingReschedule =
+    booking?.reschedule_status === 'PENDING';
 
-  const canCancel = booking?.status === 'CONFIRMED' && 
-                   new Date(booking?.start_datetime) > new Date();
-  const canReschedule = booking?.status === 'CONFIRMED' && 
-                       new Date(booking?.start_datetime) > new Date();
+  const canReschedule =
+    booking?.status === 'CONFIRMED' &&
+    new Date(booking?.start_datetime) > now &&
+    !hasPendingReschedule; // disable if request already pending
+
   const isLive = timeLeft === 'LIVE NOW';
 
   if (loading) {
@@ -552,7 +736,9 @@ const BookingDetailPage = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-6"></div>
-          <p className="text-xl font-semibold text-gray-700">Loading booking details…</p>
+          <p className="text-xl font-semibold text-gray-700">
+            Loading booking details…
+          </p>
         </div>
       </div>
     );
@@ -562,7 +748,9 @@ const BookingDetailPage = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">Booking Not Found</h1>
+          <h1 className="text-4xl font-bold text-slate-900 mb-4">
+            Booking Not Found
+          </h1>
           <button
             onClick={() => navigate('/candidate/dashboard/upcoming')}
             className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all duration-200"
@@ -576,15 +764,33 @@ const BookingDetailPage = () => {
 
   const StatusBadge = ({ status }) => {
     const config = {
-      CONFIRMED: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
-      PENDING: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Pending' },
-      COMPLETED: { bg: 'bg-slate-100', text: 'text-slate-800', label: 'Completed' },
-      CANCELLED: { bg: 'bg-rose-100', text: 'text-rose-800', label: 'Cancelled' },
+      CONFIRMED: {
+        bg: 'bg-emerald-100',
+        text: 'text-emerald-800',
+        label: 'Confirmed',
+      },
+      PENDING: {
+        bg: 'bg-amber-100',
+        text: 'text-amber-800',
+        label: 'Pending',
+      },
+      COMPLETED: {
+        bg: 'bg-slate-100',
+        text: 'text-slate-800',
+        label: 'Completed',
+      },
+      CANCELLED: {
+        bg: 'bg-rose-100',
+        text: 'text-rose-800',
+        label: 'Cancelled',
+      },
     };
     const style = config[status] || config.CANCELLED;
-    
+
     return (
-      <span className={`px-4 py-2 rounded-full text-sm font-semibold ${style.bg} ${style.text}`}>
+      <span
+        className={`px-4 py-2 rounded-full text-sm font-semibold ${style.bg} ${style.text}`}
+      >
         {style.label}
       </span>
     );
@@ -594,9 +800,14 @@ const BookingDetailPage = () => {
     if (booking.meeting_url) {
       window.open(booking.meeting_url, '_blank');
     } else {
-      toast.info('Meeting link will be available closer to the session time');
+      toast.info(
+        'Meeting link will be available closer to the session time',
+      );
     }
   };
+
+  const proposedSlot = booking.proposed_slot || null;
+  const rescheduleNote = booking.reschedule_note || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-12 px-4">
@@ -618,14 +829,49 @@ const BookingDetailPage = () => {
             {/* Header */}
             <div className="flex items-start justify-between mb-8">
               <div>
-                <h1 className="text-4xl font-black text-slate-900 mb-2">Booking #{booking.id}</h1>
+                <h1 className="text-4xl font-black text-slate-900 mb-2">
+                  Booking #{booking.id}
+                </h1>
                 <StatusBadge status={booking.status} />
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-emerald-600 mb-1">-{booking.token_cost} tokens</div>
-                <p className="text-sm text-slate-600">Locked until completion</p>
+                <div className="text-3xl font-bold text-emerald-600 mb-1">
+                  -{booking.token_cost} tokens
+                </div>
+                <p className="text-sm text-slate-600">
+                  Locked until completion
+                </p>
               </div>
             </div>
+
+            {/* NEW: Pending reschedule banner */}
+            {hasPendingReschedule && (
+              <div className="mb-8 p-5 bg-amber-50 rounded-3xl border border-amber-200">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1">
+                  Reschedule request pending
+                </p>
+                {proposedSlot && (
+                  <p className="text-sm text-amber-900">
+                    Proposed slot:{' '}
+                    <span className="font-medium">
+                      {proposedSlot.date}{' '}
+                      {proposedSlot.start_time} - {proposedSlot.end_time}
+                    </span>
+                  </p>
+                )}
+                {rescheduleNote && (
+                  <p className="text-sm text-amber-900 mt-1">
+                    Your note:{' '}
+                    <span className="italic">{rescheduleNote}</span>
+                  </p>
+                )}
+                <p className="text-xs text-amber-700 mt-2">
+                  Waiting for the interviewer to accept or reject this
+                  request. You cannot send another reschedule until they
+                  respond.
+                </p>
+              </div>
+            )}
 
             {/* 🔥 LIVE TIMER */}
             {canReschedule && (
@@ -635,13 +881,15 @@ const BookingDetailPage = () => {
                     <Clock className="w-5 h-5" />
                     Session Status
                   </span>
-                  <span className={`font-mono font-bold text-2xl px-4 py-2 rounded-xl shadow-lg ${
-                    isLive 
-                      ? 'bg-emerald-500 text-white animate-pulse' 
-                      : timeLeft.includes('h') 
-                        ? 'bg-blue-500 text-white' 
+                  <span
+                    className={`font-mono font-bold text-2xl px-4 py-2 rounded-xl shadow-lg ${
+                      isLive
+                        ? 'bg-emerald-500 text-white animate-pulse'
+                        : timeLeft.includes('h')
+                        ? 'bg-blue-500 text-white'
                         : 'bg-amber-500 text-white'
-                  }`}>
+                    }`}
+                  >
                     {timeLeft}
                   </span>
                 </div>
@@ -651,8 +899,10 @@ const BookingDetailPage = () => {
             <div className="grid lg:grid-cols-2 gap-12 mb-12">
               {/* Session Details */}
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-8">Session Details</h2>
-                
+                <h2 className="text-2xl font-bold text-slate-900 mb-8">
+                  Session Details
+                </h2>
+
                 <div className="space-y-6">
                   {/* Date & Time */}
                   <div className="flex items-start gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-3xl border-2 border-blue-100">
@@ -660,13 +910,17 @@ const BookingDetailPage = () => {
                       <Calendar className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-900 mb-2">Date & Time</h3>
+                      <h3 className="font-semibold text-slate-900 mb-2">
+                        Date & Time
+                      </h3>
                       <p className="text-2xl font-bold text-slate-900">
-                        {new Date(booking.start_datetime).toLocaleDateString('en-US', {
+                        {new Date(
+                          booking.start_datetime,
+                        ).toLocaleDateString('en-US', {
                           weekday: 'long',
                           year: 'numeric',
                           month: 'long',
-                          day: 'numeric'
+                          day: 'numeric',
                         })}
                       </p>
                       <p className="text-xl text-slate-700 mt-1">
@@ -678,15 +932,31 @@ const BookingDetailPage = () => {
                   {/* Interviewer */}
                   <div className="flex items-start gap-4 p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-3xl border-2 border-emerald-100">
                     <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1">
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 4 0 00-7 4v3h14v-3a7 4 0 00-7-4z" />
+                      <svg
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 4 0 00-7 4v3h14v-3a7 4 0 00-7-4z"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-900 mb-2">Interviewer</h3>
-                      <p className="text-2xl font-bold text-slate-900">{booking.interviewer_name}</p>
+                      <h3 className="font-semibold text-slate-900 mb-2">
+                        Interviewer
+                      </h3>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {booking.interviewer_name}
+                      </p>
                       {booking.interviewer_headline && (
-                        <p className="text-slate-600 mt-1">{booking.interviewer_headline}</p>
+                        <p className="text-slate-600 mt-1">
+                          {booking.interviewer_headline}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -695,8 +965,18 @@ const BookingDetailPage = () => {
                   {booking.type && (
                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200">
                       <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                        <svg
+                          className="w-5 h-5 text-indigo-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
+                          />
                         </svg>
                         Interview Type
                       </h3>
@@ -711,8 +991,10 @@ const BookingDetailPage = () => {
               {/* Sidebar: Actions & Status */}
               <div className="lg:sticky lg:top-12 lg:self-start">
                 <div className="bg-slate-50/80 p-8 rounded-3xl border border-slate-200">
-                  <h3 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h3>
-                  
+                  <h3 className="text-xl font-bold text-slate-900 mb-6">
+                    Quick Actions
+                  </h3>
+
                   {/* 🔥 JOIN SESSION BUTTON */}
                   {canReschedule && (
                     <button
@@ -744,8 +1026,18 @@ const BookingDetailPage = () => {
                         onClick={() => setCancelModalOpen(true)}
                         className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-lg"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                         Cancel Booking
                       </button>
@@ -756,13 +1048,23 @@ const BookingDetailPage = () => {
                         onClick={() => setRescheduleModalOpen(true)}
                         className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 text-lg"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          />
                         </svg>
                         Reschedule
                       </button>
                     )}
-                    
+
                     {booking.status === 'COMPLETED' && (
                       <button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
                         View Recording
@@ -777,23 +1079,40 @@ const BookingDetailPage = () => {
               </div>
             </div>
 
-            {booking.status === 'CANCELLED' && booking.cancellation_reason && (
-              <div className="p-6 bg-rose-50 rounded-3xl border-2 border-rose-200 mt-8">
-                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  Cancellation Reason
-                </h3>
-                <p className="text-slate-700">{booking.cancellation_reason}</p>
-              </div>
-            )}
+            {booking.status === 'CANCELLED' &&
+              booking.cancellation_reason && (
+                <div className="p-6 bg-rose-50 rounded-3xl border-2 border-rose-200 mt-8">
+                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5 text-rose-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    Cancellation Reason
+                  </h3>
+                  <p className="text-slate-700">
+                    {booking.cancellation_reason}
+                  </p>
+                </div>
+              )}
 
             {/* Additional Info */}
             {booking.notes && (
               <div className="bg-slate-50/50 p-8 rounded-3xl border border-slate-200">
-                <h3 className="text-xl font-bold text-slate-900 mb-4">Session Notes</h3>
-                <p className="text-lg text-slate-700 whitespace-pre-line">{booking.notes}</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">
+                  Session Notes
+                </h3>
+                <p className="text-lg text-slate-700 whitespace-pre-line">
+                  {booking.notes}
+                </p>
               </div>
             )}
           </div>
@@ -813,19 +1132,16 @@ const BookingDetailPage = () => {
         />
       )}
 
-      {/* 🔥 RESCHEDULE MODAL */}
+      {/* 🔥 RESCHEDULE REQUEST MODAL (new flow) */}
       {canReschedule && (
-        <RescheduleModal
+        <RescheduleRequestModal
           isOpen={rescheduleModalOpen}
           booking={booking}
-          selectedSlot={selectedNewSlot}
-          onSlotSelect={setSelectedNewSlot}
-          onClose={() => {
+          onClose={() => setRescheduleModalOpen(false)}
+          onRequestSent={async () => {
             setRescheduleModalOpen(false);
-            setSelectedNewSlot(null);
+            await fetchBooking(); // refresh to show pending state
           }}
-          onConfirm={handleRescheduleConfirm}
-          loading={rescheduleLoading}
         />
       )}
     </div>
@@ -833,7 +1149,15 @@ const BookingDetailPage = () => {
 };
 
 // 🔥 CANCEL MODAL COMPONENT (unchanged)
-const CancelBookingModal = ({ isOpen, onClose, onConfirm, loading, tokenCost, reason, onReasonChange }) => {
+const CancelBookingModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  loading,
+  tokenCost,
+  reason,
+  onReasonChange,
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -841,21 +1165,41 @@ const CancelBookingModal = ({ isOpen, onClose, onConfirm, loading, tokenCost, re
       <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full shadow-2xl border border-white/50">
         <div className="p-8 pb-6 border-b border-slate-200">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-slate-900">Cancel Booking</h2>
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-2xl transition-all duration-200" disabled={loading}>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Cancel Booking
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 rounded-2xl transition-all duration-200"
+              disabled={loading}
+            >
               <X className="w-6 h-6 text-slate-500" />
             </button>
           </div>
-          
+
           <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-200">
             <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-xl text-rose-800">Confirm Cancellation</h3>
-              <p className="text-sm text-rose-700">You'll get all {tokenCost} tokens refunded</p>
+              <h3 className="font-bold text-xl text-rose-800">
+                Confirm Cancellation
+              </h3>
+              <p className="text-sm text-rose-700">
+                You'll get all {tokenCost} tokens refunded
+              </p>
             </div>
           </div>
         </div>
@@ -897,97 +1241,6 @@ const CancelBookingModal = ({ isOpen, onClose, onConfirm, loading, tokenCost, re
                 </>
               ) : (
                 'Cancel & Refund Tokens'
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 🔥 RESCHEDULE MODAL COMPONENT
-const RescheduleModal = ({ 
-  isOpen, 
-  booking, 
-  selectedSlot, 
-  onSlotSelect, 
-  onClose, 
-  onConfirm, 
-  loading 
-}) => {
-  if (!isOpen || !booking) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[1000] flex items-center justify-center p-6">
-      <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/50">
-        <div className="p-8 pb-6 border-b bg-gradient-to-r from-slate-50 to-white/50">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-black bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text text-transparent">
-              Reschedule Booking #{booking.id}
-            </h2>
-            <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
-              <X className="w-7 h-7 text-slate-500" />
-            </button>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-8 mb-8 p-6 bg-gradient-to-r from-orange-50 to-amber-50 rounded-3xl border-2 border-orange-200">
-            <div>
-              <h3 className="font-bold text-xl mb-2 text-slate-900 flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Current Slot
-              </h3>
-              <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 line-through">
-                <div className="font-black text-lg">{booking.start_time} - {booking.end_time}</div>
-                <div className="text-sm text-rose-700 mt-1">{booking.date}</div>
-              </div>
-            </div>
-            {selectedSlot && (
-              <div>
-                <h3 className="font-bold text-xl mb-2 text-slate-900 flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  New Slot ✓
-                </h3>
-                <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-200 shadow-lg">
-                  <div className="font-black text-lg">{selectedSlot.start_time} - {selectedSlot.end_time}</div>
-                  <div className="text-sm text-emerald-700 mt-1">{selectedSlot.date}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 🔥 REAL CALENDAR COMPONENT */}
-          <div className="p-8 border-b bg-gradient-to-r from-slate-50 to-white/50">
-            <CalendarComponent 
-              interviewerId={booking.interviewer_id}
-              excludeSlotId={booking.availability_id}
-              minDate={new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0]}
-              onSlotSelect={onSlotSelect}
-            />
-          </div>
-
-        <div className="p-8 pt-0 border-t bg-gradient-to-r from-slate-50 to-white/50">
-          <div className="flex gap-4">
-            <button 
-              onClick={onClose} 
-              disabled={loading}
-              className="flex-1 py-5 px-8 border-2 border-slate-300 rounded-3xl font-black text-lg hover:bg-slate-50 hover:shadow-xl transition-all shadow-lg text-slate-800"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={onConfirm} 
-              disabled={!selectedSlot || loading}
-              className="flex-1 py-5 px-8 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-black text-lg rounded-3xl shadow-2xl hover:shadow-3xl hover:-translate-y-1 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-            >
-              {loading ? (
-                <>
-                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Rescheduling...
-                </>
-              ) : (
-                '✅ Confirm New Time'
               )}
             </button>
           </div>

@@ -24,6 +24,15 @@ const ENDPOINTS = {
   // Token management
   tokenBalance: '/api/bookings/candidate/token-balance/',
   tokenSummary: '/api/bookings/dashboard/candidate/token-summary/',
+
+
+    // Reschedule (new request-based flow)
+  rescheduleOptions: (bookingId) =>
+    `/api/bookings/${bookingId}/reschedule/options/`,
+  rescheduleRequest: (bookingId) =>
+    `/api/bookings/${bookingId}/reschedule/request/`,
+  notifyInterviewerNewSlot: (bookingId) =>
+    `/api/bookings/${bookingId}/reschedule/notify-interviewer/`,
 };
 
 export const candidateBookingsApi = {
@@ -69,6 +78,79 @@ export const candidateBookingsApi = {
 
   rescheduleBooking: (bookingId, data) =>
     API.post(`/api/bookings/bookings/${bookingId}/reschedule/`, data),
+
+
+
+  // NEW request-based reschedule flow
+
+  /**
+   * GET /api/bookings/:bookingId/reschedule/options/
+   * Returns has_slots, can_request, etc.
+   */
+  getRescheduleOptions: (bookingId) =>
+    API.get(ENDPOINTS.rescheduleOptions(bookingId)),
+
+  /**
+   * POST /api/bookings/:bookingId/reschedule/request/
+   * body: { proposed_availability_id, note }
+   */
+  submitRescheduleRequest: (bookingId, data) =>
+    API.post(ENDPOINTS.rescheduleRequest(bookingId), data),
+
+  /**
+   * POST /api/bookings/:bookingId/reschedule/notify-interviewer/
+   * body: { preferred_window }
+   */
+  notifyInterviewerForNewSlot: (bookingId, data) =>
+    API.post(ENDPOINTS.notifyInterviewerNewSlot(bookingId), data),
+
 };
+
+
+
+
+
+// export async function getRescheduleOptions(bookingId) {
+//   const res = await api.get(`/bookings/${bookingId}/reschedule/options/`);
+//   return res.data;
+// }
+
+
+// export async function requestReschedule(bookingId, payload) {
+//   const res = await api.post(`/bookings/${bookingId}/reschedule/request/`, payload);
+//   return res.data;
+// }
+
+
+
+// export async function notifyInterviewerForNewSlot(bookingId, payload) {
+//   const res = await api.post(
+//     `/bookings/${bookingId}/reschedule/notify-interviewer/`,
+//     payload
+//   );
+//   return res.data;
+// }
+
+
+
+// export async function getInterviewerUpcomingSessions() {
+//   const res = await api.get('/bookings/dashboard/interviewer/upcoming/');
+//   return res.data;
+// }
+
+
+
+
+// export async function acceptReschedule(bookingId) {
+//   const res = await api.post(`/bookings/${bookingId}/reschedule/accept/`);
+//   return res.data;
+// }
+
+
+
+// export async function rejectReschedule(bookingId, payload) {
+//   const res = await api.post(`/bookings/${bookingId}/reschedule/reject/`, payload);
+//   return res.data;
+// }
 
 

@@ -20,6 +20,22 @@ urlpatterns = [
     path("candidate/token-balance/", views.CandidateTokenBalanceAPIView.as_view(), name="candidate-token-balance"),
     path("bookings-detail/<int:booking_id>/", views.BookingDetailAPIView.as_view()),
 
+    path(
+        "<int:booking_id>/reschedule/options/",
+        views.CandidateRescheduleOptionsView.as_view(),
+        name="candidate-reschedule-options",
+    ),
+    path(
+        "<int:booking_id>/reschedule/request/",
+        views.CandidateRescheduleRequestView.as_view(),
+        name="candidate-reschedule-request",
+    ),
+    path(
+        "<int:booking_id>/reschedule/notify-interviewer/",
+        views.CandidateNotifyInterviewerForNewSlotView.as_view(),
+        name="candidate-notify-interviewer-new-slot",
+    ),
+
 
     
 
@@ -29,6 +45,20 @@ urlpatterns = [
     path("dashboard/interviewer/upcoming/", views_interviewer.InterviewerUpcomingSessionsAPIView.as_view()),
     path("dashboard/interviewer/history/", views_interviewer.InterviewerHistoryAPIView.as_view()),
     path("dashboard/interviewer/bookings/<int:booking_id>/",views_interviewer.InterviewerBookingDetailAPIView.as_view(),name="interviewer-booking-detail",),
+
+    # ── Interviewer: NEW accept/reject reschedule ────────────── # NEW ───────
+    path(
+        "<int:booking_id>/reschedule/accept/",
+        views_interviewer.InterviewerAcceptRescheduleView.as_view(),
+        name="interviewer-accept-reschedule",
+    ),
+    path(
+        "<int:booking_id>/reschedule/reject/",
+        views_interviewer.InterviewerRejectRescheduleView.as_view(),
+        name="interviewer-reject-reschedule",
+    ),
+    
+
 
 
 

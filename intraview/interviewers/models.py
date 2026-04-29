@@ -248,6 +248,7 @@ class InterviewerAvailability(models.Model):
             status__in=[
                 InterviewBooking.Status.CONFIRMED,
                 InterviewBooking.Status.COMPLETED,
+                InterviewBooking.Status.LIVE,
             ],
         ).count()
         return max(0, self.max_bookings - used)

@@ -80,7 +80,9 @@ class NotificationService:
             cls._handle_feedback_pending(ctx)
 
         elif event_type == EventType.INTERVIEW_REMINDER_30M.value:
-            cls._handle_interview_reminder_30m(ctx)    
+            cls._handle_interview_reminder_30m(ctx)   
+        elif event_type == EventType.RESCHEDULE_SLOT_REQUESTED.value:
+            cls._handle_reschedule_slot_requested(ctx)     
 
         # Add other events here as you go: INTERVIEW_COMPLETED, etc.
 
@@ -268,6 +270,53 @@ class NotificationService:
             )
 
         cls._create_logs_for(ctx, notifications)    
+
+
+
+    @classmethod
+    def _handle_reschedule_slot_requested(cls, ctx: EventContext) -> None:
+        """
+        payload expects:
+        - booking_id
+        - candidate_id
+        - interviewer_id
+        - preferred_window
+        - start_time (optional current booking start time)
+        """
+        booking_id = ctx.payload.get("booking_id")
+        candidate_id = ctx.payload.get("candidate_id")
+        interviewer_id = ctx.payload.get("interviewer_id")
+        preferred_window = ctx.payload.get("preferred_window")
+        start_time = ctx.payload.get("start_time")
+
+        if not interviewer_id or not booking_id or not preferred_window:
+            return
+
+        body = (
+            f"The candidate for interview #{booking_id} requested new time slots "
+            f"around: {preferred_window}."
+        )
+        if start_time:
+            body += f" Current interview time: {start_time}."
+
+        notifications: List[Tuple[int, str, Dict[str, Any]]] = [
+            (
+                interviewer_id,
+                NotificationChannel.IN_APP.value,
+                {
+                    "title": "Candidate requested new slots",
+                    "body": body,
+                    "booking_id": booking_id,
+                    "candidate_id": candidate_id,
+                    "role": "interviewer",
+                    "preferred_window": preferred_window,
+                    "start_time": start_time,
+                    "action": "open_slots",
+                },
+            )
+        ]
+
+        cls._create_logs_for(ctx, notifications)
 
 
 

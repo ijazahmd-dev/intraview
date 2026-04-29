@@ -16,6 +16,8 @@ class EventType(str, Enum):
 
     INTERVIEW_REMINDER_30M = "INTERVIEW_REMINDER_30M"
 
+    RESCHEDULE_SLOT_REQUESTED = "RESCHEDULE_SLOT_REQUESTED"
+
 
 class NotificationChannel(str, Enum):
     IN_APP = "IN_APP"      # purely internal, later can map to Novu in-app

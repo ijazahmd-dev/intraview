@@ -393,6 +393,7 @@ NOVU_WORKFLOW_IDS = {
     "PAYOUT_FAILED": "payout-failed",
     "FEEDBACK_PENDING": "feedback-pending",
     "INTERVIEW_REMINDER_30M": "interview-reminder-30m",
+    "RESCHEDULE_SLOT_REQUESTED": "reschedule-slot-requested",
 }
 
 

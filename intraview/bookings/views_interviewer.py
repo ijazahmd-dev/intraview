@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from datetime import timedelta, datetime
 
-from .models import InterviewBooking
+from .models import InterviewBooking, RescheduleStatus
 from .serializers import InterviewerCancelBookingSerializer, InterviewerUpcomingSerializer, InterviewerBookingDetailSerializer, InterviewerCompletedSessionSerializer, InterviewerRescheduleSerializer
 from authentication.authentication import InterviewerCookieJWTAuthentication
 from wallet.models import TokenTransactionType,TokenTransaction
@@ -20,6 +20,8 @@ from authentication.permissions import IsActiveInterviewer
 
 from django.db import transaction
 from rest_framework import status
+
+from django.db.models import Case, When, IntegerField
 
 
 
@@ -123,23 +125,23 @@ class InterviewerCancelBookingAPIView(APIView):
 
 
 
-class InterviewerUpcomingSessionsAPIView(APIView):
-    authentication_classes = [InterviewerCookieJWTAuthentication]
-    permission_classes = [IsAuthenticated, IsActiveInterviewer]
+# class InterviewerUpcomingSessionsAPIView(APIView):
+#     authentication_classes = [InterviewerCookieJWTAuthentication]
+#     permission_classes = [IsAuthenticated, IsActiveInterviewer]
 
-    def get(self, request):
-        qs = (
-            InterviewBooking.objects
-            .filter(
-                interviewer=request.user,
-                status=InterviewBooking.Status.CONFIRMED,
-            )
-            .select_related("candidate", "availability")
-            .order_by("start_datetime")
-        )
+#     def get(self, request):
+#         qs = (
+#             InterviewBooking.objects
+#             .filter(
+#                 interviewer=request.user,
+#                 status=InterviewBooking.Status.CONFIRMED,
+#             )
+#             .select_related("candidate", "availability")
+#             .order_by("start_datetime")
+#         )
 
-        serializer = InterviewerUpcomingSerializer(qs, many=True)
-        return Response(serializer.data)
+#         serializer = InterviewerUpcomingSerializer(qs, many=True)
+#         return Response(serializer.data)
     
 
 
@@ -352,3 +354,310 @@ class InterviewerRescheduleBookingView(APIView):
             "tokens_locked": TOKEN_COST,
             "max_reschedules": MAX_RESCHEDULES
         }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class InterviewerUpcomingSessionsAPIView(APIView):
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes     = [IsAuthenticated, IsActiveInterviewer]
+ 
+    def get(self, request):
+        qs = (
+            InterviewBooking.objects
+            .filter(
+                interviewer=request.user,
+                status=InterviewBooking.Status.CONFIRMED,
+            )
+            .select_related(
+                "candidate",
+                "availability",
+                "proposed_availability",
+            )
+            # Pending reschedule requests float to the top, then by start time
+            .order_by(
+                # PENDING = "PENDING" sorts before "NONE" alphabetically,
+                # but we want PENDING first regardless. Use a Case expression.
+                # Simplest portable approach: annotate a priority integer.
+            )
+        )
+ 
+        # Python-side sort: PENDING first, then chronological
+        bookings = qs.annotate(
+            priority=Case(
+                When(reschedule_status="PENDING", then=0),
+                default=1,
+                output_field=IntegerField()
+            )
+        ).order_by("priority", "start_datetime")
+ 
+        serializer = InterviewerUpcomingSerializer(bookings, many=True)
+        return Response(serializer.data)
+ 
+ 
+# ─── POST /api/bookings/<booking_id>/reschedule/accept/ ──────────────────────
+ 
+class InterviewerAcceptRescheduleView(APIView):
+    """
+    POST /api/bookings/<booking_id>/reschedule/accept/
+ 
+    Interviewer accepts the candidate's reschedule request.
+ 
+    Behaviour:
+        Case A — candidate proposed a specific slot:
+            • Re-validate slot capacity under lock.
+            • Update booking.availability, start_datetime, end_datetime.
+            • Increment reschedule_count.
+            • Reset reschedule_status → NONE.
+ 
+        Case B — candidate sent an open-preference request (no slot):
+            • The interviewer cannot accept without a slot.
+            • They must open a new availability slot first, then the candidate
+              will see it and can raise a new request.
+            • Return 400 with a clear message.
+ 
+    On success the booking is fully updated and the candidate should be notified.
+    """
+ 
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes     = [IsAuthenticated, IsActiveInterviewer]
+ 
+    def post(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+            interviewer=request.user,
+        )
+ 
+        # ── Guard: must be a PENDING request ─────────────────────────────────
+        if booking.reschedule_status != RescheduleStatus.PENDING:
+            return Response(
+                {"detail": "No pending reschedule request for this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+ 
+        # ── Guard: no-slot request — cannot accept without a slot ────────────
+        if booking.proposed_availability is None:
+            return Response(
+                {
+                    "detail": (
+                        "The candidate did not propose a specific slot. "
+                        "Please open a new availability slot and ask the candidate "
+                        "to raise a new reschedule request."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if booking.status not in [
+            InterviewBooking.Status.PENDING,
+            InterviewBooking.Status.CONFIRMED,
+        ]:
+            return Response(
+                {"detail": "Cannot reschedule this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+ 
+        with transaction.atomic():
+            # Lock both rows
+            booking = (
+                InterviewBooking.objects
+                .select_for_update()
+                .get(id=booking.id)
+            )
+ 
+            if booking.reschedule_status != RescheduleStatus.PENDING:
+                return Response(
+                    {"detail": "Reschedule request is no longer pending."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+ 
+            new_slot = (
+                InterviewerAvailability.objects
+                .select_for_update()
+                .get(id=booking.proposed_availability_id)
+            )
+ 
+            # Re-validate slot under lock
+            if not new_slot.is_active:
+                return Response(
+                    {"detail": "The proposed slot is no longer active."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+ 
+            if new_slot.remaining_capacity() <= 0:
+                return Response(
+                    {"detail": "The proposed slot is now fully booked."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+ 
+            now = timezone.now()
+ 
+            new_start = timezone.make_aware(
+                datetime.combine(new_slot.date, new_slot.start_time)
+            )
+            new_end = timezone.make_aware(
+                datetime.combine(new_slot.date, new_slot.end_time)
+            )
+ 
+            # Apply the reschedule
+            booking.availability     = new_slot
+            booking.start_datetime   = new_start
+            booking.end_datetime     = new_end
+            booking.reschedule_count += 1
+            booking.reschedule_requested_at   = now
+            booking.rescheduled_by   = "CANDIDATE"   # candidate initiated
+ 
+            # Clear the request
+            booking.reschedule_status       = RescheduleStatus.NONE
+            booking.proposed_availability   = None
+            booking.reschedule_reason       = ""
+ 
+            booking.save(update_fields=[
+                "availability",
+                "start_datetime",
+                "end_datetime",
+                "reschedule_count",
+                "reschedule_requested_at",
+                "rescheduled_by",
+                "reschedule_status",
+                "proposed_availability",
+                "reschedule_reason",
+                "updated_at",
+            ])
+ 
+        logger.info(
+            "Reschedule ACCEPTED: booking=%s interviewer=%s new_slot=%s",
+            booking.id,
+            request.user.id,
+            new_slot.id,
+        )
+ 
+        # TODO: notify_reschedule_accepted.delay(booking.id)
+ 
+        return Response(
+            {
+                "message": "Reschedule accepted. Booking updated.",
+                "booking_id": booking.id,
+                "new_slot": {
+                    "availability_id": new_slot.id,
+                    "date":            str(new_slot.date),
+                    "start_time":      str(new_slot.start_time),
+                    "end_time":        str(new_slot.end_time),
+                    "start_datetime":  new_start.isoformat(),
+                    "end_datetime":    new_end.isoformat(),
+                },
+                "reschedule_count": booking.reschedule_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+ 
+ 
+# ─── POST /api/bookings/<booking_id>/reschedule/reject/ ──────────────────────
+ 
+class InterviewerRejectRescheduleView(APIView):
+    """
+    POST /api/bookings/<booking_id>/reschedule/reject/
+ 
+    Interviewer rejects the candidate's reschedule request.
+ 
+    Body (optional):
+        { "reason": "I am not available at the proposed time." }
+ 
+    Behaviour:
+        • reschedule_status  → NONE  (request cleared)
+        • proposed_availability → null
+        • The booking times remain completely unchanged.
+        • reschedule_count is NOT incremented.
+        • The rejection reason is stored in reschedule_reason so the
+          candidate can read why it was declined.
+    """
+ 
+    authentication_classes = [InterviewerCookieJWTAuthentication]
+    permission_classes     = [IsAuthenticated, IsActiveInterviewer]
+ 
+    def post(self, request, booking_id):
+        booking = get_object_or_404(
+            InterviewBooking,
+            id=booking_id,
+            interviewer=request.user,
+        )
+ 
+        if booking.reschedule_status != RescheduleStatus.PENDING:
+            return Response(
+                {"detail": "No pending reschedule request for this booking."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+ 
+        rejection_reason = (request.data.get("reason", "") or "").strip()[:500]
+ 
+        with transaction.atomic():
+            booking = (
+                InterviewBooking.objects
+                .select_for_update()
+                .get(id=booking.id)
+            )
+ 
+            if booking.reschedule_status != RescheduleStatus.PENDING:
+                return Response(
+                    {"detail": "Reschedule request is no longer pending."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+ 
+            booking.reschedule_status     = RescheduleStatus.NONE
+            booking.proposed_availability = None
+            # Store the interviewer's reason so the candidate can see it
+            booking.reschedule_reason     = (
+                f"[Rejected] {rejection_reason}" if rejection_reason
+                else "[Rejected] Interviewer declined the reschedule request."
+            )
+            booking.updated_at = timezone.now()
+ 
+            booking.save(update_fields=[
+                "reschedule_status",
+                "proposed_availability",
+                "reschedule_reason",
+                "updated_at",
+            ])
+ 
+        logger.info(
+            "Reschedule REJECTED: booking=%s interviewer=%s",
+            booking.id,
+            request.user.id,
+        )
+ 
+        # TODO: notify_reschedule_rejected.delay(booking.id)
+ 
+        return Response(
+            {
+                "message":  "Reschedule request rejected. Booking time unchanged.",
+                "booking_id": booking.id,
+                "reason":   rejection_reason or None,
+            },
+            status=status.HTTP_200_OK,
+        )
+ 

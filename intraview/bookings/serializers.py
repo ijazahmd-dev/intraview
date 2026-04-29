@@ -1,10 +1,10 @@
 from rest_framework import serializers
 from django.utils import timezone as django_timezone
 from django.utils import timezone
-from datetime import datetime
+from datetime import datetime, timedelta
 from authentication.models import CustomUser
 from interviewers.models import InterviewerAvailability,InterviewerProfile
-from .models import InterviewBooking
+from .models import InterviewBooking, RescheduleStatus
 
 from wallet.models import TokenTransaction, TokenTransactionType
 from subscriptions.services.entitlement_service import SubscriptionEntitlementService
@@ -287,24 +287,24 @@ class InterviewerCancelBookingSerializer(serializers.Serializer):
 
 
 
-class InterviewerUpcomingSerializer(serializers.ModelSerializer):
-    candidate_email = serializers.EmailField(source="candidate.email")
-    date = serializers.DateField(source="availability.date")
-    start_time = serializers.TimeField(source="availability.start_time", read_only=True)
-    end_time = serializers.TimeField(source="availability.end_time", read_only=True)
+# class InterviewerUpcomingSerializer(serializers.ModelSerializer):
+#     candidate_email = serializers.EmailField(source="candidate.email")
+#     date = serializers.DateField(source="availability.date")
+#     start_time = serializers.TimeField(source="availability.start_time", read_only=True)
+#     end_time = serializers.TimeField(source="availability.end_time", read_only=True)
     
 
-    class Meta:
-        model = InterviewBooking
-        fields = [
-            "id",
-            "candidate_email",
-            "date",
-            "start_time",
-            "end_time",
-            "status",
-            "token_cost",
-        ]
+#     class Meta:
+#         model = InterviewBooking
+#         fields = [
+#             "id",
+#             "candidate_email",
+#             "date",
+#             "start_time",
+#             "end_time",
+#             "status",
+#             "token_cost",
+#         ]
 
 
 
@@ -560,3 +560,250 @@ class AdminBookingDetailSerializer(serializers.ModelSerializer):
 
     def get_token_transfer_tx(self, obj):
         return self._get_tx(obj, TokenTransactionType.SESSION_EARN)
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from interviewers.models import InterviewerAvailability
+ 
+ 
+# ─── Reschedule options (read-only, returned to candidate) ───────────────────
+ 
+class AvailableSlotSerializer(serializers.ModelSerializer):
+    """Single availability slot returned in the reschedule options list."""
+    remaining_capacity = serializers.SerializerMethodField()
+    start_datetime     = serializers.SerializerMethodField()
+    end_datetime       = serializers.SerializerMethodField()
+ 
+    class Meta:
+        model  = InterviewerAvailability
+        fields = [
+            "id", "date", "start_time", "end_time",
+            "timezone", "remaining_capacity",
+            "start_datetime", "end_datetime",
+        ]
+ 
+    def get_remaining_capacity(self, obj):
+        return obj.remaining_capacity()
+ 
+    def get_start_datetime(self, obj):
+        dt = timezone.make_aware(datetime.combine(obj.date, obj.start_time))
+        return dt.isoformat()
+ 
+    def get_end_datetime(self, obj):
+        dt = timezone.make_aware(datetime.combine(obj.date, obj.end_time))
+        return dt.isoformat()
+ 
+ 
+# ─── Reschedule request (submitted by candidate) ─────────────────────────────
+ 
+RESCHEDULE_LIMIT          = 2      # max successful reschedules per booking
+RESCHEDULE_MIN_HOURS_AHEAD = 2     # cannot request within 2 h of session start
+ 
+ 
+class RescheduleRequestSerializer(serializers.Serializer):
+    """
+    Validates a candidate's reschedule request.
+ 
+    proposed_availability_id  — ID of the desired slot (null = no slot / open preference)
+    note                      — optional message to the interviewer
+    """
+    proposed_availability_id = serializers.IntegerField(
+        min_value=1,
+        required=True,
+        allow_null=False,
+        help_text="elect one of the available slots for rescheduling.",
+    )
+    note = serializers.CharField(
+        max_length=500,
+        allow_blank=True,
+        required=False,
+        default="",
+    )
+ 
+    def validate(self, attrs):
+        booking = self.context["booking"]
+        now     = timezone.now()
+ 
+        # ── 1. Booking status must allow reschedule ───────────────────────────
+        if booking.status not in [
+            InterviewBooking.Status.PENDING,
+            InterviewBooking.Status.CONFIRMED,
+        ]:
+            raise serializers.ValidationError(
+                "Reschedule is only allowed for PENDING or CONFIRMED bookings."
+            )
+ 
+        # ── 2. No existing pending request ───────────────────────────────────
+        if booking.reschedule_status == RescheduleStatus.PENDING:
+            raise serializers.ValidationError(
+                "A reschedule request is already pending. "
+                "Wait for the interviewer to respond."
+            )
+ 
+        # ── 3. Reschedule limit ───────────────────────────────────────────────
+        if booking.reschedule_count >= RESCHEDULE_LIMIT:
+            raise serializers.ValidationError(
+                f"Maximum of {RESCHEDULE_LIMIT} reschedules per booking reached."
+            )
+ 
+        # ── 4. Time restriction ───────────────────────────────────────────────
+        if booking.start_datetime - now < timedelta(hours=RESCHEDULE_MIN_HOURS_AHEAD):
+            raise serializers.ValidationError(
+                f"Cannot request reschedule within "
+                f"{RESCHEDULE_MIN_HOURS_AHEAD} hours of the session."
+            )
+ 
+        # ── 5. Slot validation (only when a slot is provided) ─────────────────
+        slot_id = attrs.get("proposed_availability_id")
+
+        try:
+            slot = InterviewerAvailability.objects.get(
+                id=slot_id,
+                interviewer=booking.interviewer,
+                is_active=True,
+            )
+        except InterviewerAvailability.DoesNotExist:
+            raise serializers.ValidationError(
+                {"proposed_availability_id":
+                    "Slot not found, inactive, or belongs to a different interviewer."}
+            )
+
+        # Cannot propose the current slot
+        if slot.id == booking.availability_id:
+            raise serializers.ValidationError(
+                {"proposed_availability_id":
+                    "Cannot propose the same slot the booking is already on."}
+            )
+
+        # Slot must have capacity
+        if slot.remaining_capacity() <= 0:
+            raise serializers.ValidationError(
+                {"proposed_availability_id": "Selected slot is already full."}
+            )
+
+        # Slot must be in the future
+        slot_start = timezone.make_aware(
+            datetime.combine(slot.date, slot.start_time)
+        )
+        if slot_start <= now:
+            raise serializers.ValidationError(
+                {"proposed_availability_id":
+                    "Proposed slot must be in the future."}
+            )
+
+        attrs["proposed_availability"] = slot
+
+ 
+        return attrs
+ 
+ 
+# ─── Updated InterviewerUpcomingSerializer ───────────────────────────────────
+# Replace your existing InterviewerUpcomingSerializer with this one.
+# Added: candidate_name, reschedule_status, proposed_slot, reschedule_note
+# so the interviewer can see and act on pending requests.
+ 
+class ProposedSlotSerializer(serializers.ModelSerializer):
+    """Minimal slot info shown in the interviewer's pending-request view."""
+    start_datetime = serializers.SerializerMethodField()
+    end_datetime   = serializers.SerializerMethodField()
+ 
+    class Meta:
+        model  = InterviewerAvailability
+        fields = ["id", "date", "start_time", "end_time",
+                  "timezone", "start_datetime", "end_datetime"]
+ 
+    def get_start_datetime(self, obj):
+        return timezone.make_aware(
+            datetime.combine(obj.date, obj.start_time)
+        ).isoformat()
+ 
+    def get_end_datetime(self, obj):
+        return timezone.make_aware(
+            datetime.combine(obj.date, obj.end_time)
+        ).isoformat()
+ 
+ 
+class InterviewerUpcomingSerializer(serializers.ModelSerializer):
+    candidate_name  = serializers.SerializerMethodField()
+    candidate_email = serializers.EmailField(source="candidate.email")
+    date       = serializers.DateField(source="availability.date")
+    start_time = serializers.TimeField(source="availability.start_time", read_only=True)
+    end_time   = serializers.TimeField(source="availability.end_time",   read_only=True)
+ 
+    # Reschedule request info
+    reschedule_status   = serializers.CharField(read_only=True)
+    proposed_slot       = serializers.SerializerMethodField()
+    reschedule_note     = serializers.CharField(source="reschedule_reason", read_only=True)
+    reschedule_requested_by = serializers.CharField(source="rescheduled_by", read_only=True)
+ 
+    class Meta:
+        model  = InterviewBooking
+        fields = [
+            "id",
+            "candidate_name",
+            "candidate_email",
+            "date",
+            "start_time",
+            "end_time",
+            "start_datetime",
+            "end_datetime",
+            "status",
+            "token_cost",
+            # reschedule
+            "reschedule_status",
+            "proposed_slot",
+            "reschedule_note",
+            "reschedule_requested_by",
+        ]
+ 
+    def get_candidate_name(self, obj):
+        return (
+            f"{obj.candidate.first_name} {obj.candidate.last_name}".strip()
+            or obj.candidate.email
+        )
+ 
+    def get_proposed_slot(self, obj):
+        if obj.proposed_availability:
+            return ProposedSlotSerializer(obj.proposed_availability).data
+        return None
+    
+
+
+
+
+
+
+
+
+
+class NotifyInterviewerNewSlotSerializer(serializers.Serializer):
+    preferred_window = serializers.CharField(
+        max_length=200,
+        allow_blank=False,
+        help_text="Describe the time you prefer, e.g. 'tomorrow evening' or 'between 6–9 PM IST'.",
+    )
