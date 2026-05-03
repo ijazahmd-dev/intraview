@@ -15,6 +15,8 @@ import profileReducer from './candidateProfile/profileSlice';
 import feedbackReducer from './features/feedback/interviewer/interviewerFeedbackSlice';
 import candidateFeedbackReducer from './features/feedback/candidate/candidateFeedbackSlice';
 import notificationsSlice from './features/notification/notificationsSlice';
+import aiInterviewRolesSlice from './features/aiInterview/slice/aiInterviewRolesSlice';
+import aiInterviewSessionReducer from './features/aiInterview/slice/aiInterviewSessionSlice';
 
 export const store = configureStore({
   reducer: {
@@ -34,6 +36,8 @@ export const store = configureStore({
     profile: profileReducer,
     feedback: feedbackReducer,
     candidateFeedback: candidateFeedbackReducer,
-    notifications: notificationsSlice
+    notifications: notificationsSlice,
+    aiInterviewRoles: aiInterviewRolesSlice,
+    aiInterviewSession: aiInterviewSessionReducer,
   },
 });

@@ -77,6 +77,8 @@ import CandidateFeedbackListPage from "./features/feedback/candidate/pages/Candi
 import CandidateFeedbackDetailPage from "./features/feedback/candidate/pages/CandidateFeedbackDetailPage";
 import InterviewCompleted from "./features/interview/components/InterviewCompleted";
 import NotificationsPage from "./features/notification/user/pages/NotificationsPage";
+import RoleBasedInterviewPage from "./features/aiInterview/pages/RoleBasedInterviewPage";
+import RoleInterviewSetupPage from "./features/aiInterview/pages/RoleInterviewSetupPage";
 
 
 
@@ -144,6 +146,13 @@ function AppInner() {
                       <Route path="resume" element={<ResumePage />} />
                       <Route path="settings" element={<SettingsPage />} /> 
                     </Route>   
+
+                    {/* want to register this page named RoleBasedAiInterviewPage.jsx */}
+                    <Route path="/ai-interview/roles" element={<RoleBasedInterviewPage />} />
+                    <Route path="/ai-interview/role/:slug" element={<RoleInterviewSetupPage />}
+/>
+
+                    
 
                     <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />   
                     <Route path="/interview/completed/:bookingId" element={<InterviewCompleted />}/>       

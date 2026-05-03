@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'realtime',
     'feedbacks',
     'notifications',
+    'ai_interviews',
 
     'rest_framework',
     "channels",
