@@ -108,4 +108,5 @@ class AIInterviewSessionJoinResponseSerializer(serializers.Serializer):
     duration_minutes = serializers.IntegerField()
     status = serializers.CharField()
     livekit_room_name = serializers.CharField()
-    livekit_token = serializers.CharField(allow_null=True)
+    livekit_token = serializers.CharField()
+    livekit_server_url = serializers.CharField()

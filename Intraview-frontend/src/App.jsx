@@ -79,6 +79,7 @@ import InterviewCompleted from "./features/interview/components/InterviewComplet
 import NotificationsPage from "./features/notification/user/pages/NotificationsPage";
 import RoleBasedInterviewPage from "./features/aiInterview/pages/RoleBasedInterviewPage";
 import RoleInterviewSetupPage from "./features/aiInterview/pages/RoleInterviewSetupPage";
+import LiveInterviewPage from "./features/aiInterview/pages/LiveInterviewPage";
 
 
 
@@ -149,8 +150,10 @@ function AppInner() {
 
                     {/* want to register this page named RoleBasedAiInterviewPage.jsx */}
                     <Route path="/ai-interview/roles" element={<RoleBasedInterviewPage />} />
-                    <Route path="/ai-interview/role/:slug" element={<RoleInterviewSetupPage />}
-/>
+                    <Route path="/ai-interview/role/:slug" element={<RoleInterviewSetupPage />} />
+
+
+                    <Route path="/ai-interview/live/:sessionId" element={<LiveInterviewPage />} />
 
                     
 

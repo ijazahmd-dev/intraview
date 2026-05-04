@@ -6,6 +6,9 @@ from ai_interviews.models import Role, AIInterviewSession
 from ai_interviews.repositories import RoleRepository, AIInterviewSessionRepository
 from django.utils.crypto import get_random_string
 
+from django.conf import settings
+from livekit import api as lk_api  # LiveKit Python SDK
+
 
 class RoleService:
     @staticmethod
@@ -79,8 +82,7 @@ class AIInterviewSessionService:
     def build_join_payload(session: AIInterviewSession, user) -> dict:
         """
         Return data needed by the frontend to prepare joining the LiveKit room.
-        This does NOT mark the interview LIVE.
-        LIVE should be set only after the frontend confirms successful room connection.
+        This now generates a real LiveKit access token using the Python SDK.
         """
         if session.user != user:
             raise PermissionError("You do not own this interview session.")
@@ -91,10 +93,38 @@ class AIInterviewSessionService:
         if not session.is_owner_join_allowed:
             raise ValueError("This session is not joinable in its current state.")
 
+        # Ensure the room name exists
         session = AIInterviewSessionService.ensure_room_name(session)
 
-        # LiveKit integration not yet done.
-        livekit_token = None
+        # Validate LiveKit configuration
+        livekit_url = getattr(settings, "LIVEKIT_URL", "")
+        livekit_api_key = getattr(settings, "LIVEKIT_API_KEY", "")
+        livekit_api_secret = getattr(settings, "LIVEKIT_API_SECRET", "")
+
+        if not (livekit_url and livekit_api_key and livekit_api_secret):
+            # Misconfiguration is a server error, not a user error
+            raise RuntimeError("LiveKit configuration is missing on the server.")
+
+        # Build a LiveKit access token for this participant
+        # Using the Python server SDK (livekit.api.AccessToken)[web:43][web:35]
+        identity = f"user-{user.id}"
+        display_name = getattr(user, "full_name", None) or getattr(user, "username", str(user.id))
+
+        token_builder = (
+            lk_api.AccessToken(livekit_api_key, livekit_api_secret)
+            .with_identity(identity)
+            .with_name(display_name)
+            .with_grants(
+                lk_api.VideoGrants(
+                    room_join=True,
+                    room=session.livekit_room_name,
+                    can_publish=True,
+                    can_subscribe=True,
+                )
+            )
+        )
+
+        livekit_token = token_builder.to_jwt()  # signed JWT string[web:43][web:37]
 
         return {
             "session_id": session.id,
@@ -109,4 +139,5 @@ class AIInterviewSessionService:
             "status": session.status,
             "livekit_room_name": session.livekit_room_name,
             "livekit_token": livekit_token,
+            "livekit_server_url": livekit_url,
         }

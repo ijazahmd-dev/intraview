@@ -1651,8 +1651,9 @@ export default function RoleInterviewSetupPage() {
         role_slug: role.slug, round_type: config.roundType, difficulty: config.difficulty, duration_minutes: config.durationMinutes,
       }));
       if (createAiInterviewSession.fulfilled.match(action)) {
+        const newSession = action.payload;
         stopMediaAndAudio();
-        // navigate(`/ai-interview/live/${newSession.id}`);
+        navigate(`/ai-interview/live/${newSession.id}`);
         console.log("Session created:", action.payload);
       } else {
         setLocalError(action.payload?.detail || "Failed to start session.");
