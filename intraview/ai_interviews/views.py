@@ -168,6 +168,49 @@ class AIInterviewSessionJoinAPIView(APIView):
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
+
+class AIInterviewSessionEndAPIView(APIView):
+    """
+    POST /api/ai-interview/session/<id>/end/
+
+    Body: { "reason": "COMPLETED" | "CANCELLED" }
+
+    - COMPLETED: user finished the live interview
+    - CANCELLED: user explicitly cancels before starting (unused in UI for now)
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        reason = request.data.get("reason", "COMPLETED").upper()
+        as_cancel = reason == "CANCELLED"
+
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            session = AIInterviewSessionService.end_session(
+                session=session,
+                user=request.user,
+                as_cancel=as_cancel,
+            )
+        except PermissionError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            AIInterviewSessionSerializer(session).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+
 class PingAPIView(APIView):
     """
     Simple health check for frontend network tests.

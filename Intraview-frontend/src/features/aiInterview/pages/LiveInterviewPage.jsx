@@ -508,14 +508,726 @@
 
 
 
+// // src/pages/LiveInterviewPage.jsx
+
+// import { useEffect, useMemo, useRef, useState } from "react";
+// import { useDispatch, useSelector } from "react-redux";
+// import { useNavigate, useParams } from "react-router-dom";
+// import { Room, RoomEvent, createLocalTracks } from "livekit-client"; // LiveKit JS SDK[web:36][web:69]
+
+// import { joinAiInterviewSessionThunk } from "../slice/aiInterviewSessionSlice";
+
+// import { LiveInterviewHeader } from "../components/LiveInterviewHeader";
+// import {
+//   LoadingView,
+//   ErrorView,
+//   LobbyView,
+//   ConnectingView,
+//   LiveInterviewView,
+//   CompletedView,
+// } from "../components/LiveInterviewViews";
+
+// const UI_STATES = {
+//   LOADING: "LOADING",
+//   ERROR: "ERROR",
+//   LOBBY: "LOBBY",
+//   CONNECTING: "CONNECTING",
+//   LIVE: "LIVE",
+//   COMPLETED: "COMPLETED",
+// };
+
+// export default function LiveInterviewPage() {
+//   const { sessionId } = useParams();
+//   const dispatch = useDispatch();
+//   const navigate = useNavigate();
+
+//   const { join } = useSelector((state) => state.aiInterviewSession);
+
+//   const [uiState, setUiState] = useState(UI_STATES.LOADING);
+//   const [timeLeftSec, setTimeLeftSec] = useState(null); // seconds countdown
+//   const [connectionError, setConnectionError] = useState(null);
+
+//   // Keep a ref to the LiveKit room so we can disconnect on unmount
+//   const roomRef = useRef(null);
+
+//   // Kick off join on mount
+//   useEffect(() => {
+//     if (!sessionId) return;
+//     dispatch(joinAiInterviewSessionThunk(sessionId));
+//   }, [sessionId, dispatch]);
+
+//   // React to join status from Redux
+//   useEffect(() => {
+//     if (join.status === "joining") {
+//       setUiState(UI_STATES.LOADING);
+//     } else if (join.status === "error") {
+//       setUiState(UI_STATES.ERROR);
+//     } else if (join.status === "ready") {
+//       setUiState(UI_STATES.LOBBY);
+//       if (join.data?.duration_minutes) {
+//         setTimeLeftSec(join.data.duration_minutes * 60);
+//       }
+//     }
+//   }, [join.status, join.data]);
+
+//   // Timer: start when we enter LIVE, stop when leaving LIVE/COMPLETED
+//   useEffect(() => {
+//     if (uiState !== UI_STATES.LIVE || timeLeftSec == null) return;
+
+//     const interval = setInterval(() => {
+//       setTimeLeftSec((prev) => {
+//         if (prev == null) return prev;
+//         if (prev <= 1) {
+//           clearInterval(interval);
+//           setUiState(UI_STATES.COMPLETED);
+//           return 0;
+//         }
+//         return prev - 1;
+//       });
+//     }, 1000);
+
+//     return () => clearInterval(interval);
+//   }, [uiState, timeLeftSec]);
+
+//   // Cleanup LiveKit room on unmount
+//   useEffect(() => {
+//     return () => {
+//       if (roomRef.current) {
+//         roomRef.current.disconnect();
+//         roomRef.current = null;
+//       }
+//     };
+//   }, []);
+
+//   const handleBackToRoles = () => {
+//     navigate("/ai-interview/roles");
+//   };
+
+//   const handleJoinInterview = async () => {
+//     if (!join.data) return;
+
+//     setConnectionError(null);
+//     setUiState(UI_STATES.CONNECTING);
+
+//     try {
+//       const { livekit_server_url, livekit_token } = join.data;
+
+//       const room = new Room();
+//       roomRef.current = room;
+
+//       // When the room disconnects (e.g., network, server), bring UI back to lobby
+//       room.on(RoomEvent.Disconnected, () => {
+//         roomRef.current = null;
+//         setUiState((prev) =>
+//           prev === UI_STATES.COMPLETED ? prev : UI_STATES.LOBBY
+//         );
+//       });
+
+//       // Connect to LiveKit using the URL + token from your Django backend[web:36][web:69]
+//       await room.connect(livekit_server_url, livekit_token);
+
+//       // Publish local audio + video tracks
+//       const tracks = await createLocalTracks({
+//         audio: true,
+//         video: { facingMode: "user" },
+//       });
+//       for (const track of tracks) {
+//         await room.localParticipant.publishTrack(track);
+//       }
+
+//       setUiState(UI_STATES.LIVE);
+//     } catch (err) {
+//       console.error("Failed to connect to LiveKit room", err);
+//       setConnectionError(
+//         err?.message || "Failed to connect to the AI interview room."
+//       );
+//       // Show a structured error screen
+//       setUiState(UI_STATES.ERROR);
+//     }
+//   };
+
+//   const handleEndInterview = () => {
+//     const confirmEnd = window.confirm(
+//       "End this interview and leave the room?"
+//     );
+//     if (!confirmEnd) return;
+
+//     if (roomRef.current) {
+//       roomRef.current.disconnect();
+//       roomRef.current = null;
+//     }
+//     setUiState(UI_STATES.COMPLETED);
+//   };
+
+//   const sessionInfo = useMemo(() => {
+//     const data = join.data;
+//     if (!data) return null;
+//     return {
+//       roleName: data.role?.name || "N/A",
+//       roleCategory: data.role?.category || null,
+//       roundType: data.round_type || "N/A",
+//       difficulty: data.difficulty || "N/A",
+//       durationMinutes: data.duration_minutes || null,
+//       status: data.status || "N/A",
+//       roomName: data.livekit_room_name || "Not generated",
+//     };
+//   }, [join.data]);
+
+//   const formattedTimeLeft = useMemo(() => {
+//     if (timeLeftSec == null) return null;
+//     const m = Math.floor(timeLeftSec / 60)
+//       .toString()
+//       .padStart(2, "0");
+//     const s = (timeLeftSec % 60).toString().padStart(2, "0");
+//     return `${m}:${s}`;
+//   }, [timeLeftSec]);
+
+//   const isConnected = !!roomRef.current;
+
+//   return (
+//     <div
+//       className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-4"
+//       style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}
+//     >
+//       <div className="max-w-4xl w-full bg-gray-900/90 border border-gray-800 rounded-2xl shadow-xl p-5 sm:p-7">
+//         <LiveInterviewHeader
+//           sessionId={sessionId}
+//           joinStatus={join.status}
+//           uiState={uiState}
+//           onBack={handleBackToRoles}
+//         />
+
+//         {/* Dev-only debug: you can remove this later */}
+//         {join.status === "ready" && join.data && (
+//           <div className="mb-3 text-[10px] text-gray-500 break-all">
+//             <div>LiveKit URL: {join.data.livekit_server_url}</div>
+//             <div className="mt-1 opacity-70">
+//               Token (dev only): {join.data.livekit_token}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* Main content by uiState */}
+//         {uiState === UI_STATES.LOADING && (
+//           <LoadingView message="Connecting to your AI interview session..." />
+//         )}
+
+//         {uiState === UI_STATES.ERROR && (
+//           <ErrorView
+//             errorMessage={connectionError || join.error}
+//             onStartNew={handleBackToRoles}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.LOBBY && sessionInfo && (
+//           <LobbyView sessionInfo={sessionInfo} onJoin={handleJoinInterview} />
+//         )}
+
+//         {uiState === UI_STATES.CONNECTING && sessionInfo && (
+//           <ConnectingView sessionInfo={sessionInfo} />
+//         )}
+
+//         {uiState === UI_STATES.LIVE && sessionInfo && (
+//           <LiveInterviewView
+//             sessionInfo={sessionInfo}
+//             formattedTimeLeft={formattedTimeLeft}
+//             onEnd={handleEndInterview}
+//             isConnected={isConnected}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.COMPLETED && sessionInfo && (
+//           <CompletedView
+//             sessionInfo={sessionInfo}
+//             onBackToRoles={handleBackToRoles}
+//           />
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // src/pages/LiveInterviewPage.jsx
+
+// import { useEffect, useMemo, useState } from "react";
+// import { useDispatch, useSelector } from "react-redux";
+// import { useNavigate, useParams } from "react-router-dom";
+
+// import { joinAiInterviewSessionThunk } from "../slice/aiInterviewSessionSlice";
+
+// import { LiveInterviewHeader } from "../components/LiveInterviewHeader";
+// import {
+//   LoadingView,
+//   ErrorView,
+//   LobbyView,
+//   ConnectingView,
+//   LiveInterviewView,
+//   CompletedView,
+// } from "../components/LiveInterviewViews";
+
+// const UI_STATES = {
+//   LOADING: "LOADING",
+//   ERROR: "ERROR",
+//   LOBBY: "LOBBY",
+//   CONNECTING: "CONNECTING",
+//   LIVE: "LIVE",
+//   COMPLETED: "COMPLETED",
+// };
+
+// export default function LiveInterviewPage() {
+//   const { sessionId } = useParams();
+//   const dispatch = useDispatch();
+//   const navigate = useNavigate();
+
+//   const { join } = useSelector((state) => state.aiInterviewSession);
+
+//   const [uiState, setUiState] = useState(UI_STATES.LOADING);
+//   const [timeLeftSec, setTimeLeftSec] = useState(null);
+//   const [connectionError, setConnectionError] = useState(null);
+//   const [isConnected, setIsConnected] = useState(false);
+
+//   // Kick off join on mount
+//   useEffect(() => {
+//     if (!sessionId) return;
+//     dispatch(joinAiInterviewSessionThunk(sessionId));
+//   }, [sessionId, dispatch]);
+
+//   // React to join status from Redux
+//   useEffect(() => {
+//     if (join.status === "joining") {
+//       setUiState(UI_STATES.LOADING);
+//     } else if (join.status === "error") {
+//       setUiState(UI_STATES.ERROR);
+//     } else if (join.status === "ready") {
+//       setUiState(UI_STATES.LOBBY);
+//       if (join.data?.duration_minutes) {
+//         setTimeLeftSec(join.data.duration_minutes * 60);
+//       }
+//     }
+//   }, [join.status, join.data]);
+
+//   // Timer: start when we are in LIVE state, stop on leave/completed
+//   useEffect(() => {
+//     if (uiState !== UI_STATES.LIVE || timeLeftSec == null) return;
+
+//     const interval = setInterval(() => {
+//       setTimeLeftSec((prev) => {
+//         if (prev == null) return prev;
+//         if (prev <= 1) {
+//           clearInterval(interval);
+//           setUiState(UI_STATES.COMPLETED);
+//           return 0;
+//         }
+//         return prev - 1;
+//       });
+//     }, 1000);
+
+//     return () => clearInterval(interval);
+//   }, [uiState, timeLeftSec]);
+
+//   const handleBackToRoles = () => {
+//     navigate("/ai-interview/roles");
+//   };
+
+//   const handleJoinInterview = () => {
+//     if (!join.data) return;
+//     setConnectionError(null);
+//     setIsConnected(false);
+//     // We move into CONNECTING; LiveKitVideoPanel will auto-connect using token+url.
+//     setUiState(UI_STATES.CONNECTING);
+//   };
+
+//   const handleRoomConnected = () => {
+//     setIsConnected(true);
+//     setUiState(UI_STATES.LIVE);
+//   };
+
+//   const handleRoomDisconnected = () => {
+//     setIsConnected(false);
+//     // If we didn't complete manually, send user back to lobby
+//     setUiState((prev) =>
+//       prev === UI_STATES.COMPLETED ? prev : UI_STATES.LOBBY
+//     );
+//   };
+
+//   const handleEndInterview = () => {
+//     const confirmEnd = window.confirm(
+//       "End this interview and leave the room?"
+//     );
+//     if (!confirmEnd) return;
+//     setIsConnected(false);
+//     setUiState(UI_STATES.COMPLETED);
+//   };
+
+//   const sessionInfo = useMemo(() => {
+//     const data = join.data;
+//     if (!data) return null;
+//     return {
+//       roleName: data.role?.name || "N/A",
+//       roleCategory: data.role?.category || null,
+//       roundType: data.round_type || "N/A",
+//       difficulty: data.difficulty || "N/A",
+//       durationMinutes: data.duration_minutes || null,
+//       status: data.status || "N/A",
+//       roomName: data.livekit_room_name || "Not generated",
+//     };
+//   }, [join.data]);
+
+//   const formattedTimeLeft = useMemo(() => {
+//     if (timeLeftSec == null) return null;
+//     const m = Math.floor(timeLeftSec / 60)
+//       .toString()
+//       .padStart(2, "0");
+//     const s = (timeLeftSec % 60).toString().padStart(2, "0");
+//     return `${m}:${s}`;
+//   }, [timeLeftSec]);
+
+//   return (
+//     <div
+//       className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-4"
+//       style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}
+//     >
+//       <div className="max-w-4xl w-full bg-gray-900/90 border border-gray-800 rounded-2xl shadow-xl p-5 sm:p-7">
+//         <LiveInterviewHeader
+//           sessionId={sessionId}
+//           joinStatus={join.status}
+//           uiState={uiState}
+//           onBack={handleBackToRoles}
+//         />
+
+//         {/* (Optional) dev-only debug for token & URL */}
+//         {join.status === "ready" && join.data && (
+//           <div className="mb-3 text-[10px] text-gray-500 break-all">
+//             <div>LiveKit URL: {join.data.livekit_server_url}</div>
+//             <div className="mt-1 opacity-70">
+//               Token (dev only): {join.data.livekit_token}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* Main content by uiState */}
+//         {uiState === UI_STATES.LOADING && (
+//           <LoadingView message="Connecting to your AI interview session..." />
+//         )}
+
+//         {uiState === UI_STATES.ERROR && (
+//           <ErrorView
+//             errorMessage={connectionError || join.error}
+//             onStartNew={handleBackToRoles}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.LOBBY && sessionInfo && (
+//           <LobbyView sessionInfo={sessionInfo} onJoin={handleJoinInterview} />
+//         )}
+
+//         {uiState === UI_STATES.CONNECTING && sessionInfo && (
+//           <LiveInterviewView
+//             sessionInfo={sessionInfo}
+//             formattedTimeLeft={formattedTimeLeft}
+//             onEnd={handleEndInterview}
+//             isConnected={isConnected}
+//             livekitServerUrl={join.data.livekit_server_url}
+//             livekitToken={join.data.livekit_token}
+//             uiState={uiState}
+//             onRoomConnected={handleRoomConnected}
+//             onRoomDisconnected={handleRoomDisconnected}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.LIVE && sessionInfo && (
+//           <LiveInterviewView
+//             sessionInfo={sessionInfo}
+//             formattedTimeLeft={formattedTimeLeft}
+//             onEnd={handleEndInterview}
+//             isConnected={isConnected}
+//             livekitServerUrl={join.data.livekit_server_url}
+//             livekitToken={join.data.livekit_token}
+//             uiState={uiState}
+//             onRoomConnected={handleRoomConnected}
+//             onRoomDisconnected={handleRoomDisconnected}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.COMPLETED && sessionInfo && (
+//           <CompletedView
+//             sessionInfo={sessionInfo}
+//             onBackToRoles={handleBackToRoles}
+//           />
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // src/pages/LiveInterviewPage.jsx
+
+// import { useEffect, useMemo, useState } from "react";
+// import { useDispatch, useSelector } from "react-redux";
+// import { useNavigate, useParams } from "react-router-dom";
+
+// import { joinAiInterviewSessionThunk } from "../slice/aiInterviewSessionSlice";
+
+// import { LiveInterviewHeader } from "../components/LiveInterviewHeader";
+// import {
+//   LoadingView,
+//   ErrorView,
+//   LobbyView,
+//   ConnectingView,
+//   LiveInterviewView,
+//   CompletedView,
+// } from "../components/LiveInterviewViews";
+
+// const UI_STATES = {
+//   LOADING: "LOADING",
+//   ERROR: "ERROR",
+//   LOBBY: "LOBBY",
+//   CONNECTING: "CONNECTING",
+//   LIVE: "LIVE",
+//   COMPLETED: "COMPLETED",
+// };
+
+// export default function LiveInterviewPage() {
+//   const { sessionId } = useParams();
+//   const dispatch = useDispatch();
+//   const navigate = useNavigate();
+
+//   const { join } = useSelector((state) => state.aiInterviewSession);
+
+//   const [uiState, setUiState] = useState(UI_STATES.LOADING);
+//   const [timeLeftSec, setTimeLeftSec] = useState(null);
+//   const [connectionError, setConnectionError] = useState(null);
+//   const [isConnected, setIsConnected] = useState(false);
+
+//   // Kick off join on mount
+//   useEffect(() => {
+//     if (!sessionId) return;
+//     dispatch(joinAiInterviewSessionThunk(sessionId));
+//   }, [sessionId, dispatch]);
+
+//   // React to join status from Redux
+//   useEffect(() => {
+//     if (join.status === "joining") {
+//       setUiState(UI_STATES.LOADING);
+//     } else if (join.status === "error") {
+//       setUiState(UI_STATES.ERROR);
+//     } else if (join.status === "ready") {
+//       setUiState(UI_STATES.LOBBY);
+//       if (join.data?.duration_minutes) {
+//         setTimeLeftSec(join.data.duration_minutes * 60);
+//       }
+//     }
+//   }, [join.status, join.data]);
+
+//   // Timer only in LIVE
+//   useEffect(() => {
+//     if (uiState !== UI_STATES.LIVE || timeLeftSec == null) return;
+
+//     const interval = setInterval(() => {
+//       setTimeLeftSec((prev) => {
+//         if (prev == null) return prev;
+//         if (prev <= 1) {
+//           clearInterval(interval);
+//           setUiState(UI_STATES.COMPLETED);
+//           return 0;
+//         }
+//         return prev - 1;
+//       });
+//     }, 1000);
+
+//     return () => clearInterval(interval);
+//   }, [uiState, timeLeftSec]);
+
+//   const handleBackToRoles = () => {
+//     navigate("/ai-interview/roles");
+//   };
+
+//   const handleJoinInterview = () => {
+//     if (!join.data) return;
+//     setConnectionError(null);
+//     setIsConnected(false);
+//     setUiState(UI_STATES.CONNECTING); // this will cause LiveKitVideoPanel to connect
+//   };
+
+//   const handleRoomConnected = () => {
+//     setIsConnected(true);
+//     setUiState(UI_STATES.LIVE);
+//   };
+
+//   const handleRoomDisconnected = () => {
+//     setIsConnected(false);
+//     setUiState((prev) =>
+//       prev === UI_STATES.COMPLETED ? prev : UI_STATES.LOBBY
+//     );
+//   };
+
+//   const handleEndInterview = () => {
+//     const confirmEnd = window.confirm(
+//       "End this interview and leave the room?"
+//     );
+//     if (!confirmEnd) return;
+//     setIsConnected(false);
+//     setUiState(UI_STATES.COMPLETED);
+//   };
+
+//   const sessionInfo = useMemo(() => {
+//     const data = join.data;
+//     if (!data) return null;
+//     return {
+//       roleName: data.role?.name || "N/A",
+//       roleCategory: data.role?.category || null,
+//       roundType: data.round_type || "N/A",
+//       difficulty: data.difficulty || "N/A",
+//       durationMinutes: data.duration_minutes || null,
+//       status: data.status || "N/A",
+//       roomName: data.livekit_room_name || "Not generated",
+//     };
+//   }, [join.data]);
+
+//   const formattedTimeLeft = useMemo(() => {
+//     if (timeLeftSec == null) return null;
+//     const m = Math.floor(timeLeftSec / 60)
+//       .toString()
+//       .padStart(2, "0");
+//     const s = (timeLeftSec % 60).toString().padStart(2, "0");
+//     return `${m}:${s}`;
+//   }, [timeLeftSec]);
+
+//   return (
+//     <div
+//       className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-4"
+//       style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}
+//     >
+//       <div className="max-w-4xl w-full bg-gray-900/90 border border-gray-800 rounded-2xl shadow-xl p-5 sm:p-7">
+//         <LiveInterviewHeader
+//           sessionId={sessionId}
+//           joinStatus={join.status}
+//           uiState={uiState}
+//           onBack={handleBackToRoles}
+//         />
+
+//         {/* optional dev debug: URL + token */}
+//         {join.status === "ready" && join.data && (
+//           <div className="mb-3 text-[10px] text-gray-500 break-all">
+//             <div>LiveKit URL: {join.data.livekit_server_url}</div>
+//             <div className="mt-1 opacity-70">
+//               Token (dev only): {join.data.livekit_token}
+//             </div>
+//           </div>
+//         )}
+
+//         {uiState === UI_STATES.LOADING && (
+//           <LoadingView message="Connecting to your AI interview session..." />
+//         )}
+
+//         {uiState === UI_STATES.ERROR && (
+//           <ErrorView
+//             errorMessage={connectionError || join.error}
+//             onStartNew={handleBackToRoles}
+//           />
+//         )}
+
+//         {uiState === UI_STATES.LOBBY && sessionInfo && (
+//           <LobbyView sessionInfo={sessionInfo} onJoin={handleJoinInterview} />
+//         )}
+
+//         {(uiState === UI_STATES.CONNECTING || uiState === UI_STATES.LIVE) &&
+//           sessionInfo &&
+//           join.data && (
+//             <LiveInterviewView
+//               sessionInfo={sessionInfo}
+//               formattedTimeLeft={formattedTimeLeft}
+//               onEnd={handleEndInterview}
+//               isConnected={isConnected}
+//               livekitServerUrl={join.data.livekit_server_url}
+//               livekitToken={join.data.livekit_token}
+//               uiState={uiState}
+//               onRoomConnected={handleRoomConnected}
+//               onRoomDisconnected={handleRoomDisconnected}
+//             />
+//           )}
+
+//         {uiState === UI_STATES.COMPLETED && sessionInfo && (
+//           <CompletedView
+//             sessionInfo={sessionInfo}
+//             onBackToRoles={handleBackToRoles}
+//           />
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // src/pages/LiveInterviewPage.jsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
-import { Room, RoomEvent, createLocalTracks } from "livekit-client"; // LiveKit JS SDK[web:36][web:69]
 
-import { joinAiInterviewSessionThunk } from "../slice/aiInterviewSessionSlice";
+import {
+  joinAiInterviewSessionThunk,
+  endAiInterviewSessionThunk,
+} from "../slice/aiInterviewSessionSlice";
 
 import { LiveInterviewHeader } from "../components/LiveInterviewHeader";
 import {
@@ -541,14 +1253,15 @@ export default function LiveInterviewPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { join } = useSelector((state) => state.aiInterviewSession);
+  const { join, end } = useSelector((state) => state.aiInterviewSession);
 
   const [uiState, setUiState] = useState(UI_STATES.LOADING);
-  const [timeLeftSec, setTimeLeftSec] = useState(null); // seconds countdown
+  const [timeLeftSec, setTimeLeftSec] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
 
-  // Keep a ref to the LiveKit room so we can disconnect on unmount
-  const roomRef = useRef(null);
+  // Prevent duplicate auto-end calls from timer
+  const hasAutoEndedRef = useRef(false);
 
   // Kick off join on mount
   useEffect(() => {
@@ -556,112 +1269,163 @@ export default function LiveInterviewPage() {
     dispatch(joinAiInterviewSessionThunk(sessionId));
   }, [sessionId, dispatch]);
 
-  // React to join status from Redux
-  useEffect(() => {
-    if (join.status === "joining") {
-      setUiState(UI_STATES.LOADING);
-    } else if (join.status === "error") {
-      setUiState(UI_STATES.ERROR);
-    } else if (join.status === "ready") {
-      setUiState(UI_STATES.LOBBY);
-      if (join.data?.duration_minutes) {
-        setTimeLeftSec(join.data.duration_minutes * 60);
-      }
-    }
-  }, [join.status, join.data]);
+  // React to join status from Redux + backend session status
+  // React to join status from Redux + backend session status
+useEffect(() => {
+  if (join.status === "joining") {
+    setUiState(UI_STATES.LOADING);
+    return;
+  }
 
-  // Timer: start when we enter LIVE, stop when leaving LIVE/COMPLETED
+  if (join.status === "error") {
+    setUiState(UI_STATES.ERROR);
+    return;
+  }
+
+  if (join.status === "ready") {
+    const backendStatus = join.data?.status;
+
+    // Use backend authority for remaining time
+    const remainingFromBackend =
+      typeof join.data?.remaining_seconds === "number"
+        ? join.data.remaining_seconds
+        : join.data?.duration_minutes
+        ? join.data.duration_minutes * 60
+        : null;
+
+    setTimeLeftSec(remainingFromBackend);
+    hasAutoEndedRef.current = false;
+
+    if (backendStatus === "COMPLETED") {
+      setUiState(UI_STATES.COMPLETED);
+      return;
+    }
+
+    if (backendStatus === "CANCELLED" || backendStatus === "FAILED") {
+      setConnectionError(
+        `This interview session is ${backendStatus.toLowerCase()}.`
+      );
+      setUiState(UI_STATES.ERROR);
+      return;
+    }
+
+    // For READY or LIVE, go to lobby; LIVE will use remaining_seconds,
+    // so refresh + rejoin continues where it left off instead of restarting.
+    setUiState(UI_STATES.LOBBY);
+  }
+}, [join.status, join.data]);
+
+  // React to end status
+  useEffect(() => {
+    if (end.status === "success") {
+      setIsConnected(false);
+      setUiState(UI_STATES.COMPLETED);
+    } else if (end.status === "error") {
+      setConnectionError(end.error || "Failed to end interview.");
+      // Keep user in LIVE if end fails, do not silently complete
+    }
+  }, [end.status, end.error]);
+
+  // Timer only in LIVE
   useEffect(() => {
     if (uiState !== UI_STATES.LIVE || timeLeftSec == null) return;
 
     const interval = setInterval(() => {
       setTimeLeftSec((prev) => {
         if (prev == null) return prev;
+
         if (prev <= 1) {
           clearInterval(interval);
-          setUiState(UI_STATES.COMPLETED);
+
+          // Backend-authoritative auto-end
+          if (!hasAutoEndedRef.current && join.data?.session_id) {
+            hasAutoEndedRef.current = true;
+            dispatch(
+              endAiInterviewSessionThunk({
+                sessionId: join.data.session_id,
+                reason: "COMPLETED",
+              })
+            );
+          }
+
           return 0;
         }
+
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [uiState, timeLeftSec]);
-
-  // Cleanup LiveKit room on unmount
-  useEffect(() => {
-    return () => {
-      if (roomRef.current) {
-        roomRef.current.disconnect();
-        roomRef.current = null;
-      }
-    };
-  }, []);
+  }, [uiState, timeLeftSec, dispatch, join.data]);
 
   const handleBackToRoles = () => {
     navigate("/ai-interview/roles");
   };
 
-  const handleJoinInterview = async () => {
+  const handleJoinInterview = () => {
     if (!join.data) return;
 
-    setConnectionError(null);
-    setUiState(UI_STATES.CONNECTING);
+    const backendStatus = join.data.status;
 
-    try {
-      const { livekit_server_url, livekit_token } = join.data;
-
-      const room = new Room();
-      roomRef.current = room;
-
-      // When the room disconnects (e.g., network, server), bring UI back to lobby
-      room.on(RoomEvent.Disconnected, () => {
-        roomRef.current = null;
-        setUiState((prev) =>
-          prev === UI_STATES.COMPLETED ? prev : UI_STATES.LOBBY
-        );
-      });
-
-      // Connect to LiveKit using the URL + token from your Django backend[web:36][web:69]
-      await room.connect(livekit_server_url, livekit_token);
-
-      // Publish local audio + video tracks
-      const tracks = await createLocalTracks({
-        audio: true,
-        video: { facingMode: "user" },
-      });
-      for (const track of tracks) {
-        await room.localParticipant.publishTrack(track);
-      }
-
-      setUiState(UI_STATES.LIVE);
-    } catch (err) {
-      console.error("Failed to connect to LiveKit room", err);
-      setConnectionError(
-        err?.message || "Failed to connect to the AI interview room."
-      );
-      // Show a structured error screen
+    // Do not allow entering if backend says final state
+    if (
+      backendStatus === "COMPLETED" ||
+      backendStatus === "CANCELLED" ||
+      backendStatus === "FAILED"
+    ) {
+      setConnectionError("This interview can no longer be started.");
       setUiState(UI_STATES.ERROR);
+      return;
     }
+
+    setConnectionError(null);
+    setIsConnected(false);
+    setUiState(UI_STATES.CONNECTING);
   };
 
-  const handleEndInterview = () => {
+  const handleRoomConnected = () => {
+    setIsConnected(true);
+    setUiState(UI_STATES.LIVE);
+  };
+
+  const handleRoomDisconnected = () => {
+    setIsConnected(false);
+
+    // If interview is already completed, do nothing.
+    if (uiState === UI_STATES.COMPLETED) return;
+
+    // If disconnect happens while connecting/live, show error instead of sending user back to lobby.
+    setConnectionError(
+      "Connection to the interview room was lost. Please refresh only if the backend still allows resuming this session."
+    );
+    setUiState(UI_STATES.ERROR);
+  };
+
+  const handleEndInterview = async () => {
     const confirmEnd = window.confirm(
       "End this interview and leave the room?"
     );
     if (!confirmEnd) return;
+    if (!join.data?.session_id) return;
 
-    if (roomRef.current) {
-      roomRef.current.disconnect();
-      roomRef.current = null;
+    try {
+      await dispatch(
+        endAiInterviewSessionThunk({
+          sessionId: join.data.session_id,
+          reason: "COMPLETED",
+        })
+      ).unwrap();
+    } catch (error) {
+      setConnectionError(
+        error?.detail || "Failed to end interview. Please try again."
+      );
     }
-    setUiState(UI_STATES.COMPLETED);
   };
 
   const sessionInfo = useMemo(() => {
     const data = join.data;
     if (!data) return null;
+
     return {
       roleName: data.role?.name || "N/A",
       roleCategory: data.role?.category || null,
@@ -682,8 +1446,6 @@ export default function LiveInterviewPage() {
     return `${m}:${s}`;
   }, [timeLeftSec]);
 
-  const isConnected = !!roomRef.current;
-
   return (
     <div
       className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center px-4"
@@ -697,24 +1459,16 @@ export default function LiveInterviewPage() {
           onBack={handleBackToRoles}
         />
 
-        {/* Dev-only debug: you can remove this later */}
-        {join.status === "ready" && join.data && (
-          <div className="mb-3 text-[10px] text-gray-500 break-all">
-            <div>LiveKit URL: {join.data.livekit_server_url}</div>
-            <div className="mt-1 opacity-70">
-              Token (dev only): {join.data.livekit_token}
-            </div>
-          </div>
-        )}
 
-        {/* Main content by uiState */}
+
+
         {uiState === UI_STATES.LOADING && (
           <LoadingView message="Connecting to your AI interview session..." />
         )}
 
         {uiState === UI_STATES.ERROR && (
           <ErrorView
-            errorMessage={connectionError || join.error}
+            errorMessage={connectionError || join.error || end.error}
             onStartNew={handleBackToRoles}
           />
         )}
@@ -727,14 +1481,22 @@ export default function LiveInterviewPage() {
           <ConnectingView sessionInfo={sessionInfo} />
         )}
 
-        {uiState === UI_STATES.LIVE && sessionInfo && (
-          <LiveInterviewView
-            sessionInfo={sessionInfo}
-            formattedTimeLeft={formattedTimeLeft}
-            onEnd={handleEndInterview}
-            isConnected={isConnected}
-          />
-        )}
+        {(uiState === UI_STATES.LIVE || uiState === UI_STATES.CONNECTING) &&
+          sessionInfo &&
+          join.data && (
+            <LiveInterviewView
+              sessionInfo={sessionInfo}
+              formattedTimeLeft={formattedTimeLeft}
+              onEnd={handleEndInterview}
+              isConnected={isConnected}
+              livekitServerUrl={join.data.livekit_server_url}
+              livekitToken={join.data.livekit_token}
+              uiState={uiState}
+              onRoomConnected={handleRoomConnected}
+              onRoomDisconnected={handleRoomDisconnected}
+              isEnding={end.status === "ending"}
+            />
+          )}
 
         {uiState === UI_STATES.COMPLETED && sessionInfo && (
           <CompletedView

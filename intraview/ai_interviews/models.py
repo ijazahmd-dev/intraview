@@ -140,6 +140,8 @@ class AIInterviewSession(models.Model):
         INTERMEDIATE = "INTERMEDIATE", "Intermediate"
         PROFESSIONAL = "PROFESSIONAL", "Professional"
 
+    ACTIVE_STATUSES = {Status.CREATED, Status.READY, Status.LIVE}    
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -212,11 +214,56 @@ class AIInterviewSession(models.Model):
             self.ended_at = timezone.now()
             self.save(update_fields=["status", "ended_at", "updated_at"])
 
-    @property
-    def is_expired(self) -> bool:
+
+    def mark_cancelled(self):
         """
-        A READY/CREATED session should not remain joinable forever.
-        For now, we expire sessions 10 minutes after creation if they were never joined.
+        Mark as CANCELLED from any active status (READY/LIVE/CREATED).
+        Used when user aborts or when a newer session replaces this one.
+        """
+        if self.status in self.ACTIVE_STATUSES:
+            self.status = self.Status.CANCELLED
+            self.ended_at = timezone.now()
+            self.save(update_fields=["status", "ended_at", "updated_at"])
+
+    def mark_failed(self, reason: str | None = None):
+        """
+        Mark as FAILED due to timeout or technical error.
+        """
+        if self.status in self.ACTIVE_STATUSES:
+            self.status = self.Status.FAILED
+            self.ended_at = timezone.now()
+            self.save(update_fields=["status", "ended_at", "updated_at"])
+            # `reason` can be logged later if you add an audit model.
+        
+
+    # ---- Derived state helpers ----    
+
+
+    # ---------- Time helpers ----------
+
+    def elapsed_seconds(self, now: timezone.datetime | None = None) -> int:
+        """
+        How many seconds this session has been LIVE.
+        """
+        if not self.started_at:
+            return 0
+        if now is None:
+            now = timezone.now()
+        return max(0, int((now - self.started_at).total_seconds()))
+
+    def remaining_seconds(self, now: timezone.datetime | None = None) -> int:
+        """
+        Remaining allowed interview time in seconds (0 when over).
+        """
+        total = int(self.duration_minutes * 60)
+        elapsed = self.elapsed_seconds(now)
+        return max(0, total - elapsed)
+
+
+    @property
+    def is_expired_before_live(self) -> bool:
+        """
+        READY/CREATED sessions expire if never joined within 10 minutes.
         """
         expiry_window = timedelta(minutes=10)
         return (
@@ -225,15 +272,33 @@ class AIInterviewSession(models.Model):
         )
 
     @property
+    def is_duration_over(self) -> bool:
+        """
+        Return True if LIVE session has run past its planned duration.
+        """
+        if self.status != self.Status.LIVE or not self.started_at:
+            return False
+        return self.remaining_seconds() <= 0
+
+    def refresh_status_from_time(self):
+        """
+        Apply time-based transitions (expiry / auto-complete).
+        This is called from service layer before decisions.
+        """
+        if self.status in {self.Status.CREATED, self.Status.READY} and self.is_expired_before_live:
+            self.mark_failed()
+        elif self.status == self.Status.LIVE and self.is_duration_over:
+            self.mark_completed()
+
+    @property
     def is_owner_join_allowed(self) -> bool:
         """
-        Owner can join only if the session is READY/CREATED and not expired,
-        or if it is already LIVE.
+        Owner can join only if session is still active and not expired or finished.
         """
-        if self.status == self.Status.LIVE:
-            return True
+        # Apply time-based transitions first
+        self.refresh_status_from_time()
 
-        if self.status in {self.Status.CREATED, self.Status.READY} and not self.is_expired:
+        if self.status in {self.Status.READY, self.Status.LIVE}:
             return True
 
         return False

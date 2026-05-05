@@ -37,7 +37,37 @@ class RoleService:
 
 
 
+
+MIN_COMPLETION_SECONDS = 90  # threshold: <90s → CANCELLED, otherwise COMPLETED
+READY_EXPIRY_MINUTES = 10    # still used inside model, here for clarity
+
+
+
+
+
 class AIInterviewSessionService:
+    ACTIVE_STATUSES = {
+        AIInterviewSession.Status.CREATED,
+        AIInterviewSession.Status.READY,
+        AIInterviewSession.Status.LIVE,
+    }
+
+    @staticmethod
+    def _cancel_other_active_sessions(user, keep_session_id: int | None = None) -> None:
+        """
+        Ensure the user has only one active session.
+        Any other READY/CREATED/LIVE sessions are marked CANCELLED.
+        """
+        qs = AIInterviewSession.objects.filter(
+            user=user,
+            status__in=AIInterviewSessionService.ACTIVE_STATUSES,
+        )
+        if keep_session_id:
+            qs = qs.exclude(id=keep_session_id)
+
+        for s in qs:
+            s.mark_cancelled()
+
     @staticmethod
     def create_session(
         *,
@@ -51,8 +81,6 @@ class AIInterviewSessionService:
         if not role:
             raise ValueError("Invalid or inactive role.")
 
-        # TODO: you can later enforce allowed duration per round type here.
-
         session = AIInterviewSessionRepository.create_session_for_user(
             user=user,
             role=role,
@@ -60,55 +88,88 @@ class AIInterviewSessionService:
             difficulty=difficulty,
             duration_minutes=duration_minutes,
         )
+
+        # Enforce one active session: cancel all others
+        AIInterviewSessionService._cancel_other_active_sessions(
+            user=user, keep_session_id=session.id
+        )
+
         return session
 
     @staticmethod
     def get_session_for_user(session_id: int, user) -> Optional[AIInterviewSession]:
-        return AIInterviewSessionRepository.get_owned_session(session_id, user)
+        session = AIInterviewSessionRepository.get_owned_session(session_id, user)
+        if session:
+            session.refresh_status_from_time()
+        return session
 
     @staticmethod
     def ensure_room_name(session: AIInterviewSession) -> AIInterviewSession:
-        """
-        Ensure the session has a unique LiveKit room name.
-        Using session.id makes collisions far less likely.
-        """
         if not session.livekit_room_name:
             random_suffix = get_random_string(6).lower()
             session.livekit_room_name = f"ai-{session.id}-{random_suffix}"
             session.save(update_fields=["livekit_room_name", "updated_at"])
         return session
 
+
+
     @staticmethod
     def build_join_payload(session: AIInterviewSession, user) -> dict:
         """
-        Return data needed by the frontend to prepare joining the LiveKit room.
-        This now generates a real LiveKit access token using the Python SDK.
+        Called from /join/:
+
+        - Ensure ownership & that session can be joined
+        - Ensure room name exists
+        - Move READY/CREATED → LIVE (first join)
+        - Treat LIVE as resume (no state reset)
+        - Generate LiveKit token
+        - Return remaining_seconds so frontend never resets duration
         """
         if session.user != user:
             raise PermissionError("You do not own this interview session.")
 
-        if session.is_expired:
-            raise ValueError("Session expired.")
+        # Apply time-based transitions first.
+        session.refresh_status_from_time()
+
+        # Hard guard: if remaining_seconds <= 0, session has ended.
+        remaining = session.remaining_seconds()
+        if remaining <= 0:
+            if session.status == AIInterviewSession.Status.LIVE:
+                # Make sure we don't leave a LIVE session without duration.
+                session.mark_completed()
+            raise ValueError("This interview session has ended.")
 
         if not session.is_owner_join_allowed:
-            raise ValueError("This session is not joinable in its current state.")
+            raise ValueError("This interview is no longer joinable.")
 
-        # Ensure the room name exists
+        # Ensure room name exists.
         session = AIInterviewSessionService.ensure_room_name(session)
 
-        # Validate LiveKit configuration
+        # First-time join: READY/CREATED → LIVE.
+        if session.status in {
+            AIInterviewSession.Status.READY,
+            AIInterviewSession.Status.CREATED,
+        }:
+            session.mark_live()
+            # After marking live, remaining time is full duration again
+            # (this is the first join).
+            remaining = session.remaining_seconds()
+        else:
+            # Already LIVE; this /join/ is a resume. Do not touch started_at.
+            remaining = session.remaining_seconds()
+
+        # LiveKit config.
         livekit_url = getattr(settings, "LIVEKIT_URL", "")
         livekit_api_key = getattr(settings, "LIVEKIT_API_KEY", "")
         livekit_api_secret = getattr(settings, "LIVEKIT_API_SECRET", "")
 
         if not (livekit_url and livekit_api_key and livekit_api_secret):
-            # Misconfiguration is a server error, not a user error
             raise RuntimeError("LiveKit configuration is missing on the server.")
 
-        # Build a LiveKit access token for this participant
-        # Using the Python server SDK (livekit.api.AccessToken)[web:43][web:35]
         identity = f"user-{user.id}"
-        display_name = getattr(user, "full_name", None) or getattr(user, "username", str(user.id))
+        display_name = getattr(user, "full_name", None) or getattr(
+            user, "username", str(user.id)
+        )
 
         token_builder = (
             lk_api.AccessToken(livekit_api_key, livekit_api_secret)
@@ -123,8 +184,7 @@ class AIInterviewSessionService:
                 )
             )
         )
-
-        livekit_token = token_builder.to_jwt()  # signed JWT string[web:43][web:37]
+        livekit_token = token_builder.to_jwt()
 
         return {
             "session_id": session.id,
@@ -136,8 +196,45 @@ class AIInterviewSessionService:
             "round_type": session.round_type,
             "difficulty": session.difficulty,
             "duration_minutes": session.duration_minutes,
-            "status": session.status,
+            "status": session.status,  # usually LIVE here
+            "started_at": session.started_at,
+            "ended_at": session.ended_at,
+            "remaining_seconds": remaining,
             "livekit_room_name": session.livekit_room_name,
             "livekit_token": livekit_token,
             "livekit_server_url": livekit_url,
         }
+
+    # ---- End / cancel APIs ----
+
+    @staticmethod
+    def end_session(session: AIInterviewSession, user, *, as_cancel: bool = False):
+        """
+        Called when user clicks "End interview" or cancels before starting.
+
+        - If as_cancel=True and status is active → CANCELLED.
+        - If as_cancel=False and status is LIVE:
+              elapsed < MIN_COMPLETION_SECONDS → CANCELLED
+              elapsed >= MIN_COMPLETION_SECONDS → COMPLETED
+        """
+        if session.user != user:
+            raise PermissionError("You do not own this interview session.")
+
+        session.refresh_status_from_time()
+
+        if as_cancel:
+            if session.status in AIInterviewSession.ACTIVE_STATUSES:
+                session.mark_cancelled()
+            else:
+                raise ValueError("This interview cannot be cancelled anymore.")
+        else:
+            if session.status != AIInterviewSession.Status.LIVE:
+                raise ValueError("Interview is not live, cannot complete.")
+
+            elapsed = session.elapsed_seconds()
+            if elapsed < MIN_COMPLETION_SECONDS:
+                session.mark_cancelled()
+            else:
+                session.mark_completed()
+
+        return session

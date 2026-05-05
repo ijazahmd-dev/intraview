@@ -1,5 +1,7 @@
 // src/components/ai-interview/LiveInterviewViews.jsx
 
+import { LiveKitVideoPanel } from "./LiveKitVideoPanel";
+
 export function LoadingView({ message }) {
   return (
     <div className="py-10 text-center text-sm text-gray-300">
@@ -152,14 +154,24 @@ export function LiveInterviewView({
   formattedTimeLeft,
   onEnd,
   isConnected,
+  livekitServerUrl,
+  livekitToken,
+  uiState,
+  onRoomConnected,
+  onRoomDisconnected,
+  isEnding = false,
 }) {
+  const shouldConnect =
+    uiState === "CONNECTING" || uiState === "LIVE";
+
   return (
     <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5">
       {/* Top bar: role + timer */}
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <p className="text-[11px] text-gray-400 uppercase tracking-wide">
-            Live AI Interview {isConnected ? "· Connected" : "· Connecting..."}
+            Live AI Interview ·{" "}
+            {isConnected ? "Connected" : "Connecting to room..."}
           </p>
           <p className="text-sm font-semibold text-gray-50">
             {sessionInfo.roleName} · {sessionInfo.roundType}
@@ -174,39 +186,40 @@ export function LiveInterviewView({
           <button
             type="button"
             onClick={onEnd}
-            className="px-3 py-1.5 rounded-lg bg-red-500/90 hover:bg-red-500 text-[11px] font-semibold text-white"
-          >
-            End Interview
-          </button>
+            disabled={isEnding}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
+                isEnding
+                ? "bg-red-400 cursor-not-allowed opacity-70"
+                : "bg-red-500/90 hover:bg-red-500"
+            }`}
+            >
+            {isEnding ? "Ending..." : "End Interview"}
+            </button>
+
         </div>
       </div>
 
-      {/* Body: AI placeholder */}
+      {/* Body: video on left, tips on right */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* AI "video" placeholder */}
         <div className="md:col-span-2">
-          <div className="aspect-video rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center">
-            <div className="text-center px-4">
-              <p className="text-sm font-semibold text-gray-50 mb-1">
-                AI interviewer is preparing your first question…
-              </p>
-              <p className="text-[11px] text-gray-400">
-                In the real implementation, your AI interviewer video/voice and
-                questions will appear here. You're already connected to the
-                LiveKit room in the background.
-              </p>
-            </div>
+          <div className="aspect-video rounded-xl bg-gray-800 border border-gray-700 overflow-hidden">
+            <LiveKitVideoPanel
+              serverUrl={livekitServerUrl}
+              token={livekitToken}
+              connect={shouldConnect}
+              onConnected={onRoomConnected}
+              onDisconnected={onRoomDisconnected}
+            />
           </div>
         </div>
 
-        {/* Right: Upcoming question / notes */}
         <div className="md:col-span-1 flex flex-col gap-3">
           <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
             <p className="text-[11px] font-semibold text-gray-200 mb-1">
               What to expect
             </p>
             <p className="text-[11px] text-gray-400">
-              You'll hear a question, then you'll have a few seconds to think
+              You’ll hear a question, then you’ll have a few seconds to think
               before answering out loud. Try to respond in 1–2 minutes per
               question.
             </p>
@@ -225,6 +238,7 @@ export function LiveInterviewView({
     </div>
   );
 }
+
 
 export function CompletedView({ sessionInfo, onBackToRoles }) {
   return (

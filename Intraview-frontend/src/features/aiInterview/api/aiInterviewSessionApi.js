@@ -28,3 +28,8 @@ export const joinAiInterviewSession = (sessionId) => {
 export const pingAiInterview = () => {
   return API.get("/api/ai-interview/ping/");
 };
+
+
+export const endAiInterviewSession = (sessionId, payload) => {
+  return API.post(`/api/ai-interview/session/${sessionId}/end/`, payload);
+};
