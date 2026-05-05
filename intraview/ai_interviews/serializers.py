@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from .models import Role, AIInterviewSession
+from .models import Role, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -113,3 +113,113 @@ class AIInterviewSessionJoinResponseSerializer(serializers.Serializer):
     livekit_room_name = serializers.CharField()
     livekit_token = serializers.CharField()
     livekit_server_url = serializers.CharField()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AIInterviewTurnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIInterviewTurn
+        fields = [
+            "id",
+            "session",
+            "turn_index",
+            "question_text",
+            "answer_text",
+            "metadata",
+            "created_at",
+        ]
+        read_only_fields = ["id", "session", "created_at"]
+
+
+class AIInterviewEvaluationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIInterviewEvaluation
+        fields = [
+            "id",
+            "turn",
+            "score",
+            "strengths",
+            "weaknesses",
+            "suggestions",
+            "confidence",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["id", "turn", "status", "created_at"]
+
+
+class AIInterviewFinalReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIInterviewFinalReport
+        fields = [
+            "id",
+            "session",
+            "overall_score",
+            "summary",
+            "strengths",
+            "areas_for_improvement",
+            "recommendations",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["id", "session", "status", "created_at"]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AgentTurnCreateSerializer(serializers.Serializer):
+    """
+    Payload the agent sends when a turn is completed.
+
+    - turn_index: optional; if provided, we use it for idempotency.
+    - metadata: arbitrary JSON from the agent (e.g. topic, difficulty tag).
+    """
+
+    turn_index = serializers.IntegerField(required=False, min_value=1)
+    question_text = serializers.CharField()
+    answer_text = serializers.CharField()
+    metadata = serializers.JSONField(required=False)
+
+    def validate_answer_text(self, value: str) -> str:
+        if not value.strip():
+            raise serializers.ValidationError("Answer cannot be empty.")
+        return value

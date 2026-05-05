@@ -2,9 +2,11 @@
 
 from typing import Optional
 
-from ai_interviews.models import Role, AIInterviewSession
+from ai_interviews.models import Role, AIInterviewSession, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport
 from ai_interviews.repositories import RoleRepository, AIInterviewSessionRepository
+from ai_interviews.tasks import generate_final_report
 from django.utils.crypto import get_random_string
+from django.db import transaction
 
 from django.conf import settings
 from livekit import api as lk_api  # LiveKit Python SDK
@@ -237,4 +239,136 @@ class AIInterviewSessionService:
             else:
                 session.mark_completed()
 
+        if session.status == AIInterviewSession.Status.COMPLETED:
+            generate_final_report.delay(session.id)        
+
         return session
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AIInterviewTurnService:
+    """
+    Helper for creating turns and ensuring turn_index uniqueness.
+    """
+
+    @staticmethod
+    @transaction.atomic
+    def create_turn(
+        *,
+        session: AIInterviewSession,
+        question_text: str,
+        answer_text: str,
+        metadata: Optional[dict] = None,
+        proposed_index: Optional[int] = None,
+    ) -> AIInterviewTurn:
+        """
+        Create a new AIInterviewTurn for a session.
+
+        - Backend computes turn_index if not provided (count + 1).
+        - If agent retries with same (session, proposed_index), we return existing turn
+          instead of creating duplicates (idempotent behavior).
+        """
+        if proposed_index is not None:
+            # Try to find existing turn with this index for idempotency.
+            existing = AIInterviewTurn.objects.filter(
+                session=session,
+                turn_index=proposed_index,
+            ).first()
+            if existing:
+                # Optionally update answer/metadata if they were blank.
+                if not existing.answer_text and answer_text:
+                    existing.answer_text = answer_text
+                if metadata:
+                    existing.metadata = {**(existing.metadata or {}), **metadata}
+                existing.save(update_fields=["answer_text", "metadata", "updated_at"])
+                return existing
+
+            turn_index = proposed_index
+        else:
+            # Backend-authoritative index: count existing + 1 (inside transaction).
+            max_index = (
+                AIInterviewTurn.objects.filter(session=session)
+                .order_by("-turn_index")
+                .values_list("turn_index", flat=True)
+                .first()
+            )
+            turn_index = (max_index or 0) + 1
+
+        turn = AIInterviewTurn.objects.create(
+            session=session,
+            turn_index=turn_index,
+            question_text=question_text,
+            answer_text=answer_text,
+            metadata=metadata or {},
+        )
+
+        # Create a placeholder evaluation row in PENDING status.
+        AIInterviewEvaluation.objects.create(
+            turn=turn,
+            status=AIInterviewEvaluation.Status.PENDING,
+        )
+
+        return turn
+
+
+class AIInterviewReportService:
+    """
+    Helper for managing the final report record; the actual content will be filled
+    by Phase 2 Celery tasks.
+    """
+
+    @staticmethod
+    def ensure_final_report(session: AIInterviewSession) -> AIInterviewFinalReport:
+        """
+        Get or create the final report record for a session.
+        """
+        report, _ = AIInterviewFinalReport.objects.get_or_create(
+            session=session,
+            defaults={
+                "status": AIInterviewFinalReport.Status.PENDING,
+            },
+        )
+        return report
+
+    @staticmethod
+    def mark_report_failed(session: AIInterviewSession, reason: Optional[dict] = None):
+        """
+        Mark final report as FAILED and optionally attach error metadata.
+        """
+        report = AIInterviewReportService.ensure_final_report(session)
+        report.status = AIInterviewFinalReport.Status.FAILED
+        if reason:
+            report.raw_response = reason
+        report.save(update_fields=["status", "raw_response", "updated_at"])
+        return report

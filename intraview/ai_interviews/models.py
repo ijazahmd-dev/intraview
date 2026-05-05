@@ -302,3 +302,159 @@ class AIInterviewSession(models.Model):
             return True
 
         return False
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AIInterviewTurn(models.Model):
+  """
+  One question-answer pair inside an AI interview session.
+  Backend is authoritative for `turn_index` to ensure idempotency.
+  """
+
+  session = models.ForeignKey(
+      AIInterviewSession,
+      on_delete=models.CASCADE,
+      related_name="turns",
+  )
+
+  # 1-based index: 1, 2, 3, ...
+  turn_index = models.PositiveIntegerField()
+
+  question_text = models.TextField()
+  answer_text = models.TextField(blank=True)
+
+  # Optional extra metadata coming from agent (JSON).
+  # Example: {"agent_question_id": "q1", "topic": "behavioral"}
+  metadata = models.JSONField(blank=True, null=True)
+
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+      ordering = ["turn_index"]
+      constraints = [
+          # Enforce uniqueness for (session, turn_index) for idempotent POSTs.[web:160][web:166]
+          models.UniqueConstraint(
+              fields=["session", "turn_index"],
+              name="uniq_turn_per_session_index",
+          )
+      ]
+
+  def __str__(self) -> str:
+      return f"Turn {self.turn_index} for session #{self.session_id}"
+
+
+class AIInterviewEvaluation(models.Model):
+  """
+  Per-question evaluation: score & feedback for a single turn.
+  Generated asynchronously by an evaluation LLM (Gemini Flash).
+  """
+
+  class Status(models.TextChoices):
+      PENDING = "PENDING", "Pending"
+      SUCCESS = "SUCCESS", "Success"
+      FAILED = "FAILED", "Failed"
+
+  turn = models.OneToOneField(
+      AIInterviewTurn,
+      on_delete=models.CASCADE,
+      related_name="evaluation",
+  )
+
+  # Numeric score (you can decide 0–10 or 0–100; keep it flexible).
+  score = models.FloatField(blank=True, null=True)
+
+  # High-level feedback – we treat them as plain text; you can change to JSON later.
+  strengths = models.TextField(blank=True)
+  weaknesses = models.TextField(blank=True)
+  suggestions = models.TextField(blank=True)
+
+  confidence = models.CharField(
+      max_length=16,
+      blank=True,
+      help_text="Optional model confidence label: low/medium/high.",
+  )
+
+  status = models.CharField(
+      max_length=16,
+      choices=Status.choices,
+      default=Status.PENDING,
+      db_index=True,
+  )
+
+  # Raw LLM response for debugging/auditing.
+  raw_response = models.JSONField(blank=True, null=True)
+
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  def __str__(self) -> str:
+      return f"Evaluation for turn {self.turn.turn_index} in session #{self.turn.session_id}"
+
+
+class AIInterviewFinalReport(models.Model):
+  """
+  Final session-level report aggregating all per-turn evaluations.
+  Generated asynchronously by a higher-quality model (Gemini Pro).
+  """
+
+  class Status(models.TextChoices):
+      PENDING = "PENDING", "Pending"
+      SUCCESS = "SUCCESS", "Success"
+      FAILED = "FAILED", "Failed"
+
+  session = models.OneToOneField(
+      AIInterviewSession,
+      on_delete=models.CASCADE,
+      related_name="final_report",
+  )
+
+  overall_score = models.FloatField(blank=True, null=True)
+
+  summary = models.TextField(blank=True)
+  strengths = models.TextField(blank=True)
+  areas_for_improvement = models.TextField(blank=True)
+  recommendations = models.TextField(blank=True)
+
+  status = models.CharField(
+      max_length=16,
+      choices=Status.choices,
+      default=Status.PENDING,
+      db_index=True,
+  )
+
+  raw_response = models.JSONField(blank=True, null=True)
+
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  def __str__(self) -> str:
+      return f"Final report for session #{self.session_id} ({self.status})"

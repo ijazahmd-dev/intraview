@@ -4,14 +4,22 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
+import logging
+from django.conf import settings
+from django.shortcuts import get_object_or_404
+from rest_framework import status, permissions
 
-from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer
-from ai_interviews.service.services import RoleService, AIInterviewSessionService
+from .models import AIInterviewSession
+from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer
+from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
+from .tasks import evaluate_turn
 
 # Adjust this import to where your auth class lives:
 # from core.authentication import MultiRoleJWTAuthentication
 from authentication.authentication import CookieJWTAuthentication, MultiRoleJWTAuthentication
 
+
+logger = logging.getLogger(__name__)
 
 class FeaturedRoleListAPIView(APIView):
     """
@@ -223,4 +231,127 @@ class PingAPIView(APIView):
         return Response(
             {"status": "ok"},
             status=status.HTTP_200_OK,
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+logger = logging.getLogger(__name__)
+
+
+class IsAgentWithSharedSecret(permissions.BasePermission):
+    """
+    Very simple auth: require X-Agent-Token header matching shared secret.
+
+    In production you may want mTLS or signed JWTs instead.
+    """
+
+    def has_permission(self, request, view) -> bool:
+        header_token = request.headers.get("X-Agent-Token")
+        expected = getattr(settings, "AI_AGENT_SHARED_SECRET", None)
+        if not expected:
+            logger.error("AI_AGENT_SHARED_SECRET not configured.")
+            return False
+        return header_token == expected
+
+
+class RecordTurnFromAgentView(APIView):
+    """
+    POST /api/ai-interview/session/<id>/turns/
+
+    Called by the LiveKit agent when a question+answer turn is completed.
+    """
+
+    permission_classes = [IsAgentWithSharedSecret]
+
+    def post(self, request, session_id: int):
+        session = get_object_or_404(AIInterviewSession, pk=session_id)
+
+        if session.status != AIInterviewSession.Status.LIVE:
+            logger.warning(
+                "RecordTurnFromAgentView: session not live",
+                extra={"session_id": session.id, "status": session.status},
+            )
+            return Response(
+                {"detail": "Session is not active."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = AgentTurnCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        proposed_index = data.get("turn_index")
+        question_text = data["question_text"]
+        answer_text = data["answer_text"]
+        metadata = data.get("metadata") or {}
+
+        logger.info(
+            "RecordTurnFromAgentView received turn",
+            extra={
+                "session_id": session.id,
+                "turn_index": proposed_index,
+            },
+        )
+        try:
+            turn = AIInterviewTurnService.create_turn(
+                session=session,
+                question_text=question_text,
+                answer_text=answer_text,
+                metadata=metadata,
+                proposed_index=proposed_index,
+            )
+        except ValueError as e:
+            logger.warning(
+                "RecordTurnFromAgentView: invalid turn for session %s: %s",
+                session.id,
+                e,
+            )
+            return Response(
+                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Enqueue evaluation asynchronously.
+        evaluate_turn.delay(turn.id)
+
+        return Response(
+            {
+                "id": turn.id,
+                "session_id": session.id,
+                "turn_index": turn.turn_index,
+                "status": "accepted",
+            },
+            status=status.HTTP_201_CREATED,
         )

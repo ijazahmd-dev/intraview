@@ -413,6 +413,12 @@ LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 
 
 
+AI_AGENT_SHARED_SECRET = os.getenv("AI_AGENT_SHARED_SECRET", "change-me")
+
+
+
+
+
 
 
 
