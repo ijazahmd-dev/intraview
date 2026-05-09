@@ -417,7 +417,17 @@ AI_AGENT_SHARED_SECRET = os.getenv("AI_AGENT_SHARED_SECRET", "change-me")
 
 
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+GEMINI_EVALUATION_MODEL = os.getenv(
+    "GEMINI_EVALUATION_MODEL",
+    "gemini-2.5-flash",
+)
+
+GEMINI_FINAL_REPORT_MODEL = os.getenv(
+    "GEMINI_FINAL_REPORT_MODEL",
+    "gemini-2.5-pro",
+)
 
 
 

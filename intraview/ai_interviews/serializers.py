@@ -290,3 +290,64 @@ class InterviewRuntimeStateUpdateSerializer(serializers.Serializer):
     agent_session_id = serializers.CharField(
         required=False, allow_blank=True, max_length=64
     )
+
+
+
+
+
+
+
+
+class AIInterviewEvaluationNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIInterviewEvaluation
+        fields = [
+            "id",
+            "score",
+            "strengths",
+            "weaknesses",
+            "suggestions",
+            "confidence",
+            "status",
+            "created_at",
+        ]
+
+
+class AIInterviewTurnWithEvaluationSerializer(serializers.ModelSerializer):
+    evaluation = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AIInterviewTurn
+        fields = [
+            "id",
+            "turn_index",
+            "question_text",
+            "answer_text",
+            "metadata",
+            "created_at",
+            "evaluation",
+        ]
+
+    def get_evaluation(self, obj):
+        evaluation = getattr(obj, "evaluation", None)
+        if not evaluation:
+            return None
+        return AIInterviewEvaluationNestedSerializer(evaluation).data
+
+
+class AIInterviewTurnEvaluationDetailSerializer(serializers.ModelSerializer):
+    turn = AIInterviewTurnSerializer()
+
+    class Meta:
+        model = AIInterviewEvaluation
+        fields = [
+            "id",
+            "turn",
+            "score",
+            "strengths",
+            "weaknesses",
+            "suggestions",
+            "confidence",
+            "status",
+            "created_at",
+        ]

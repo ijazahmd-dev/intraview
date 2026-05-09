@@ -9,8 +9,8 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status, permissions
 
-from .models import AIInterviewSession, InterviewRuntimeState
-from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer
+from .models import AIInterviewSession, InterviewRuntimeState, AIInterviewFinalReport, AIInterviewTurn
+from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer, AIInterviewFinalReportSerializer, AIInterviewTurnEvaluationDetailSerializer, AIInterviewTurnWithEvaluationSerializer
 from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
 from .tasks import evaluate_turn
 
@@ -444,3 +444,137 @@ class InterviewRuntimeStateView(APIView):
             InterviewRuntimeStateSerializer(state).data,
             status=status.HTTP_200_OK,
         )
+    
+
+
+
+
+
+
+
+
+
+
+
+class AIInterviewSessionDetailAPIView(APIView):
+    """
+    GET /api/ai-interview/session/<id>/
+
+    Returns the current state of an AIInterviewSession for the owner.
+    Useful for polling status after the room is closed or on page refresh.
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk: int, *args, **kwargs):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = AIInterviewSessionSerializer(session)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+
+
+
+
+
+
+
+class AIInterviewFinalReportAPIView(APIView):
+    """
+    GET /api/ai-interview/session/<id>/report/
+
+    Returns the final report for a completed session, if available.
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk: int, *args, **kwargs):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            report = session.final_report
+        except AIInterviewFinalReport.DoesNotExist:
+            return Response(
+                {"detail": "Report not ready yet."},
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        serializer = AIInterviewFinalReportSerializer(report)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+
+
+
+
+
+
+
+
+class AIInterviewSessionEvaluationsAPIView(APIView):
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk: int, *args, **kwargs):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        turns = (
+            AIInterviewTurn.objects.filter(session=session)
+            .select_related("evaluation")
+            .order_by("turn_index")
+        )
+
+        serializer = AIInterviewTurnWithEvaluationSerializer(turns, many=True)
+        return Response(
+            {
+                "session_id": session.id,
+                "status": session.status,
+                "turns": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AIInterviewTurnEvaluationDetailAPIView(APIView):
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, turn_id: int, *args, **kwargs):
+        turn = get_object_or_404(
+            AIInterviewTurn.objects.select_related("session", "evaluation"),
+            pk=turn_id,
+        )
+
+        if turn.session.user_id != request.user.id:
+            return Response(
+                {"detail": "You do not have permission to access this turn."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        evaluation = getattr(turn, "evaluation", None)
+        if not evaluation:
+            return Response(
+                {"detail": "Evaluation not found for this turn."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = AIInterviewTurnEvaluationDetailSerializer(evaluation)
+        return Response(serializer.data, status=status.HTTP_200_OK)

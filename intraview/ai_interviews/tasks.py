@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any, Dict, List, Optional
+from django.conf import settings
 
 from celery import shared_task
 from django.db import transaction
@@ -12,6 +13,13 @@ from .models import (
     AIInterviewFinalReport,
     AIInterviewSession,
 )
+
+from .service.gemini.client import (
+    GeminiPermanentError,
+    GeminiTransientError,
+)
+from .service.gemini.evaluation import evaluate_turn_payload
+from .service.gemini.reporting import generate_final_report_payload
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +35,14 @@ def _build_evaluation_input(turn: AIInterviewTurn) -> Dict[str, Any]:
     role_name = session.role.name
     difficulty = session.difficulty
     round_type = session.round_type
+
+    answer_text = (turn.answer_text or "").strip()
+    if len(answer_text) > 4000:
+        answer_text = answer_text[:4000]
+
+    question_text = (turn.question_text or "").strip()
+    if len(question_text) > 1000:
+        question_text = question_text[:1000]
 
     # You can enrich this with role.expected_skills later.
     return {
@@ -82,7 +98,7 @@ def evaluate_turn(self, turn_id: int) -> None:
     Retries on transient errors with exponential backoff.
     """
     try:
-        turn = AIInterviewTurn.objects.select_related("session", "evaluation").get(
+        turn = AIInterviewTurn.objects.select_related("session", "evaluation", "session__role").get(
             pk=turn_id
         )
     except AIInterviewTurn.DoesNotExist:
@@ -92,26 +108,86 @@ def evaluate_turn(self, turn_id: int) -> None:
     evaluation = turn.evaluation  # OneToOne
 
     if evaluation.status == AIInterviewEvaluation.Status.SUCCESS:
-        logger.info("evaluate_turn: turn %s already evaluated, skipping", turn_id)
+        logger.info(
+            "evaluate_turn: turn %s already evaluated, skipping",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+            },
+        )
         return
 
     if not turn.answer_text or not turn.answer_text.strip():
         # Nothing to evaluate; mark FAILED but do not retry.
         evaluation.status = AIInterviewEvaluation.Status.FAILED
         evaluation.suggestions = ["Empty answer; no evaluation generated."]
-        evaluation.save(update_fields=["status", "suggestions", "updated_at"])
-        logger.info("evaluate_turn: empty answer for turn %s, marking FAILED", turn_id)
+        evaluation.raw_response = {
+            "reason": "EMPTY_ANSWER",
+            "retryable": False,
+        }
+        evaluation.save(update_fields=["status", "suggestions", "raw_response", "updated_at"])
+        logger.info(
+            "evaluate_turn: empty answer for turn %s, marking FAILED",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+            },
+        )
         return
 
     payload = _build_evaluation_input(turn)
-    logger.info("evaluate_turn: evaluating turn %s", turn_id)
+    logger.info(
+        "evaluate_turn: evaluating turn %s",
+        turn_id,
+        extra={
+            "turn_id": turn.id,
+            "session_id": turn.session_id,
+            "task_id": self.request.id,
+            "model_name": getattr(settings, "GEMINI_EVALUATION_MODEL", "gemini-2.5-flash"),
+            "retry_count": self.request.retries,
+        },
+    )
 
     try:
-        result = _call_gemini_flash_evaluation(payload)
+        result = evaluate_turn_payload(payload)
     except Exception as exc:
-        logger.exception("evaluate_turn: error while evaluating turn %s", turn_id)
-        # raise to trigger autoretry
-        raise exc
+        logger.exception(
+            "evaluate_turn: transient Gemini error for turn %s",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+                "retry_count": self.request.retries,
+            },
+        )
+        raise self.retry(exc=exc)
+    
+    except GeminiPermanentError as exc:
+        logger.exception(
+            "evaluate_turn: permanent Gemini error for turn %s",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+            },
+        )
+        evaluation.status = AIInterviewEvaluation.Status.FAILED
+        evaluation.suggestions = "Evaluation unavailable."
+        evaluation.raw_response = {
+            "reason": "MODEL_OUTPUT_INVALID",
+            "retryable": False,
+            "error": str(exc),
+        }
+        evaluation.save(
+            update_fields=["status", "suggestions", "raw_response", "updated_at"]
+        )
+        return
 
     # Persist structured output.
     with transaction.atomic():
@@ -140,6 +216,7 @@ def evaluate_turn(self, turn_id: int) -> None:
         extra={
             "turn_id": turn.id,
             "session_id": turn.session_id,
+            "task_id": self.request.id,
             "score": evaluation.score,
         },
     )
@@ -195,6 +272,14 @@ def _build_final_report_input(session: AIInterviewSession) -> Dict[str, Any]:
                 "suggestions": eval_obj.suggestions,
                 "confidence": eval_obj.confidence,
             }
+
+        answer_text = (t.answer_text or "").strip()
+        if len(answer_text) > 2000:
+            answer_text = answer_text[:2000]
+
+        question_text = (t.question_text or "").strip()
+        if len(question_text) > 500:
+            question_text = question_text[:500]    
 
         interview_data.append(
             {
@@ -262,7 +347,11 @@ def generate_final_report(self, session_id: int) -> None:
     if session.status != AIInterviewSession.Status.COMPLETED:
         logger.warning(
             "generate_final_report skipped",
-            extra={"session_id": session_id, "status": session.status},
+            extra={
+                "session_id": session_id,
+                "status": session.status,
+                "task_id": self.request.id,
+            },
         )
         return
 
@@ -272,19 +361,56 @@ def generate_final_report(self, session_id: int) -> None:
         logger.info(
             "generate_final_report: report already SUCCESS for session %s, skipping",
             session_id,
+            extra={
+                "session_id": session_id,
+                "task_id": self.request.id,
+            },
         )
         return
 
     payload = _build_final_report_input(session)
-    logger.info("generate_final_report: generating report for session %s", session_id)
+    logger.info(
+        "generate_final_report: generating report for session %s",
+        session_id,
+        extra={
+            "session_id": session_id,
+            "task_id": self.request.id,
+            "model_name": getattr(settings, "GEMINI_FINAL_REPORT_MODEL", "gemini-2.5-pro"),
+            "retry_count": self.request.retries,
+        },
+    )
 
     try:
-        result = _call_gemini_pro_report(payload)
-    except Exception as exc:
+        result = generate_final_report_payload(payload)
+    except GeminiTransientError as exc:
         logger.exception(
-            "generate_final_report: error for session %s (will retry)", session_id
+            "generate_final_report: transient Gemini error for session %s",
+            session_id,
+            extra={
+                "session_id": session_id,
+                "task_id": self.request.id,
+                "retry_count": self.request.retries,
+            },
         )
-        raise exc
+        raise self.retry(exc=exc)
+    
+    except GeminiPermanentError as exc:
+        logger.exception(
+            "generate_final_report: permanent Gemini error for session %s",
+            session_id,
+            extra={
+                "session_id": session_id,
+                "task_id": self.request.id,
+            },
+        )
+        report.status = AIInterviewFinalReport.Status.FAILED
+        report.raw_response = {
+            "reason": "MODEL_OUTPUT_INVALID",
+            "retryable": False,
+            "error": str(exc),
+        }
+        report.save(update_fields=["status", "raw_response", "updated_at"])
+        return
 
     report.overall_score = result.get("overall_score")
     report.summary = result.get("summary", "")
@@ -308,4 +434,11 @@ def generate_final_report(self, session_id: int) -> None:
         ]
     )
 
-    logger.info("generate_final_report: SUCCESS for session %s", session_id)
+    logger.info(
+        "generate_final_report: SUCCESS for session %s",
+        session_id,
+        extra={
+            "session_id": session_id,
+            "task_id": self.request.id,
+        },
+    )
