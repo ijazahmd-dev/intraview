@@ -578,6 +578,77 @@
 
 
 
+# # src/agent.py
+
+# import logging
+
+# from dotenv import load_dotenv
+# from livekit.agents import AgentServer, JobContext, JobProcess, cli
+# from livekit.plugins import silero
+
+# from intraview_agent.runtime import InterviewRuntime
+
+# logger = logging.getLogger("agent")
+
+# load_dotenv(".env.local")
+
+# server = AgentServer()
+
+
+# def prewarm(proc: JobProcess):
+#     # Preload Silero VAD so each worker process has it ready.
+#     proc.userdata["vad"] = silero.VAD.load()
+
+
+# server.setup_fnc = prewarm
+
+
+# @server.rtc_session(agent_name="intraview-agent")
+# async def my_agent(ctx: JobContext):
+#     # Attach room name to log context.
+#     ctx.log_context_fields = {
+#         "room": ctx.room.name,
+#     }
+
+#     runtime = InterviewRuntime(ctx)
+#     try:
+#         await runtime.run()
+#     except Exception:
+#         logger.exception("InterviewRuntime failed")
+
+
+# if __name__ == "__main__":
+#     cli.run_app(server)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # src/agent.py
 
 import logging
@@ -596,7 +667,7 @@ server = AgentServer()
 
 
 def prewarm(proc: JobProcess):
-    # Preload Silero VAD so each worker process has it ready.
+    # Preload Silero VAD once per worker process.
     proc.userdata["vad"] = silero.VAD.load()
 
 
@@ -605,16 +676,11 @@ server.setup_fnc = prewarm
 
 @server.rtc_session(agent_name="intraview-agent")
 async def my_agent(ctx: JobContext):
-    # Attach room name to log context.
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
-
     runtime = InterviewRuntime(ctx)
-    try:
-        await runtime.run()
-    except Exception:
-        logger.exception("InterviewRuntime failed")
+    await runtime.run()
 
 
 if __name__ == "__main__":

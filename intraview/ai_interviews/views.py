@@ -9,8 +9,8 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status, permissions
 
-from .models import AIInterviewSession
-from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer
+from .models import AIInterviewSession, InterviewRuntimeState
+from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer
 from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
 from .tasks import evaluate_turn
 
@@ -354,4 +354,93 @@ class RecordTurnFromAgentView(APIView):
                 "status": "accepted",
             },
             status=status.HTTP_201_CREATED,
+        )
+    
+
+
+
+
+
+
+
+
+
+
+class InterviewRuntimeStateView(APIView):
+    """
+    GET/PATCH /api/ai-interview/session/<session_id>/runtime-state/
+
+    Used only by the LiveKit agent (and optionally admin tools).
+
+    - GET: agent loads durable runtime state (for reconnect/resume).
+    - PATCH: agent updates current_turn_index / current_state / remaining_seconds, etc.
+
+    Auth: X-Agent-Token header checked via IsAgentWithSharedSecret.
+    """
+
+    permission_classes = [IsAgentWithSharedSecret]
+
+    def _get_session_and_state(
+        self, session_id: int
+    ) -> tuple[AIInterviewSession, InterviewRuntimeState]:
+        session = get_object_or_404(AIInterviewSession, pk=session_id)
+        state, _created = InterviewRuntimeState.objects.get_or_create(
+            session=session,
+            defaults={
+                "current_turn_index": 0,
+                "waiting_for_answer": False,
+                "current_state": "INITIALIZING",
+            },
+        )
+        return session, state
+
+    def get(self, request, session_id: int, *args, **kwargs):
+        _session, state = self._get_session_and_state(session_id)
+        serializer = InterviewRuntimeStateSerializer(state)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, session_id: int, *args, **kwargs):
+        session, state = self._get_session_and_state(session_id)
+
+        serializer = InterviewRuntimeStateUpdateSerializer(
+            data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Apply updates from agent
+        if "current_turn_index" in data:
+            state.current_turn_index = data["current_turn_index"]
+        if "waiting_for_answer" in data:
+            state.waiting_for_answer = data["waiting_for_answer"]
+        if "current_state" in data:
+            state.current_state = data["current_state"]
+        if "current_question_id" in data:
+            state.current_question_id = data["current_question_id"]
+        if "remaining_seconds" in data:
+            state.remaining_seconds = data["remaining_seconds"]
+        if "reconnect_grace_until" in data:
+            state.reconnect_grace_until = data["reconnect_grace_until"]
+        if "disconnect_count" in data:
+            state.disconnect_count = data["disconnect_count"]
+        if "agent_session_id" in data:
+            state.agent_session_id = data["agent_session_id"]
+
+        state.save()
+
+        # Optionally sync AIInterviewSession.status when we see terminal states
+        if (
+            state.current_state == "COMPLETED"
+            and session.status == AIInterviewSession.Status.LIVE
+        ):
+            session.mark_completed()
+        elif (
+            state.current_state == "FAILED"
+            and session.status in AIInterviewSession.ACTIVE_STATUSES
+        ):
+            session.mark_failed()
+
+        return Response(
+            InterviewRuntimeStateSerializer(state).data,
+            status=status.HTTP_200_OK,
         )

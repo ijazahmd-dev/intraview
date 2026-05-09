@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from .models import Role, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport
+from .models import Role, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport, InterviewRuntimeState
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -223,3 +223,70 @@ class AgentTurnCreateSerializer(serializers.Serializer):
         if not value.strip():
             raise serializers.ValidationError("Answer cannot be empty.")
         return value
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class InterviewRuntimeStateSerializer(serializers.ModelSerializer):
+    """
+    Full representation of runtime state for debugging or admin tools.
+    Also used for GET /runtime-state/ by the agent.
+    """
+
+    class Meta:
+        model = InterviewRuntimeState
+        fields = [
+            "session",
+            "current_turn_index",
+            "waiting_for_answer",
+            "current_state",
+            "current_question_id",
+            "remaining_seconds",
+            "last_event_at",
+            "reconnect_grace_until",
+            "disconnect_count",
+            "agent_session_id",
+        ]
+
+
+class InterviewRuntimeStateUpdateSerializer(serializers.Serializer):
+    """
+    Minimal schema that the agent uses to PATCH runtime state.
+
+    This matches what your LiveKit agent sends in
+    BackendClient.update_runtime_state().
+    """
+
+    current_turn_index = serializers.IntegerField(required=False, min_value=0)
+    waiting_for_answer = serializers.BooleanField(required=False)
+    current_state = serializers.CharField(required=False, max_length=32)
+    current_question_id = serializers.CharField(
+        required=False, allow_blank=True, max_length=128
+    )
+    remaining_seconds = serializers.IntegerField(required=False, min_value=0)
+    reconnect_grace_until = serializers.DateTimeField(required=False, allow_null=True)
+    disconnect_count = serializers.IntegerField(required=False, min_value=0)
+    agent_session_id = serializers.CharField(
+        required=False, allow_blank=True, max_length=64
+    )

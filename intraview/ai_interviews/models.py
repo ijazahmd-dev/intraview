@@ -313,7 +313,65 @@ class AIInterviewSession(models.Model):
 
 
 
+class InterviewRuntimeState(models.Model):
+    """
+    Durable runtime state owned by the backend.
 
+    The LiveKit agent treats this as the single source of truth for:
+      - which turn we're on
+      - whether we're waiting for an answer
+      - high-level runtime state (e.g. INTRO, ASKING, LISTENING, PROCESSING)
+      - reconnect-related metadata
+
+    Separated from AIInterviewSession to avoid cluttering the main model
+    with runtime-only concerns.
+    """
+
+    # Use OneToOne so session.id == runtime_state.session_id
+    session = models.OneToOneField(
+        AIInterviewSession,
+        on_delete=models.CASCADE,
+        related_name="runtime_state",
+        primary_key=True,
+    )
+
+    # 0-based index of current turn (matches TurnManager / agent)
+    current_turn_index = models.PositiveIntegerField(default=0)
+
+    # Whether the agent is currently waiting for the candidate's answer
+    waiting_for_answer = models.BooleanField(default=False)
+
+    # String representation of InterviewState (INTRO, ASKING, LISTENING, etc.)
+    current_state = models.CharField(max_length=32, default="INITIALIZING")
+
+    # Optional identifier for the current question (e.g. topic or question id)
+    current_question_id = models.CharField(max_length=128, blank=True)
+
+    # Remaining seconds as perceived by backend (optional – good for UI)
+    remaining_seconds = models.PositiveIntegerField(null=True, blank=True)
+
+    # When we last saw any event for this session (agent / user / system)
+    last_event_at = models.DateTimeField(auto_now=True)
+
+    # If user disconnects, we can set a grace deadline when they can resume
+    reconnect_grace_until = models.DateTimeField(null=True, blank=True)
+
+    # Count of times the candidate has disconnected
+    disconnect_count = models.PositiveIntegerField(default=0)
+
+    # Optional: LiveKit agent session / job id for observability/debugging
+    agent_session_id = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        verbose_name = "Interview runtime state"
+        verbose_name_plural = "Interview runtime states"
+
+    def __str__(self) -> str:
+        return (
+            f"RuntimeState(session={self.session_id}, "
+            f"state={self.current_state}, "
+            f"turn={self.current_turn_index})"
+        )
 
 
 
