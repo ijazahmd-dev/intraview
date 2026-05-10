@@ -1075,12 +1075,12 @@ from livekit.agents import (
 from livekit.plugins import ai_coustics, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from .backend_client import BackendClient
-from .config import get_interview_defaults
-from .constants import TIMEOUT_LOOP_INTERVAL_SECONDS
-from .planner import InterviewConfig, QuestionPlanner
-from .state import InterviewState, StateMachine
-from .turn_manager import TurnManager
+from backend_client import BackendClient
+from config import get_interview_defaults
+from constants import TIMEOUT_LOOP_INTERVAL_SECONDS
+from planner import InterviewConfig, QuestionPlanner
+from state import InterviewState, StateMachine
+from turn_manager import TurnManager
 
 logger = logging.getLogger(__name__)
 
@@ -1136,11 +1136,25 @@ class InterviewRuntime:
     # ---------- initialization helpers ----------
 
     def _build_config_from_metadata(self) -> InterviewConfig:
-        meta = self.ctx.job.metadata or {}
+        raw_meta = self.ctx.job.metadata
+
+        if not raw_meta:
+            meta = {}
+        elif isinstance(raw_meta, str):
+            try:
+                meta = json.loads(raw_meta)
+            except json.JSONDecodeError:
+                raise RuntimeError(f"job metadata is not valid JSON: {raw_meta!r}")
+        elif isinstance(raw_meta, dict):
+            meta = raw_meta
+        else:
+            raise RuntimeError(
+                f"job metadata must be dict or JSON string, got {type(raw_meta)!r}: {raw_meta!r}"
+            )
 
         try:
             session_id = int(meta.get("session_id"))
-        except Exception:
+        except (TypeError, ValueError):
             raise RuntimeError(f"session_id missing or invalid in metadata: {meta!r}")
 
         role_slug = str(meta.get("role_slug") or "unknown-role")
@@ -1148,16 +1162,16 @@ class InterviewRuntime:
         difficulty = str(meta.get("difficulty") or "INTERMEDIATE").upper()
 
         defaults = get_interview_defaults()
+
         raw_max = meta.get("max_questions")
         if raw_max is not None:
             try:
                 max_questions = int(raw_max)
-            except ValueError:
+            except (TypeError, ValueError):
                 max_questions = defaults.max_questions
         else:
             max_questions = defaults.max_questions
 
-        # Duration can come as seconds or minutes from backend.
         duration_seconds: Optional[int] = None
         raw_dur_sec = meta.get("duration_seconds")
         raw_dur_min = meta.get("duration_minutes")
@@ -1165,12 +1179,12 @@ class InterviewRuntime:
         if raw_dur_sec is not None:
             try:
                 duration_seconds = int(raw_dur_sec)
-            except ValueError:
+            except (TypeError, ValueError):
                 duration_seconds = None
         elif raw_dur_min is not None:
             try:
                 duration_seconds = int(raw_dur_min) * 60
-            except ValueError:
+            except (TypeError, ValueError):
                 duration_seconds = None
 
         return InterviewConfig(
@@ -1253,8 +1267,29 @@ class InterviewRuntime:
                 voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
             ),
             vad=self.ctx.proc.userdata["vad"],
-            turn_detection=MultilingualModel(),
-            preemptive_generation=True,
+            turn_handling={
+                "turn_detection": MultilingualModel(),
+                "endpointing": {
+                    "mode": "dynamic",
+                    "min_delay": 0.4,
+                    "max_delay": 1.2,
+                },
+                "interruption": {
+                    "enabled": True,
+                    "mode": "adaptive",
+                    "min_duration": 0.4,
+                    "min_words": 0,
+                    "false_interruption_timeout": 2.0,
+                    "resume_false_interruption": True,
+                    "discard_audio_if_uninterruptible": True,
+                },
+                "preemptive_generation": {
+                    "enabled": True,
+                    "preemptive_tts": False,
+                    "max_speech_duration": 8.0,
+                    "max_retries": 1,
+                },
+            },
         )
 
         # Start interview timer for duration enforcement.
@@ -1325,8 +1360,7 @@ class InterviewRuntime:
         assert self.planner is not None
         assert self.tm is not None
 
-        @self.session.on("conversation_item_added")
-        async def _on_item(ev: ConversationItemAddedEvent):
+        async def _handle_item(ev: ConversationItemAddedEvent):
             item = ev.item
             role = getattr(item, "role", None)
             text = getattr(item, "text", None)
@@ -1454,6 +1488,10 @@ class InterviewRuntime:
                         }
                     )
                     await self._sync_runtime_state()
+
+        @self.session.on("conversation_item_added")
+        def _on_item(ev: ConversationItemAddedEvent):
+            asyncio.create_task(_handle_item(ev))
 
     # ---------- session start & first question ----------
 

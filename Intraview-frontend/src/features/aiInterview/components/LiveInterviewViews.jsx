@@ -156,96 +156,113 @@ export function ConnectingView({ sessionInfo }) {
 
 
 
+// Add this ABOVE LiveInterviewView in LiveInterviewViews.jsx
 
-// export function LiveInterviewView({
-//   sessionInfo,
-//   formattedTimeLeft,
-//   onEnd,
-//   isConnected,
-//   livekitServerUrl,
-//   livekitToken,
-//   uiState,
-//   onRoomConnected,
-//   onRoomDisconnected,
-//   isEnding = false,
-// }) {
-//   const shouldConnect =
-//     uiState === "CONNECTING" || uiState === "LIVE";
+import { useAgentTranscript } from "../hooks/useAgentTranscript";
 
-//   return (
-//     <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5">
-//       {/* Top bar: role + timer */}
-//       <div className="flex items-center justify-between gap-3 mb-4">
-//         <div>
-//           <p className="text-[11px] text-gray-400 uppercase tracking-wide">
-//             Live AI Interview ·{" "}
-//             {isConnected ? "Connected" : "Connecting to room..."}
-//           </p>
-//           <p className="text-sm font-semibold text-gray-50">
-//             {sessionInfo.roleName} · {sessionInfo.roundType}
-//           </p>
-//         </div>
-//         <div className="flex items-center gap-3">
-//           {formattedTimeLeft && (
-//             <div className="px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700 text-[11px] font-semibold text-teal-300">
-//               Time left: {formattedTimeLeft}
-//             </div>
-//           )}
-//           <button
-//             type="button"
-//             onClick={onEnd}
-//             disabled={isEnding}
-//             className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
-//                 isEnding
-//                 ? "bg-red-400 cursor-not-allowed opacity-70"
-//                 : "bg-red-500/90 hover:bg-red-500"
-//             }`}
-//             >
-//             {isEnding ? "Ending..." : "End Interview"}
-//             </button>
+function LiveInterviewInner({
+  sessionInfo,
+  formattedTimeLeft,
+  onEnd,
+  isEnding,
+}) {
+  const { currentQuestion, transcript } = useAgentTranscript();
 
-//         </div>
-//       </div>
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      {/* Top bar: role + timer + end button */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+            Live AI Interview
+          </p>
+          <p className="text-sm font-semibold text-gray-50">
+            {sessionInfo.roleName} · {sessionInfo.roundType}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {formattedTimeLeft && (
+            <div className="px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700 text-[11px] font-semibold text-teal-300">
+              Time left: {formattedTimeLeft}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onEnd}
+            disabled={isEnding}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
+              isEnding
+                ? "bg-red-400 cursor-not-allowed opacity-70"
+                : "bg-red-500/90 hover:bg-red-500"
+            }`}
+          >
+            {isEnding ? "Ending..." : "End Interview"}
+          </button>
+        </div>
+      </div>
 
-//       {/* Body: video on left, tips on right */}
-//       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-//         <div className="md:col-span-2">
-//           <div className="aspect-video rounded-xl bg-gray-800 border border-gray-700 overflow-hidden">
-//             <LiveKitVideoPanel
-//               serverUrl={livekitServerUrl}
-//               token={livekitToken}
-//               connect={shouldConnect}
-//               onConnected={onRoomConnected}
-//               onDisconnected={onRoomDisconnected}
-//             />
-//           </div>
-//         </div>
+      {/* Current question banner */}
+      {currentQuestion && (
+        <div className="rounded-xl bg-teal-500/10 border border-teal-500/30 px-4 py-3">
+          <p className="text-[10px] font-semibold text-teal-400 uppercase tracking-wide mb-1">
+            Current Question
+          </p>
+          <p className="text-[13px] text-gray-100 leading-relaxed">
+            {currentQuestion.text}
+          </p>
+        </div>
+      )}
 
-//         <div className="md:col-span-1 flex flex-col gap-3">
-//           <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-//             <p className="text-[11px] font-semibold text-gray-200 mb-1">
-//               What to expect
-//             </p>
-//             <p className="text-[11px] text-gray-400">
-//               You’ll hear a question, then you’ll have a few seconds to think
-//               before answering out loud. Try to respond in 1–2 minutes per
-//               question.
-//             </p>
-//           </div>
-//           <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-//             <p className="text-[11px] font-semibold text-gray-200 mb-1">
-//               Tip
-//             </p>
-//             <p className="text-[11px] text-gray-400">
-//               Use STAR (Situation, Task, Action, Result) for behavioral
-//               questions to structure your answers clearly.
-//             </p>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
+      {/* Transcript panel */}
+      {transcript.length > 0 && (
+        <div className="rounded-xl bg-gray-800/60 border border-gray-700 p-3 max-h-40 overflow-y-auto flex flex-col gap-2">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+            Transcript
+          </p>
+          {transcript.map((msg) => (
+            <div
+              key={msg.id}
+              className={`text-[11px] leading-relaxed ${
+                msg.role === "agent"
+                  ? "text-teal-300"
+                  : "text-gray-300"
+              }`}
+            >
+              <span className="font-semibold mr-1">
+                {msg.role === "agent" ? "AI:" : "You:"}
+              </span>
+              {msg.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tips sidebar — shown only when no transcript yet */}
+      {transcript.length === 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
+            <p className="text-[11px] font-semibold text-gray-200 mb-1">
+              What to expect
+            </p>
+            <p className="text-[11px] text-gray-400">
+              You'll hear a question, then answer out loud. Try to respond in
+              1–2 minutes per question.
+            </p>
+          </div>
+          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
+            <p className="text-[11px] font-semibold text-gray-200 mb-1">
+              Tip
+            </p>
+            <p className="text-[11px] text-gray-400">
+              Use STAR (Situation, Task, Action, Result) to structure
+              behavioral answers clearly.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 

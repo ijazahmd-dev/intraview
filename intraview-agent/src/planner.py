@@ -240,7 +240,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .questions import Question, get_fixed_question_set
+from questions import Question, get_fixed_question_set
 
 
 @dataclass

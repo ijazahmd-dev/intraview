@@ -82,7 +82,7 @@ from typing import Any, Mapping, Optional
 
 import httpx
 
-from .config import get_backend_config
+from config import get_backend_config
 
 
 @dataclass

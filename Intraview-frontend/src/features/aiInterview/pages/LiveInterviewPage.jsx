@@ -1593,15 +1593,22 @@ export default function LiveInterviewPage() {
   const { formattedTimeLeft } = useInterviewTimer({
     uiState,
     initialSeconds,
-    onExpire: () => {
+    onExpire: async () => {
       if (!hasAutoEndedRef.current && join.data?.session_id) {
         hasAutoEndedRef.current = true;
-        dispatch(
-          endAiInterviewSessionThunk({
-            sessionId: join.data.session_id,
-            reason: "COMPLETED",
-          })
-        );
+        try {
+          await dispatch(
+            endAiInterviewSessionThunk({
+              sessionId: join.data.session_id,
+              reason: "COMPLETED",
+            })
+          ).unwrap();
+          // Navigation handled by end.status effect
+        } catch {
+          // Backend failed but timer is zero — still move to completed UI
+          setIsConnected(false);
+          setUiState(UI_STATES.COMPLETED);
+        }
       }
     },
   });

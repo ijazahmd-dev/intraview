@@ -352,14 +352,23 @@ class AIInterviewSessionService:
             else:
                 raise ValueError("This interview cannot be cancelled anymore.")
         else:
-            if session.status != AIInterviewSession.Status.LIVE:
-                raise ValueError("Interview is not live, cannot complete.")
-
-            elapsed = session.elapsed_seconds()
-            if elapsed < MIN_COMPLETION_SECONDS:
-                session.mark_cancelled()
+            # Accept READY, LIVE, or already COMPLETED as valid end states
+            if session.status in (
+                AIInterviewSession.Status.LIVE,
+                AIInterviewSession.Status.READY,
+            ):
+                elapsed = session.elapsed_seconds()
+                if elapsed < MIN_COMPLETION_SECONDS:
+                    session.mark_cancelled()
+                else:
+                    session.mark_completed()
+            elif session.status == AIInterviewSession.Status.COMPLETED:
+                # Already completed — return session as-is without error
+                pass
             else:
-                session.mark_completed()
+                raise ValueError(
+                    f"Interview cannot be ended from status: {session.status}"
+                )
 
         if session.status == AIInterviewSession.Status.COMPLETED:
             generate_final_report.delay(session.id)        

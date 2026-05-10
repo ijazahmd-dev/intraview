@@ -105,7 +105,7 @@
 import time
 from dataclasses import dataclass
 
-from .constants import NO_ANSWER_TIMEOUT_SECONDS, NO_ANSWER_MAX_MULTIPLIER
+from constants import NO_ANSWER_TIMEOUT_SECONDS, NO_ANSWER_MAX_MULTIPLIER
 
 
 @dataclass
