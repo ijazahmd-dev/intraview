@@ -1,6 +1,7 @@
-// src/components/ai-interview/LiveInterviewViews.jsx
+// src/features/aiInterview/components/LiveInterviewViews.jsx
 
 import { LiveKitVideoPanel } from "./LiveKitVideoPanel";
+import { useNavigate } from "react-router-dom";
 
 export function LoadingView({ message }) {
   return (
@@ -149,6 +150,113 @@ export function ConnectingView({ sessionInfo }) {
   );
 }
 
+
+
+
+
+
+
+
+// export function LiveInterviewView({
+//   sessionInfo,
+//   formattedTimeLeft,
+//   onEnd,
+//   isConnected,
+//   livekitServerUrl,
+//   livekitToken,
+//   uiState,
+//   onRoomConnected,
+//   onRoomDisconnected,
+//   isEnding = false,
+// }) {
+//   const shouldConnect =
+//     uiState === "CONNECTING" || uiState === "LIVE";
+
+//   return (
+//     <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5">
+//       {/* Top bar: role + timer */}
+//       <div className="flex items-center justify-between gap-3 mb-4">
+//         <div>
+//           <p className="text-[11px] text-gray-400 uppercase tracking-wide">
+//             Live AI Interview ·{" "}
+//             {isConnected ? "Connected" : "Connecting to room..."}
+//           </p>
+//           <p className="text-sm font-semibold text-gray-50">
+//             {sessionInfo.roleName} · {sessionInfo.roundType}
+//           </p>
+//         </div>
+//         <div className="flex items-center gap-3">
+//           {formattedTimeLeft && (
+//             <div className="px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700 text-[11px] font-semibold text-teal-300">
+//               Time left: {formattedTimeLeft}
+//             </div>
+//           )}
+//           <button
+//             type="button"
+//             onClick={onEnd}
+//             disabled={isEnding}
+//             className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
+//                 isEnding
+//                 ? "bg-red-400 cursor-not-allowed opacity-70"
+//                 : "bg-red-500/90 hover:bg-red-500"
+//             }`}
+//             >
+//             {isEnding ? "Ending..." : "End Interview"}
+//             </button>
+
+//         </div>
+//       </div>
+
+//       {/* Body: video on left, tips on right */}
+//       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+//         <div className="md:col-span-2">
+//           <div className="aspect-video rounded-xl bg-gray-800 border border-gray-700 overflow-hidden">
+//             <LiveKitVideoPanel
+//               serverUrl={livekitServerUrl}
+//               token={livekitToken}
+//               connect={shouldConnect}
+//               onConnected={onRoomConnected}
+//               onDisconnected={onRoomDisconnected}
+//             />
+//           </div>
+//         </div>
+
+//         <div className="md:col-span-1 flex flex-col gap-3">
+//           <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
+//             <p className="text-[11px] font-semibold text-gray-200 mb-1">
+//               What to expect
+//             </p>
+//             <p className="text-[11px] text-gray-400">
+//               You’ll hear a question, then you’ll have a few seconds to think
+//               before answering out loud. Try to respond in 1–2 minutes per
+//               question.
+//             </p>
+//           </div>
+//           <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
+//             <p className="text-[11px] font-semibold text-gray-200 mb-1">
+//               Tip
+//             </p>
+//             <p className="text-[11px] text-gray-400">
+//               Use STAR (Situation, Task, Action, Result) for behavioral
+//               questions to structure your answers clearly.
+//             </p>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
 export function LiveInterviewView({
   sessionInfo,
   formattedTimeLeft,
@@ -161,95 +269,44 @@ export function LiveInterviewView({
   onRoomDisconnected,
   isEnding = false,
 }) {
-  const shouldConnect =
-    uiState === "CONNECTING" || uiState === "LIVE";
+  const shouldConnect = uiState === "CONNECTING" || uiState === "LIVE";
 
   return (
-    <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5">
-      {/* Top bar: role + timer */}
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div>
-          <p className="text-[11px] text-gray-400 uppercase tracking-wide">
-            Live AI Interview ·{" "}
-            {isConnected ? "Connected" : "Connecting to room..."}
-          </p>
-          <p className="text-sm font-semibold text-gray-50">
-            {sessionInfo.roleName} · {sessionInfo.roundType}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {formattedTimeLeft && (
-            <div className="px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700 text-[11px] font-semibold text-teal-300">
-              Time left: {formattedTimeLeft}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onEnd}
-            disabled={isEnding}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
-                isEnding
-                ? "bg-red-400 cursor-not-allowed opacity-70"
-                : "bg-red-500/90 hover:bg-red-500"
-            }`}
-            >
-            {isEnding ? "Ending..." : "End Interview"}
-            </button>
-
-        </div>
-      </div>
-
-      {/* Body: video on left, tips on right */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <div className="aspect-video rounded-xl bg-gray-800 border border-gray-700 overflow-hidden">
-            <LiveKitVideoPanel
-              serverUrl={livekitServerUrl}
-              token={livekitToken}
-              connect={shouldConnect}
-              onConnected={onRoomConnected}
-              onDisconnected={onRoomDisconnected}
-            />
-          </div>
-        </div>
-
-        <div className="md:col-span-1 flex flex-col gap-3">
-          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-            <p className="text-[11px] font-semibold text-gray-200 mb-1">
-              What to expect
-            </p>
-            <p className="text-[11px] text-gray-400">
-              You’ll hear a question, then you’ll have a few seconds to think
-              before answering out loud. Try to respond in 1–2 minutes per
-              question.
-            </p>
-          </div>
-          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-            <p className="text-[11px] font-semibold text-gray-200 mb-1">
-              Tip
-            </p>
-            <p className="text-[11px] text-gray-400">
-              Use STAR (Situation, Task, Action, Result) for behavioral
-              questions to structure your answers clearly.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5 flex flex-col">
+      <LiveKitVideoPanel
+        serverUrl={livekitServerUrl}
+        token={livekitToken}
+        connect={shouldConnect}
+        onConnected={onRoomConnected}
+        onDisconnected={onRoomDisconnected}
+      >
+        {/*
+          LiveInterviewInner is inside LiveKitRoom context,
+          so useAgentTranscript (useDataChannel) works correctly here.
+        */}
+        <LiveInterviewInner
+          sessionInfo={sessionInfo}
+          formattedTimeLeft={formattedTimeLeft}
+          onEnd={onEnd}
+          isEnding={isEnding}
+        />
+      </LiveKitVideoPanel>
     </div>
   );
 }
 
+export function CompletedView({ sessionInfo, onBackToRoles, sessionId }) {
+  const navigate = useNavigate();
 
-export function CompletedView({ sessionInfo, onBackToRoles }) {
   return (
     <div className="py-10 flex flex-col items-center text-center">
       <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center mb-3">
         <svg
           className="w-5 h-5 text-emerald-400"
-          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
         >
           <path d="M20 6 9 17l-5-5" />
         </svg>
@@ -257,21 +314,37 @@ export function CompletedView({ sessionInfo, onBackToRoles }) {
       <h2 className="text-sm font-semibold text-gray-50 mb-1">
         Interview completed
       </h2>
-      <p className="text-[11px] text-gray-400 max-w-sm mb-4">
-        Your mock interview for the {sessionInfo.roleName} role is finished.
-        Later we'll show a detailed feedback report here.
+      <p className="text-11px text-gray-400 max-w-sm mb-6">
+        Your mock interview for the{" "}
+        <span className="text-gray-200 font-medium">
+          {sessionInfo?.roleName}
+        </span>{" "}
+        role is finished. Your evaluation report is being generated.
       </p>
-      <button
-        type="button"
-        onClick={onBackToRoles}
-        className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-xs font-semibold text-white"
-      >
-        Back to roles
-      </button>
+
+      <div className="flex items-center gap-3">
+        {sessionId && (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/ai-interview/results/${sessionId}`)
+            }
+            className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-600 text-xs font-semibold text-white transition-colors"
+          >
+            View Results
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onBackToRoles}
+          className="px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-600 text-xs font-semibold text-gray-300 transition-colors"
+        >
+          Back to roles
+        </button>
+      </div>
     </div>
   );
 }
-
 function Row({ label, value, uppercase, valueClass }) {
   return (
     <div className="flex justify-between gap-3">

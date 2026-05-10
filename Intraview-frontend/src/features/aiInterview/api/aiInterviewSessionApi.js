@@ -1,4 +1,4 @@
-// src/api/aiInterviewSessionApi.js
+// src/features/aiInterview/api/aiInterviewSessionApi.js
 
 import API from "../../../utils/axiosClient"; // your base axios instance (with baseURL + withCredentials)
 
@@ -33,3 +33,12 @@ export const pingAiInterview = () => {
 export const endAiInterviewSession = (sessionId, payload) => {
   return API.post(`/api/ai-interview/session/${sessionId}/end/`, payload);
 };
+
+
+
+/**
+ * GET /api/ai-interview/session/<id>/
+ * Returns session detail (status, role, times, etc.)
+ */
+export const getAiInterviewSessionDetail = (sessionId) =>
+  API.get(`/api/ai-interview/session/${sessionId}/`);

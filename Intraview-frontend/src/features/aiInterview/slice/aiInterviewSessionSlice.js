@@ -223,7 +223,7 @@
 
 
 
-// src/store/aiInterviewSessionSlice.js
+// src/features/aiInterview/slice/aiInterviewSessionSlice.js
 
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
@@ -314,6 +314,20 @@ export const endAiInterviewSessionThunk = createAsyncThunk(
   }
 );
 
+export const fetchAiInterviewSessionDetail = createAsyncThunk(
+  "aiInterviewSession/fetchSessionDetail",
+  async (sessionId, { rejectWithValue }) => {
+    try {
+      const res = await getAiInterviewSessionDetail(sessionId);
+      return res.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.detail ?? "Failed to fetch session detail."
+      );
+    }
+  }
+);
+
 const initialState = {
   role: null,
   roleLoading: false,
@@ -339,6 +353,9 @@ const initialState = {
     status: "idle", // "idle" | "creating" | "ready" | "error"
     createError: null,
     data: null,
+      detail: null,
+      detailStatus: "idle", // idle | loading | success | error
+      detailError: null,
   },
 
   join: {
@@ -464,6 +481,21 @@ const aiInterviewSessionSlice = createSlice({
         state.end.status = "error";
         state.end.error =
           action.payload?.detail || "Failed to end AI interview session.";
+      });
+      // Session detail fetch
+    builder
+      .addCase(fetchAiInterviewSessionDetail.pending, (state) => {
+        state.session.detailStatus = "loading";
+        state.session.detailError = null;
+      })
+      .addCase(fetchAiInterviewSessionDetail.fulfilled, (state, action) => {
+        state.session.detailStatus = "success";
+        state.session.detail = action.payload;
+      })
+      .addCase(fetchAiInterviewSessionDetail.rejected, (state, action) => {
+        state.session.detailStatus = "error";
+        state.session.detailError =
+          action.payload?.detail ?? "Failed to fetch session detail.";
       });
   },
 });

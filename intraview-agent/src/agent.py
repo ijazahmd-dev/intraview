@@ -657,7 +657,7 @@ from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, JobProcess, cli
 from livekit.plugins import silero
 
-from intraview_agent.runtime import InterviewRuntime
+from runtime import InterviewRuntime
 
 logger = logging.getLogger("agent")
 

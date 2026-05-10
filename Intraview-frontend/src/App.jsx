@@ -80,6 +80,7 @@ import NotificationsPage from "./features/notification/user/pages/NotificationsP
 import RoleBasedInterviewPage from "./features/aiInterview/pages/RoleBasedInterviewPage";
 import RoleInterviewSetupPage from "./features/aiInterview/pages/RoleInterviewSetupPage";
 import LiveInterviewPage from "./features/aiInterview/pages/LiveInterviewPage";
+import InterviewResultsPage from "./features/aiInterview/pages/InterviewResultsPage";
 
 
 
@@ -154,6 +155,8 @@ function AppInner() {
 
 
                     <Route path="/ai-interview/live/:sessionId" element={<LiveInterviewPage />} />
+
+                    <Route path="/ai-interview/results/:sessionId" element={<InterviewResultsPage />} />
 
                     
 

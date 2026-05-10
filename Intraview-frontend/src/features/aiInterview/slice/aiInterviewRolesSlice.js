@@ -1,4 +1,4 @@
-// src/store/aiInterviewRolesSlice.js
+// src/features/aiInterview/slice/aiInterviewRolesSlice.js
 
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { getFeaturedRoles, searchRoles } from "../api/aiInterviewApi";

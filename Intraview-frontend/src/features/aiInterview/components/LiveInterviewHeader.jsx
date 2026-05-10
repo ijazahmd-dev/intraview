@@ -66,7 +66,7 @@
 
 
 
-// src/components/ai-interview/LiveInterviewHeader.jsx
+// src/features/aiInterview/components/LiveInterviewHeader.jsx
 
 const UI_STATES = {
   LOADING: "LOADING",

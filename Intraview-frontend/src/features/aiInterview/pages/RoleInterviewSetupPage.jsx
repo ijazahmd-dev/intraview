@@ -1516,7 +1516,7 @@
 
 
 
-// src/pages/RoleInterviewSetupPage.jsx
+// src/features/aiInterview/pages/RoleInterviewSetupPage.jsx
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";

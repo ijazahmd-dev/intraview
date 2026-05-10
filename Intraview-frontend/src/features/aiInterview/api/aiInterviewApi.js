@@ -1,4 +1,4 @@
-// src/api/aiInterviewApi.js
+// src/features/aiInterview/api/aiInterviewApi.js
 
 import API from "../../../utils/axiosClient"; // <-- adjust path to your base axios file
 
