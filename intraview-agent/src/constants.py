@@ -27,3 +27,7 @@ PROCESSED_ITEM_ID_LIMIT: int = 2000
 # These are intentionally conservative; you can tune them later.
 MIN_ANSWER_CHARS: int = 15   # ignore extremely short transcripts
 MIN_ANSWER_WORDS: int = 3    # ignore 1-word / 2-word fillers
+
+# Maximum number of follow-up questions allowed per base question.
+# Follow-ups do not increment turn_index or count toward max_questions.
+MAX_FOLLOWUPS_PER_QUESTION: int = 2

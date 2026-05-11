@@ -4,6 +4,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.authentication import BaseAuthentication
 from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
@@ -108,3 +109,50 @@ class MultiRoleJWTAuthentication(BaseAuthentication):
                 continue
         
         return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ai_interviews/authentication.py  (or permissions.py — wherever IsAgentWithSharedSecret lives)
+
+
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
+
+
+class AgentTokenAuthentication(BaseAuthentication):
+    """
+    Authenticates requests from the LiveKit agent using a shared secret
+    passed in the X-Agent-Token header.
+
+    Returns a sentinel (None, None) tuple on success so DRF treats the
+    request as authenticated without a real User object.
+    """
+
+    def authenticate(self, request):
+        token = request.META.get("HTTP_X_AGENT_TOKEN", "")
+        if not token:
+            # No token → not our authenticator, let others try
+            return None
+
+        expected = getattr(settings, "BACKEND_AGENT_SHARED_SECRET", "") or ""
+        if not expected:
+            raise AuthenticationFailed("Server is missing BACKEND_AGENT_SHARED_SECRET config.")
+
+        if token != expected:
+            raise AuthenticationFailed("Invalid agent token.")
+
+        # Return (user, auth) — None user is fine for agent-only endpoints
+        return (None, token)
+
+    def authenticate_header(self, request):
+        return "X-Agent-Token"

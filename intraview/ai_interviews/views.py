@@ -16,7 +16,7 @@ from .tasks import evaluate_turn
 
 # Adjust this import to where your auth class lives:
 # from core.authentication import MultiRoleJWTAuthentication
-from authentication.authentication import CookieJWTAuthentication, MultiRoleJWTAuthentication
+from authentication.authentication import CookieJWTAuthentication, MultiRoleJWTAuthentication, AgentTokenAuthentication
 
 
 logger = logging.getLogger(__name__)
@@ -293,8 +293,8 @@ class RecordTurnFromAgentView(APIView):
 
     Called by the LiveKit agent when a question+answer turn is completed.
     """
-
-    permission_classes = [IsAgentWithSharedSecret]
+    authentication_classes = [AgentTokenAuthentication] 
+    permission_classes = []
 
     def post(self, request, session_id: int):
         session = get_object_or_404(AIInterviewSession, pk=session_id)
@@ -378,7 +378,8 @@ class InterviewRuntimeStateView(APIView):
     Auth: X-Agent-Token header checked via IsAgentWithSharedSecret.
     """
 
-    permission_classes = [IsAgentWithSharedSecret]
+    authentication_classes = [AgentTokenAuthentication] 
+    permission_classes = []
 
     def _get_session_and_state(
         self, session_id: int

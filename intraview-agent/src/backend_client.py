@@ -83,6 +83,12 @@ from typing import Any, Mapping, Optional
 import httpx
 
 from config import get_backend_config
+import logging
+
+
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -93,20 +99,20 @@ class BackendClient:
 
     base_url: str
     shared_secret: str
-    _client: httpx.AsyncClient
+    client: httpx.AsyncClient
 
     @classmethod
     async def create(cls) -> "BackendClient":
         cfg = get_backend_config()
         client = httpx.AsyncClient(http2=True, timeout=10.0)
-        return cls(base_url=cfg.base_url, shared_secret=cfg.shared_secret, _client=client)
+        return cls(base_url=cfg.base_url, shared_secret=cfg.shared_secret, client=client)
 
     async def close(self):
-        await self._client.aclose()
+        await self.client.aclose()
 
     def _auth_headers(self) -> dict:
         return {
-            "Content-Type": "application/json",
+            # "Content-Type": "application/json",
             "X-Agent-Token": self.shared_secret,
         }
 
@@ -135,7 +141,7 @@ class BackendClient:
             "answer_text": answer_text,
             "metadata": dict(metadata),
         }
-        return await self._client.post(url, json=payload, headers=headers)
+        return await self.client.post(url, json=payload, headers=headers)
 
     async def load_runtime_state(self, session_id: int) -> Optional[dict]:
         """
@@ -148,7 +154,7 @@ class BackendClient:
         and continue with in-memory defaults.
         """
         url = f"{self.base_url}/api/ai-interview/session/{session_id}/runtime-state/"
-        resp = await self._client.get(url, headers=self._auth_headers())
+        resp = await self.client.get(url, headers=self._auth_headers())
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -171,6 +177,9 @@ class BackendClient:
         """
         url = f"{self.base_url}/api/ai-interview/session/{session_id}/runtime-state/"
         # We don't crash on 404 – allows backend to adopt this gradually.
-        resp = await self._client.patch(url, json=dict(payload), headers=self._auth_headers())
-        if resp.status_code >= 400 and resp.status_code != 404:
+        resp = await self.client.patch(url, json=dict(payload), headers=self._auth_headers())
+        if resp.status_code == 404:
+            logger.warning("update_runtime_state: endpoint not found for session %s", session_id)
+            return
+        if resp.status_code >= 400:
             resp.raise_for_status()
