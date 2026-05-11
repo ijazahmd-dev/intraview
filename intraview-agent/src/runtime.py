@@ -2084,11 +2084,14 @@ class InterviewRuntime:
                     "resume_false_interruption": True,
                     "discard_audio_if_uninterruptible": True,
                 },
+                # "preemptive_generation": {
+                #     "enabled": True,
+                #     "preemptive_tts": False,
+                #     "max_speech_duration": 8.0,
+                #     "max_retries": 1,
+                # },
                 "preemptive_generation": {
-                    "enabled": True,
-                    "preemptive_tts": False,
-                    "max_speech_duration": 8.0,
-                    "max_retries": 1,
+                    "enabled": False,
                 },
             },
         )
@@ -2318,14 +2321,24 @@ class InterviewRuntime:
                     await self._sync_runtime_state()
 
                 else:
-                    # Assistant filler / closing messages – forward as info or ignore.
-                    await self._send_data(
-                        {
-                            "type": "info",
-                            "reason": "assistant_message",
-                            "message": text,
-                        }
+                    # # Assistant filler / closing messages – forward as info or ignore.
+                    # await self._send_data(
+                    #     {
+                    #         "type": "info",
+                    #         "reason": "assistant_message",
+                    #         "message": text,
+                    #     }
+                    # )
+
+                    #replaced
+                    # Ignore assistant messages not explicitly initiated by runtime.
+                    # This prevents autonomous conversational continuation from
+                    # interfering with deterministic interview flow.
+                    logger.warning(
+                        "Ignoring autonomous assistant message: %s",
+                        text,
                     )
+                    return
                 return
 
             # ----------------------------------------------------------------
@@ -2528,13 +2541,13 @@ class InterviewRuntime:
         # Now increment turn_index (base question fully finalized).
         self.tm.mark_answer_received()
 
-        try:
-            self.state_machine.transition(InterviewState.PROCESSING)
-        except ValueError:
-            logger.warning(
-                "Illegal state transition to PROCESSING from %s",
-                self.state_machine.value.name,
-            )
+        # try:
+        #     self.state_machine.transition(InterviewState.PROCESSING)
+        # except ValueError:
+        #     logger.warning(
+        #         "Illegal state transition to PROCESSING from %s",
+        #         self.state_machine.value.name,
+        #     )
 
         await self._send_data(
             {
@@ -2574,11 +2587,15 @@ class InterviewRuntime:
             )
             await self._sync_runtime_state()
 
-            self._pending_generation_type = (
-                "FOLLOWUP"
-                if self.tm.state.is_followup_active
-                else "QUESTION"
-            )
+            # self._pending_generation_type = (
+            #     "FOLLOWUP"
+            #     if self.tm.state.is_followup_active
+            #     else "QUESTION"
+            # )
+
+            # Follow-up lifecycle is already closed at this point.
+            # Next generation is always a new base question.
+            self._pending_generation_type = "QUESTION"
             async with self._generation_lock:
                 await self.session.generate_reply(instructions=instr)
 
@@ -2786,20 +2803,27 @@ class InterviewRuntime:
                         "Do not add new information, hints, or commentary. "
                         "Respond with the question only."
                     )
-                    self._pending_generation_type = "QUESTION"
+                    self._pending_generation_type = (
+                        "FOLLOWUP"
+                        if self.tm.state.is_followup_active
+                        else "QUESTION"
+                    )
                     async with self._generation_lock:
                         await self.session.generate_reply(instructions=retry_instr)
                     await self._sync_runtime_state()
                     continue
 
-                # If still nothing after second window, skip with empty answer.
                 if self.tm.should_timeout_and_skip():
+
+                    skip_confirmed = False
+
                     async with self._turn_lock:
                         # Double-check after acquiring lock.
                         if not self.tm.has_pending_question():
                             continue
 
                         idx_1based = self.tm.current_turn_index_1based()
+
                         try:
                             self.state_machine.transition(InterviewState.SKIPPING)
                         except ValueError:
@@ -2817,17 +2841,18 @@ class InterviewRuntime:
                             }
                         )
 
-                        # [NEW] If timed out on a follow-up, skip the follow-up only
-                        # and finalize the base turn with what we have so far.
-                        # If timed out on the base question, finalize with empty answer.
+                        # If timed out on a follow-up, finalize using existing base answer.
                         if self.tm.state.is_followup_active:
-                            # Record the skipped follow-up as an empty answer.
                             self.tm.mark_followup_answer_received(answer_text="")
-
                             self.tm.mark_followup_phase_completed()
                             self._followup_phase_closed = True
 
-                        # Finalize the base turn regardless (follow-up or base timeout).
+                        skip_confirmed = True
+
+                    # IMPORTANT:
+                    # _finalize_base_turn() internally calls generate_reply().
+                    # Never run generation while holding _turn_lock.
+                    if skip_confirmed:
                         await self._finalize_base_turn(total_q)
 
         except asyncio.CancelledError:
@@ -2863,6 +2888,11 @@ def _build_interview_agent(cfg: InterviewConfig):
         - Do NOT introduce new topics on your own.
         - Always follow the exact instructions given to you for each question.
         - When asked to rephrase or clarify, stay strictly on the same topic.
+        - NEVER ask follow-up or clarifying questions on your own initiative.
+        - You will receive explicit runtime instructions whenever a follow-up is required.
+        - If no explicit instruction is given, remain silent after the candidate finishes speaking.
+        - Never continue the conversation autonomously.
+        - Never probe deeper unless explicitly instructed.
 
         Respond in plain text only. No lists, JSON, or formatting.
         """

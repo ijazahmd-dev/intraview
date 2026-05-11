@@ -441,6 +441,11 @@ class QuestionPlanner:
             - Does NOT give hints, coaching, or feedback.
             - Does NOT comment on whether previous answers were good or bad.
             - Does NOT mention question numbers or the word "question".
+            - Ask ONLY the requested interview question.
+            - Do NOT ask additional probing or clarifying questions.
+            - Do NOT continue the conversation after asking the question.
+            - Wait for runtime instructions before speaking again.
+            - Never autonomously continue the interview.
 
             Respond with the question as plain text only. No JSON, lists, or formatting.
             """
@@ -484,7 +489,7 @@ class QuestionPlanner:
             The candidate's answer so far:
             "{clipped_answer}"
 
-            The candidate's answer may be incomplete, vague, or lacking detail.
+            The candidate's answer may require ONE brief clarification.
 
             Ask ONLY ONE short clarifying question if absolutely necessary.
             Do NOT ask multiple questions.
@@ -501,6 +506,13 @@ class QuestionPlanner:
             - Do NOT say "follow-up" or mention question numbers.
             - Keep it concise, natural, and conversational.
             - Prefer clarification over interrogation.
+            - This is the ONLY follow-up question you should ask right now.
+            - After asking this clarification, stop speaking.
+            - Do NOT continue probing unless explicitly instructed again.
+            - Do NOT ask another follow-up automatically after the candidate answers.
+
+            Runtime controls interview flow.
+            You are only generating the single clarification question requested.
 
             Respond with the clarifying question as plain text only. No JSON, lists, or formatting.
             """
@@ -547,6 +559,10 @@ class QuestionPlanner:
             - Do NOT praise or criticize the candidate.
             - Do NOT mention question numbers.
             - Keep the question concise and natural.
+            - Do NOT continue discussing the previous answer.
+            - Do NOT ask clarification questions.
+            - Do NOT ask probing questions.
+            - Ask the next main question only, then stop speaking.
 
             Respond with ONLY the interview question as plain text.
             No JSON, markdown, lists, or formatting.

@@ -306,6 +306,14 @@ class TurnManager:
 
     def has_pending_question(self) -> bool:
         return self.state.waiting_for_answer and self.state.last_question_text is not None
+    
+    def current_prompt_kind(self) -> str:
+        """
+        Returns the currently active prompt type.
+
+        Used by runtime to correctly classify retries and lifecycle flow.
+        """
+        return "followup" if self.state.is_followup_active else "base"
 
     def should_retry_for_no_answer(self) -> bool:
         if not self.state.waiting_for_answer or self.state.no_answer_retry_used:
@@ -343,6 +351,7 @@ class TurnManager:
         return (
             not self.state.done
             and self.state.base_question_text is not None
+            and not self.state.followup_phase_completed
             and self.state.followup_count < max_followups
         )
     
@@ -352,6 +361,13 @@ class TurnManager:
         for the current base question.
         """
         return self.state.followup_count >= max_followups
+    
+    def followup_phase_is_closed(self) -> bool:
+        """
+        True once runtime has decided the follow-up phase
+        for this base question is permanently finished.
+        """
+        return self.state.followup_phase_completed
 
     def mark_followup_asked(self, question_text: str):
         """
@@ -369,6 +385,10 @@ class TurnManager:
         if self.state.base_question_text is None:
             raise RuntimeError(
                 "Cannot ask follow-up without an active base question."
+            )
+        if self.state.waiting_for_answer:
+            raise RuntimeError(
+                "Cannot ask follow-up while another prompt is still pending."
             )
         self.state.followup_count += 1
         self.state.is_followup_active = True
@@ -388,6 +408,10 @@ class TurnManager:
         - is_followup_active stays True until base question is finalized
           (so runtime knows a follow-up phase just completed).
         """
+        if not self.state.is_followup_active:
+            raise RuntimeError(
+                "Cannot record follow-up answer without active follow-up."
+            )
         self.state.followup_exchanges.append(
             {
                 "question": self.state.last_question_text or "",
@@ -422,6 +446,10 @@ class TurnManager:
         Stores the answer for backend metadata and clears waiting state.
         Does NOT call mark_answer_received() — runtime decides that later.
         """
+        if self.state.followup_phase_completed:
+            raise RuntimeError(
+                "Cannot record new base answer after follow-up phase is closed."
+            )
         self.state.base_answer_text = answer_text
         self.state.waiting_for_answer = False
         self.state.last_question_time = 0.0
@@ -436,6 +464,7 @@ class TurnManager:
             "base_question_text": self.state.base_question_text or "",
             "base_answer_text": self.state.base_answer_text,
             "followup_count": self.state.followup_count,
+            "followup_phase_completed": self.state.followup_phase_completed,
             "followup_exchanges": list(self.state.followup_exchanges),
         }
 
