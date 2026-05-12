@@ -83,6 +83,7 @@ from typing import Any, Mapping, Optional
 import httpx
 
 from config import get_backend_config
+import uuid
 import logging
 
 
@@ -100,20 +101,150 @@ class BackendClient:
     base_url: str
     shared_secret: str
     client: httpx.AsyncClient
+    runtime_id: str
 
     @classmethod
     async def create(cls) -> "BackendClient":
         cfg = get_backend_config()
         client = httpx.AsyncClient(http2=True, timeout=10.0)
-        return cls(base_url=cfg.base_url, shared_secret=cfg.shared_secret, client=client)
+        return cls(
+            base_url=cfg.base_url,
+            shared_secret=cfg.shared_secret,
+            client=client,
+            runtime_id=str(uuid.uuid4()),
+        )
 
     async def close(self):
         await self.client.aclose()
+
+
+    async def acquire_runtime_ownership(
+        self,
+        session_id: int,
+    ) -> dict:
+        """
+        Attempt to acquire runtime ownership for this interview session.
+
+        Backend decides:
+        - whether ownership is granted
+        - whether an old runtime is stale
+        - whether this runtime replaces another runtime
+        """
+
+        url = (
+            f"{self.base_url}/api/ai-interview/"
+            f"session/{session_id}/runtime-ownership/acquire/"
+        )
+
+        payload = {
+            "runtime_id": self.runtime_id,
+        }
+
+        resp = await self.client.post(
+            url,
+            json=payload,
+            headers=self._auth_headers(),
+        )
+
+        resp.raise_for_status()
+        return resp.json()
+
+
+    async def heartbeat_runtime(
+        self,
+        session_id: int,
+    ) -> dict:
+        """
+        Send runtime heartbeat to backend.
+
+        Backend uses this to:
+        - detect stale runtimes
+        - maintain ownership lease
+        - invalidate dead workers
+        """
+
+        url = (
+            f"{self.base_url}/api/ai-interview/"
+            f"session/{session_id}/runtime-ownership/heartbeat/"
+        )
+
+        payload = {
+            "runtime_id": self.runtime_id,
+        }
+
+        resp = await self.client.post(
+            url,
+            json=payload,
+            headers=self._auth_headers(),
+        )
+
+        resp.raise_for_status()
+        return resp.json()
+
+
+    async def validate_runtime_ownership(
+        self,
+        session_id: int,
+    ) -> bool:
+        """
+        Check whether THIS runtime still owns the interview session.
+
+        If backend returns false:
+        - runtime must immediately shut down
+        """
+
+        url = (
+            f"{self.base_url}/api/ai-interview/"
+            f"session/{session_id}/runtime-ownership/validate/"
+        )
+
+        resp = await self.client.get(
+            url,
+            headers=self._auth_headers(),
+        )
+
+        if resp.status_code == 404:
+            return True
+
+        resp.raise_for_status()
+
+        data = resp.json()
+        return bool(data.get("is_owner", True))
+
+    async def release_runtime_ownership(
+        self,
+        session_id: int,
+    ) -> None:
+        """
+        Release runtime ownership during graceful shutdown.
+        """
+
+        url = (
+            f"{self.base_url}/api/ai-interview/"
+            f"session/{session_id}/runtime-ownership/release/"
+        )
+
+        payload = {
+            "runtime_id": self.runtime_id,
+        }
+
+        try:
+            await self.client.post(
+                url,
+                json=payload,
+                headers=self._auth_headers(),
+            )
+        except Exception:
+            logger.exception(
+                "Failed to release runtime ownership: session_id=%s",
+                session_id,
+            )    
 
     def _auth_headers(self) -> dict:
         return {
             # "Content-Type": "application/json",
             "X-Agent-Token": self.shared_secret,
+            "X-Runtime-Id": self.runtime_id,
         }
 
     async def post_turn(

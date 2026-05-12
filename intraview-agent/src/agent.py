@@ -651,6 +651,7 @@
 
 # src/agent.py
 
+import asyncio
 import logging
 
 from dotenv import load_dotenv
@@ -676,11 +677,66 @@ server.setup_fnc = prewarm
 
 @server.rtc_session(agent_name="intraview-agent")
 async def my_agent(ctx: JobContext):
+
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
-    runtime = InterviewRuntime(ctx)
-    await runtime.run()
+
+    runtime = None
+
+    try:
+
+        logger.info(
+            "Starting interview runtime: room=%s",
+            ctx.room.name,
+        )
+
+        runtime = InterviewRuntime(ctx)
+
+        await runtime.run()
+
+        logger.info(
+            "Interview runtime completed cleanly: room=%s",
+            ctx.room.name,
+        )
+
+    except asyncio.CancelledError:
+
+        logger.warning(
+            "Interview runtime cancelled: room=%s",
+            ctx.room.name,
+        )
+
+        raise
+
+    except Exception:
+
+        logger.exception(
+            "Fatal runtime error: room=%s",
+            ctx.room.name,
+        )
+
+        raise
+
+    finally:
+
+        if runtime is not None:
+
+            try:
+
+                logger.info(
+                    "Shutting down runtime: room=%s",
+                    ctx.room.name,
+                )
+
+                await runtime.shutdown()
+
+            except Exception:
+
+                logger.exception(
+                    "Runtime shutdown failed: room=%s",
+                    ctx.room.name,
+                )
 
 
 if __name__ == "__main__":

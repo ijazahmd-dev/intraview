@@ -16,7 +16,13 @@ urlpatterns = [
     path("session/<int:pk>/end/",views.AIInterviewSessionEndAPIView.as_view(),name="ai-session-end",),
     path("ping/",views.PingAPIView.as_view(),name="ai-ping",),
     path("session/<int:session_id>/turns/",views.RecordTurnFromAgentView.as_view(),name="ai-interview-record-turn",),
+
     path("session/<int:session_id>/runtime-state/",views.InterviewRuntimeStateView.as_view(),name="ai-interview-runtime-state",),
+    path("session/<int:session_id>/runtime-ownership/acquire/",views.AcquireRuntimeOwnershipView.as_view(),name="ai-interview-runtime-acquire",),
+    path("session/<int:session_id>/runtime-ownership/heartbeat/",views.RuntimeHeartbeatView.as_view(),name="ai-interview-runtime-heartbeat",),
+    path("session/<int:session_id>/runtime-ownership/validate/",views.ValidateRuntimeOwnershipView.as_view(),name="ai-interview-runtime-validate",),
+    path("session/<int:session_id>/runtime-ownership/release/",views.ReleaseRuntimeOwnershipView.as_view(),name="ai-interview-runtime-release",),
+    
     path("session/<int:pk>/",views.AIInterviewSessionDetailAPIView.as_view(),name="ai-session-detail",),
     path("session/<int:pk>/report/",views.AIInterviewFinalReportAPIView.as_view(),name="ai-session-report",),
     path("turns/<int:turn_id>/evaluation/", views.AIInterviewTurnEvaluationDetailAPIView.as_view(), name="ai-turn-evaluation-detail"),

@@ -1872,8 +1872,13 @@ from livekit.plugins import ai_coustics, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from backend_client import BackendClient
+from runtime_guard import RuntimeGuard, RuntimeOwnershipLost
 from config import get_interview_defaults
-from constants import TIMEOUT_LOOP_INTERVAL_SECONDS, MAX_FOLLOWUPS_PER_QUESTION  # [NEW] MAX_FOLLOWUPS_PER_QUESTION
+from constants import (
+    TIMEOUT_LOOP_INTERVAL_SECONDS,
+    MAX_FOLLOWUPS_PER_QUESTION,
+    ASSISTANT_GENERATION_TIMEOUT_SECONDS,
+)
 from planner import InterviewConfig, QuestionPlanner
 from state import InterviewState, StateMachine
 from turn_manager import TurnManager
@@ -1910,9 +1915,11 @@ class InterviewRuntime:
         self.planner: Optional[QuestionPlanner] = None
         self.tm: Optional[TurnManager] = None
         self.backend: Optional[BackendClient] = None
+        self.runtime_guard: Optional[RuntimeGuard] = None
 
         self.session: Optional[AgentSession] = None
         self.timeout_task: Optional[asyncio.Task] = None
+        self.heartbeat_task: Optional[asyncio.Task] = None
 
         # Track when interview started (for duration enforcement)
         self._start_time_monotonic: Optional[float] = None
@@ -1933,6 +1940,20 @@ class InterviewRuntime:
         # Hard runtime guard that prevents recursive follow-up generation.
         # Once True for a base question, runtime will never ask another follow-up.
         self._followup_phase_closed: bool = False
+
+        # True while a generate_reply() call is actively running.
+        # Prevents overlapping generation requests.
+        self._generation_in_progress: bool = False
+
+        # Runtime lifecycle guard.
+        # Prevents stale/zombie callbacks after shutdown or fatal failure.
+        self._runtime_alive: bool = True
+
+        # Prevent duplicate shutdown execution.
+        self._shutdown_started: bool = False
+
+        # Background tasks owned by runtime.
+        self._background_tasks: set[asyncio.Task] = set()
 
     # ---------- initialization helpers ----------
 
@@ -2036,6 +2057,112 @@ class InterviewRuntime:
             # Log but do not crash runtime on sync failure.
             logger.exception("Failed to sync runtime state to backend")
 
+
+
+
+    
+    async def _safe_generate_reply(
+        self,
+        *,
+        instructions: str,
+        generation_type: str,
+    ):
+        """
+        Centralized protected wrapper around session.generate_reply().
+
+        Prevents:
+        - overlapping generation
+        - permanent deadlocks
+        - stuck generation locks
+        - stale pending generation state
+        - silent provider hangs
+        """
+
+        assert self.session is not None
+        assert self.cfg is not None
+
+        if not self._runtime_alive:
+            logger.warning(
+                "Skipping generation because runtime is no longer alive."
+            )
+            return
+        
+        if self.runtime_guard:
+            await self.runtime_guard.ensure_runtime_valid()
+
+        async with self._generation_lock:
+
+            if self._generation_in_progress:
+                logger.warning(
+                    "Skipping overlapping generation request: session_id=%s",
+                    self.cfg.session_id,
+                )
+                return
+
+            self._generation_in_progress = True
+            self._pending_generation_type = generation_type
+
+            try:
+                logger.info(
+                    "Starting generation: session_id=%s type=%s",
+                    self.cfg.session_id,
+                    generation_type,
+                )
+
+                await asyncio.wait_for(
+                    self.session.generate_reply(
+                        instructions=instructions
+                    ),
+                    timeout=ASSISTANT_GENERATION_TIMEOUT_SECONDS,
+                )
+
+                logger.info(
+                    "Generation completed: session_id=%s type=%s",
+                    self.cfg.session_id,
+                    generation_type,
+                )
+
+            except asyncio.TimeoutError:
+                logger.exception(
+                    "Generation timeout: session_id=%s type=%s",
+                    self.cfg.session_id,
+                    generation_type,
+                )
+
+
+                await self._send_data(
+                    {
+                        "type": "info",
+                        "reason": "generation_timeout",
+                        "message": (
+                            "The interviewer response timed out. "
+                            "Continuing interview..."
+                        ),
+                    }
+                )
+
+            except Exception:
+                logger.exception(
+                    "Generation failed: session_id=%s type=%s",
+                    self.cfg.session_id,
+                    generation_type,
+                )
+
+
+                await self._send_data(
+                    {
+                        "type": "info",
+                        "reason": "generation_failure",
+                        "message": (
+                            "The interviewer encountered an issue. "
+                            "Recovering..."
+                        ),
+                    }
+                )
+
+            finally:
+                self._generation_in_progress = False        
+
     # ---------- main entry ----------
 
     async def run(self):
@@ -2049,6 +2176,15 @@ class InterviewRuntime:
         """
         self.cfg = self._build_config_from_metadata()
         self.backend = await BackendClient.create()
+        # Runtime ownership guard.
+        # Prevents duplicate/zombie interview agents.
+        self.runtime_guard = RuntimeGuard(
+            backend=self.backend,
+            session_id=self.cfg.session_id,
+        )
+
+        # Acquire ownership BEFORE interview starts.
+        await self.runtime_guard.start()
         self.planner = QuestionPlanner(self.cfg)
 
         total_q = self.planner.total_questions()
@@ -2107,24 +2243,25 @@ class InterviewRuntime:
         try:
             await self._start_session_and_ask_first()
             self.timeout_task = asyncio.create_task(self._timeout_loop())
+            self._background_tasks.add(self.timeout_task)
+            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            self._background_tasks.add(self.heartbeat_task)
             await self.ctx.connect()
         except asyncio.CancelledError:
             # Propagate cancellation cleanly.
             raise
+        except RuntimeOwnershipLost:
+            logger.error(
+                "Runtime ownership lost for session %s",
+                self.cfg.session_id if self.cfg else None,
+            )
+
+            self._runtime_alive = False
+
         except Exception:
             logger.exception("InterviewRuntime failed")
         finally:
-            if self.timeout_task:
-                self.timeout_task.cancel()
-                try:
-                    await self.timeout_task
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    logger.exception("Timeout task failed during shutdown")
-
-            if self.backend:
-                await self.backend.close()
+            await self.shutdown()
 
     async def _load_existing_runtime_state(self):
         """
@@ -2172,9 +2309,37 @@ class InterviewRuntime:
             self._followup_phase_closed = True
             return False
 
-        text = (answer_text or "").strip()
+        # Evaluate the COMPLETE accumulated answer instead of
+        # only the latest response fragment.
+        #
+        # This prevents recursive follow-ups when the candidate
+        # gradually answers across multiple turns.
+
+        if self.tm.state.followup_exchanges:
+            combined_parts = [
+                self.tm.state.base_answer_text,
+                *[
+                    ex["answer"]
+                    for ex in self.tm.state.followup_exchanges
+                    if ex.get("answer")
+                ],
+            ]
+
+            text = " ".join(
+                part.strip()
+                for part in combined_parts
+                if part and part.strip()
+            )
+
+        else:
+            text = (answer_text or "").strip()
+
         if not text:
             return False
+
+        word_count = len(
+            re.findall(r"\b[\w'-]+\b", text)
+        )
 
         lower = text.lower()
         refusal_markers = (
@@ -2196,11 +2361,10 @@ class InterviewRuntime:
         if any(m in lower for m in refusal_markers):
             return False
 
-        word_count = len(re.findall(r"\b[\w'-]+\b", text))
 
 
         # Extremely short answers usually need clarification.
-        if word_count < 12:
+        if word_count < 20:
             return True
 
         vague_markers = (
@@ -2227,6 +2391,8 @@ class InterviewRuntime:
         assert self.tm is not None
 
         async def _handle_item(ev: ConversationItemAddedEvent):
+            if not self._runtime_alive:
+                return
             item = ev.item
             role = getattr(item, "role", None)
             text = getattr(item, "text", None)
@@ -2422,6 +2588,11 @@ class InterviewRuntime:
                         should_followup = self._should_ask_followup(answer_text)
 
                 try:
+                    if self.tm.followup_budget_exhausted(
+                        MAX_FOLLOWUPS_PER_QUESTION
+                    ):
+                        should_followup = False
+
                     if should_followup:
                         await self._ask_followup(total_q)
                     else:
@@ -2435,7 +2606,15 @@ class InterviewRuntime:
 
         @self.session.on("conversation_item_added")
         def _on_item(ev: ConversationItemAddedEvent):
-            asyncio.create_task(_handle_item(ev))
+
+            task = asyncio.create_task(_handle_item(ev))
+
+            self._background_tasks.add(task)
+
+            def _cleanup_task(t: asyncio.Task):
+                self._background_tasks.discard(t)
+
+            task.add_done_callback(_cleanup_task)
 
     # ---------- follow-up helper (NEW) ----------
 
@@ -2448,6 +2627,27 @@ class InterviewRuntime:
         assert self.planner is not None
         assert self.tm is not None
         assert self.cfg is not None
+
+        # Runtime already finalized follow-up phase.
+        # Never allow re-entry.
+        if self.tm.state.followup_phase_completed:
+            logger.warning(
+                "Blocked follow-up generation because phase is closed."
+            )
+            return
+
+        # Hard follow-up budget enforcement.
+        if not self.tm.can_ask_followup(
+            MAX_FOLLOWUPS_PER_QUESTION
+        ):
+            logger.warning(
+                "Blocked follow-up generation because budget exhausted."
+            )
+
+            self.tm.mark_followup_phase_completed()
+            self._followup_phase_closed = True
+
+            return
 
         idx = self.tm.current_turn_index_0based()
         base_q = self.planner.base_question_for_turn(idx)
@@ -2486,9 +2686,10 @@ class InterviewRuntime:
             }
         )
 
-        self._pending_generation_type = "FOLLOWUP"
-        async with self._generation_lock:
-            await self.session.generate_reply(instructions=instr)
+        await self._safe_generate_reply(
+            instructions=instr,
+            generation_type="FOLLOWUP",
+        )
 
     # ---------- base turn finalization (NEW) ----------
 
@@ -2593,11 +2794,10 @@ class InterviewRuntime:
             #     else "QUESTION"
             # )
 
-            # Follow-up lifecycle is already closed at this point.
-            # Next generation is always a new base question.
-            self._pending_generation_type = "QUESTION"
-            async with self._generation_lock:
-                await self.session.generate_reply(instructions=instr)
+            await self._safe_generate_reply(
+                instructions=instr,
+                generation_type="QUESTION",
+            )
 
         else:
             # All base questions done.
@@ -2702,10 +2902,62 @@ class InterviewRuntime:
         )
         await self._sync_runtime_state()
 
-        # Mark that we expect the next assistant message to be a question.
-        self._pending_generation_type = "QUESTION"
-        async with self._generation_lock:
-            await self.session.generate_reply(instructions=instr)
+        await self._safe_generate_reply(
+            instructions=instr,
+            generation_type="QUESTION",
+        )
+
+
+
+    async def _heartbeat_loop(self):
+        """
+        Periodically renew runtime ownership lease.
+
+        Prevents backend from treating this runtime as stale.
+        """
+
+        assert self.backend is not None
+        assert self.cfg is not None
+
+        try:
+
+            while self._runtime_alive:
+
+                await asyncio.sleep(5)
+
+                if not self._runtime_alive:
+                    return
+
+                try:
+                    await self.backend.heartbeat_runtime(
+                        self.cfg.session_id
+                    )
+
+                except RuntimeOwnershipLost:
+                    raise
+
+                except Exception:
+                    logger.exception(
+                        "Runtime heartbeat failed: session_id=%s",
+                        self.cfg.session_id,
+                    )
+
+        except asyncio.CancelledError:
+            raise
+
+        except RuntimeOwnershipLost:
+            logger.error(
+                "Runtime ownership lost during heartbeat: session_id=%s",
+                self.cfg.session_id,
+            )
+
+            self._runtime_alive = False
+
+        except Exception:
+            logger.exception(
+                "Heartbeat loop crashed"
+            )
+
 
     # ---------- timeout loop ----------
 
@@ -2803,13 +3055,14 @@ class InterviewRuntime:
                         "Do not add new information, hints, or commentary. "
                         "Respond with the question only."
                     )
-                    self._pending_generation_type = (
-                        "FOLLOWUP"
-                        if self.tm.state.is_followup_active
-                        else "QUESTION"
+                    await self._safe_generate_reply(
+                        instructions=retry_instr,
+                        generation_type=(
+                            "FOLLOWUP"
+                            if self.tm.state.is_followup_active
+                            else "QUESTION"
+                        ),
                     )
-                    async with self._generation_lock:
-                        await self.session.generate_reply(instructions=retry_instr)
                     await self._sync_runtime_state()
                     continue
 
@@ -2864,6 +3117,127 @@ class InterviewRuntime:
             except Exception:
                 pass
             await self._sync_runtime_state()
+
+
+
+    async def shutdown(self):
+            """
+            Graceful runtime shutdown.
+
+            Safe to call multiple times.
+            """
+
+            if self._shutdown_started:
+                return
+
+            self._shutdown_started = True
+
+            logger.info(
+                "Runtime shutdown starting: session_id=%s",
+                self.cfg.session_id if self.cfg else None,
+            )
+
+            self._runtime_alive = False
+
+            #
+            # Cancel background tasks
+            #
+            for task in list(self._background_tasks):
+
+                if task.done():
+                    continue
+
+                task.cancel()
+
+            for task in list(self._background_tasks):
+
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.exception(
+                        "Background task failed during shutdown"
+                    )
+
+            self._background_tasks.clear()
+
+            #
+            # Stop heartbeat task
+            #
+            if self.heartbeat_task:
+
+                if not self.heartbeat_task.done():
+                    self.heartbeat_task.cancel()
+
+                try:
+                    await self.heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.exception(
+                        "Heartbeat task shutdown failure"
+                    )
+
+            #
+            # Stop timeout task
+            #
+            if self.timeout_task:
+
+                if not self.timeout_task.done():
+                    self.timeout_task.cancel()
+
+                try:
+                    await self.timeout_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.exception(
+                        "Timeout task shutdown failure"
+                    )
+
+            #
+            # Stop runtime guard
+            #
+            if self.runtime_guard:
+
+                try:
+                    await self.runtime_guard.stop()
+                except Exception:
+                    logger.exception(
+                        "Runtime guard shutdown failed"
+                    )
+
+            #
+            # Release ownership
+            #
+            if self.backend and self.cfg:
+
+                try:
+                    await self.backend.release_runtime_ownership(
+                        self.cfg.session_id
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed releasing runtime ownership"
+                    )
+
+            #
+            # Close backend client
+            #
+            if self.backend:
+
+                try:
+                    await self.backend.close()
+                except Exception:
+                    logger.exception(
+                        "Backend close failed"
+                    )
+
+            logger.info(
+                "Runtime shutdown completed: session_id=%s",
+                self.cfg.session_id if self.cfg else None,
+            )            
 
 
 def _build_interview_agent(cfg: InterviewConfig):

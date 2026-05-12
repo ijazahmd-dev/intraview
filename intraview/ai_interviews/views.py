@@ -8,6 +8,8 @@ import logging
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import status, permissions
+from django.utils import timezone
+from datetime import timedelta
 
 from .models import AIInterviewSession, InterviewRuntimeState, AIInterviewFinalReport, AIInterviewTurn
 from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer, AIInterviewFinalReportSerializer, AIInterviewTurnEvaluationDetailSerializer, AIInterviewTurnWithEvaluationSerializer
@@ -362,11 +364,64 @@ class RecordTurnFromAgentView(APIView):
 
 
 
+RUNTIME_LEASE_SECONDS = 20
 
 
 
 
-class InterviewRuntimeStateView(APIView):
+
+
+
+class RuntimeOwnershipMixin:
+    """
+    Shared helpers for runtime ownership / lease management.
+    """
+
+    def _runtime_id(self, request) -> str:
+        return request.headers.get("X-Runtime-Id", "").strip()
+
+    def _lease_expired(self, state: InterviewRuntimeState) -> bool:
+        if not state.runtime_lease_expires_at:
+            return True
+
+        return timezone.now() >= state.runtime_lease_expires_at
+
+    def _extend_lease(self, state: InterviewRuntimeState):
+        now = timezone.now()
+
+        state.last_runtime_heartbeat_at = now
+        state.runtime_lease_expires_at = (
+            now + timedelta(seconds=RUNTIME_LEASE_SECONDS)
+        )
+
+    def _validate_runtime_ownership(
+        self,
+        request,
+        state: InterviewRuntimeState,
+    ) -> tuple[bool, str]:
+
+        runtime_id = self._runtime_id(request)
+
+        if not runtime_id:
+            return False, "Missing X-Runtime-Id header."
+
+        if not state.active_runtime_id:
+            return False, "No active runtime owner."
+
+        if state.active_runtime_id != runtime_id:
+            return False, "Runtime ownership mismatch."
+
+        if self._lease_expired(state):
+            return False, "Runtime lease expired."
+
+        return True, ""
+    
+
+
+
+
+
+class InterviewRuntimeStateView(RuntimeOwnershipMixin, APIView):
     """
     GET/PATCH /api/ai-interview/session/<session_id>/runtime-state/
 
@@ -402,6 +457,19 @@ class InterviewRuntimeStateView(APIView):
 
     def patch(self, request, session_id: int, *args, **kwargs):
         session, state = self._get_session_and_state(session_id)
+
+        is_valid_owner, reason = self._validate_runtime_ownership(
+            request,
+            state,
+        )
+
+        if not is_valid_owner:
+            return Response(
+                {
+                    "detail": reason,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         serializer = InterviewRuntimeStateUpdateSerializer(
             data=request.data, partial=True
@@ -443,6 +511,227 @@ class InterviewRuntimeStateView(APIView):
 
         return Response(
             InterviewRuntimeStateSerializer(state).data,
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+
+
+
+class AcquireRuntimeOwnershipView(
+    RuntimeOwnershipMixin,
+    APIView,
+):
+    """
+    Acquire runtime ownership for an interview session.
+    """
+
+    authentication_classes = [AgentTokenAuthentication]
+    permission_classes = []
+
+    def post(self, request, session_id: int, *args, **kwargs):
+
+        session = get_object_or_404(
+            AIInterviewSession,
+            pk=session_id,
+        )
+
+        state, _ = InterviewRuntimeState.objects.get_or_create(
+            session=session,
+            defaults={
+                "current_turn_index": 0,
+                "waiting_for_answer": False,
+                "current_state": "INITIALIZING",
+            },
+        )
+
+        runtime_id = self._runtime_id(request)
+
+        if not runtime_id:
+            return Response(
+                {"detail": "Missing X-Runtime-Id header."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ownership_granted = False
+
+        if not state.active_runtime_id:
+            ownership_granted = True
+
+        elif state.active_runtime_id == runtime_id:
+            ownership_granted = True
+
+        elif self._lease_expired(state):
+            logger.warning(
+                "Stealing stale runtime ownership: "
+                "session_id=%s old_runtime=%s new_runtime=%s",
+                session_id,
+                state.active_runtime_id,
+                runtime_id,
+            )
+            ownership_granted = True
+
+        if ownership_granted:
+
+            if state.active_runtime_id != runtime_id:
+                state.runtime_generation += 1
+
+            state.active_runtime_id = runtime_id
+
+            self._extend_lease(state)
+
+            state.save()
+
+            return Response(
+                {
+                    "is_owner": True,
+                    "runtime_generation": state.runtime_generation,
+                    "lease_expires_at": state.runtime_lease_expires_at,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "is_owner": False,
+                "active_runtime_id": state.active_runtime_id,
+                "runtime_generation": state.runtime_generation,
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+
+
+
+
+
+class RuntimeHeartbeatView(
+    RuntimeOwnershipMixin,
+    APIView,
+):
+    """
+    Runtime heartbeat endpoint.
+    """
+
+    authentication_classes = [AgentTokenAuthentication]
+    permission_classes = []
+
+    def post(self, request, session_id: int, *args, **kwargs):
+
+        session = get_object_or_404(
+            AIInterviewSession,
+            pk=session_id,
+        )
+
+        state = get_object_or_404(
+            InterviewRuntimeState,
+            session=session,
+        )
+
+        is_valid_owner, reason = self._validate_runtime_ownership(
+            request,
+            state,
+        )
+
+        if not is_valid_owner:
+            return Response(
+                {"detail": reason},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        self._extend_lease(state)
+
+        state.save()
+
+        return Response(
+            {
+                "ok": True,
+                "lease_expires_at": state.runtime_lease_expires_at,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+
+
+
+class ValidateRuntimeOwnershipView(
+    RuntimeOwnershipMixin,
+    APIView,
+):
+    """
+    Validate whether THIS runtime still owns the interview session.
+    """
+
+    authentication_classes = [AgentTokenAuthentication]
+    permission_classes = []
+
+    def get(self, request, session_id: int, *args, **kwargs):
+
+        session = get_object_or_404(
+            AIInterviewSession,
+            pk=session_id,
+        )
+
+        state = get_object_or_404(
+            InterviewRuntimeState,
+            session=session,
+        )
+
+        is_valid_owner, _reason = self._validate_runtime_ownership(
+            request,
+            state,
+        )
+
+        return Response(
+            {
+                "is_owner": is_valid_owner,
+                "runtime_generation": state.runtime_generation,
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+
+
+
+
+
+class ReleaseRuntimeOwnershipView(
+    RuntimeOwnershipMixin,
+    APIView,
+):
+    """
+    Release runtime ownership gracefully.
+    """
+
+    authentication_classes = [AgentTokenAuthentication]
+    permission_classes = []
+
+    def post(self, request, session_id: int, *args, **kwargs):
+
+        session = get_object_or_404(
+            AIInterviewSession,
+            pk=session_id,
+        )
+
+        state = get_object_or_404(
+            InterviewRuntimeState,
+            session=session,
+        )
+
+        runtime_id = self._runtime_id(request)
+
+        if state.active_runtime_id == runtime_id:
+
+            state.active_runtime_id = ""
+            state.runtime_lease_expires_at = None
+            state.last_runtime_heartbeat_at = None
+
+            state.save()
+
+        return Response(
+            {"released": True},
             status=status.HTTP_200_OK,
         )
     

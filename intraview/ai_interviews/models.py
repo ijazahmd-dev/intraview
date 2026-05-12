@@ -362,6 +362,34 @@ class InterviewRuntimeState(models.Model):
     # Optional: LiveKit agent session / job id for observability/debugging
     agent_session_id = models.CharField(max_length=64, blank=True)
 
+    # Which runtime currently owns this interview session.
+    #
+    # Prevents multiple LiveKit runtimes from simultaneously controlling
+    # the same interview after reconnects or worker failures.
+    active_runtime_id = models.CharField(max_length=128, blank=True)
+
+    # Incrementing ownership generation number.
+    #
+    # Every time ownership changes, generation increments.
+    # Helps stale runtimes detect they are no longer valid.
+    runtime_generation = models.PositiveIntegerField(default=0)
+
+    # Last heartbeat received from the owning runtime.
+    last_runtime_heartbeat_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    # Lease expiration timestamp for runtime ownership.
+    #
+    # If current time exceeds this:
+    # - runtime is considered stale/dead
+    # - new runtime may safely acquire ownership
+    runtime_lease_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         verbose_name = "Interview runtime state"
         verbose_name_plural = "Interview runtime states"

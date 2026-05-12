@@ -267,6 +267,10 @@ class InterviewRuntimeStateSerializer(serializers.ModelSerializer):
             "reconnect_grace_until",
             "disconnect_count",
             "agent_session_id",
+            "active_runtime_id",
+            "runtime_generation",
+            "last_runtime_heartbeat_at",
+            "runtime_lease_expires_at",
         ]
 
 
@@ -289,6 +293,21 @@ class InterviewRuntimeStateUpdateSerializer(serializers.Serializer):
     disconnect_count = serializers.IntegerField(required=False, min_value=0)
     agent_session_id = serializers.CharField(
         required=False, allow_blank=True, max_length=64
+    )
+    active_runtime_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=128,
+    )
+
+    runtime_generation = serializers.IntegerField(
+        required=False,
+        min_value=0,
+    )
+
+    runtime_lease_expires_at = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
     )
 
 

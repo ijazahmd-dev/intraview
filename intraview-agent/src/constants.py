@@ -1,7 +1,7 @@
 # intraview_agent/constants.py
 
 """
-Centralized constants for the agent runtime.
+
 
 This file prevents scattering magic numbers across the codebase.
 """
@@ -46,6 +46,19 @@ FOLLOWUP_MIN_ANSWER_CHARS: int = 80
 # exceed this total number of clarification attempts.
 ABSOLUTE_MAX_FOLLOWUP_GENERATIONS: int = 2
 
+# Maximum total assistant follow-up events allowed
+# for a single base question INCLUDING unexpected
+# autonomous assistant generations.
+#
+# This is a final hard safety ceiling.
+MAX_TOTAL_ASSISTANT_FOLLOWUP_EVENTS: int = 3
+
+# Maximum number of duplicate user transcript events
+# tolerated for the same pending prompt.
+#
+# Helps protect against repeated STT emissions.
+MAX_DUPLICATE_TRANSCRIPT_EVENTS: int = 2
+
 # Maximum number of unexpected autonomous assistant messages
 # tolerated before runtime forcefully suppresses further processing.
 #
@@ -59,3 +72,32 @@ MAX_NO_ANSWER_RETRIES: int = 1
 # Maximum time allowed for assistant response generation
 # before runtime considers generation stalled.
 ASSISTANT_GENERATION_TIMEOUT_SECONDS: float = 20.0
+
+RUNTIME_LEASE_SECONDS: int = 20
+
+# How frequently runtime heartbeats are sent.
+#
+# Must always be LOWER than lease duration.
+RUNTIME_HEARTBEAT_INTERVAL_SECONDS: float = 5.0
+
+# Maximum number of consecutive heartbeat failures
+# before runtime shuts itself down defensively.
+MAX_HEARTBEAT_FAILURES: int = 3
+
+# Maximum consecutive assistant generation failures allowed
+# before runtime forcefully shuts down the interview session.
+#
+# Prevents zombie/stuck interview agents from lingering forever.
+MAX_CONSECUTIVE_GENERATION_FAILURES: int = 3
+
+# Maximum number of concurrent in-flight generation
+# requests allowed at runtime.
+#
+# Prevents overlapping generate_reply() storms.
+MAX_CONCURRENT_GENERATIONS: int = 1
+
+# Safety timeout for turn finalization lock ownership.
+#
+# Prevents permanently stuck finalization state if
+# runtime crashes mid-finalize.
+TURN_FINALIZATION_TIMEOUT_SECONDS: float = 15.0

@@ -216,6 +216,14 @@ class TurnState:
     last_question_time: float = 0.0
     no_answer_retry_used: bool = False
     done: bool = False
+    # True once current base turn is entering finalization.
+    #
+    # Prevents duplicate finalize/post operations caused by:
+    # - timeout races
+    # - duplicate transcript callbacks
+    # - overlapping async tasks
+    is_finalizing_turn: bool = False
+
 
     # --- Follow-up sub-state (scoped to current base question) ---
     # Stores the original base question text for backend metadata.
@@ -276,6 +284,7 @@ class TurnManager:
         self.state.is_followup_active = False
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
+        self.state.is_finalizing_turn = False
 
         self.state.last_question_text = question_text
         self.state.waiting_for_answer = True
@@ -294,6 +303,7 @@ class TurnManager:
         self.state.last_question_text = None
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
+        self.state.is_finalizing_turn = False
 
         if self.state.turn_index >= self.total_questions:
             self.state.done = True
@@ -306,6 +316,26 @@ class TurnManager:
 
     def has_pending_question(self) -> bool:
         return self.state.waiting_for_answer and self.state.last_question_text is not None
+    
+    def try_begin_turn_finalization(self) -> bool:
+        """
+        Atomically marks current turn as entering finalization.
+
+        Returns:
+        - True  -> caller owns finalization
+        - False -> another coroutine already finalized
+
+        Prevents:
+        - duplicate backend turn posts
+        - double question advancement
+        - timeout/transcript races
+        """
+
+        if self.state.is_finalizing_turn:
+            return False
+
+        self.state.is_finalizing_turn = True
+        return True
     
     def current_prompt_kind(self) -> str:
         """
@@ -350,6 +380,7 @@ class TurnManager:
         """
         return (
             not self.state.done
+            and not self.state.is_finalizing_turn
             and self.state.base_question_text is not None
             and not self.state.followup_phase_completed
             and self.state.followup_count < max_followups
@@ -446,6 +477,10 @@ class TurnManager:
         Stores the answer for backend metadata and clears waiting state.
         Does NOT call mark_answer_received() — runtime decides that later.
         """
+        if self.state.base_answer_text.strip():
+            raise RuntimeError(
+                "Base answer already recorded for current turn."
+            )
         if self.state.followup_phase_completed:
             raise RuntimeError(
                 "Cannot record new base answer after follow-up phase is closed."
@@ -482,3 +517,4 @@ class TurnManager:
         self.state.is_followup_active = False
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
+        self.state.is_finalizing_turn = False
