@@ -23,7 +23,7 @@ def extract_json_object(text: str) -> Dict[str, Any]:
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
 
-        if lines and lines.startswith("```"):
+        if lines and lines[0].startswith("```"):
             lines = lines[1:]
 
         if lines and lines[-1].startswith("```"):

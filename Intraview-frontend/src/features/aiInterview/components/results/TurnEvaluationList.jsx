@@ -13,10 +13,9 @@ import { ScoreRing } from "./ScoreRing";
  */
 function splitLines(str) {
   if (!str) return [];
-  return str
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  if (Array.isArray(str)) return str.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof str === "string") return str.split("\n").map((s) => s.trim()).filter(Boolean);
+  return [];
 }
 
 export function TurnEvaluationList({ turns }) {

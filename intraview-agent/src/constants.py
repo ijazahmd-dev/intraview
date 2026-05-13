@@ -7,7 +7,7 @@ This file prevents scattering magic numbers across the codebase.
 """
 
 # How long to wait for a candidate answer before a gentle retry.
-NO_ANSWER_TIMEOUT_SECONDS: float = 40.0
+NO_ANSWER_TIMEOUT_SECONDS: float = 15.0
 
 # Maximum multiplier for total no-answer wait after retry.
 # 40s (initial) + 40s (retry) = 80s total window.

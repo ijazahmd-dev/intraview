@@ -314,3 +314,34 @@ class BackendClient:
             return
         if resp.status_code >= 400:
             resp.raise_for_status()
+
+
+
+
+    async def notify_interview_completed(self, session_id: int) -> None:
+        """
+        Notify backend that the agent has completed all interview questions.
+        Triggers session completion and final report generation.
+        """
+        url = (
+            f"{self.base_url}/api/ai-interview/"
+            f"session/{session_id}/agent-completed/"
+        )
+        try:
+            resp = await self.client.post(
+                url,
+                json={"runtime_id": self.runtime_id},
+                headers=self._auth_headers(),
+            )
+            if resp.status_code >= 400:
+                logger.error(
+                    "notify_interview_completed failed: session_id=%s status=%s body=%s",
+                    session_id,
+                    resp.status_code,
+                    resp.text,
+                )
+        except Exception:
+            logger.exception(
+                "notify_interview_completed error: session_id=%s",
+                session_id,
+            )        

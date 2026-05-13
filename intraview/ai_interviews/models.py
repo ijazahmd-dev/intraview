@@ -479,9 +479,9 @@ class AIInterviewEvaluation(models.Model):
   score = models.FloatField(blank=True, null=True)
 
   # High-level feedback – we treat them as plain text; you can change to JSON later.
-  strengths = models.TextField(blank=True)
-  weaknesses = models.TextField(blank=True)
-  suggestions = models.TextField(blank=True)
+  strengths = models.JSONField(default=list, blank=True)
+  weaknesses = models.JSONField(default=list, blank=True)
+  suggestions = models.JSONField(default=list, blank=True)
 
   confidence = models.CharField(
       max_length=16,
@@ -514,6 +514,7 @@ class AIInterviewFinalReport(models.Model):
 
   class Status(models.TextChoices):
       PENDING = "PENDING", "Pending"
+      PROCESSING = "PROCESSING", "Processing"
       SUCCESS = "SUCCESS", "Success"
       FAILED = "FAILED", "Failed"
 
@@ -526,9 +527,9 @@ class AIInterviewFinalReport(models.Model):
   overall_score = models.FloatField(blank=True, null=True)
 
   summary = models.TextField(blank=True)
-  strengths = models.TextField(blank=True)
-  areas_for_improvement = models.TextField(blank=True)
-  recommendations = models.TextField(blank=True)
+  strengths = models.JSONField(default=list, blank=True)
+  areas_for_improvement = models.JSONField(default=list, blank=True)
+  recommendations = models.JSONField(default=list, blank=True)
 
   status = models.CharField(
       max_length=16,

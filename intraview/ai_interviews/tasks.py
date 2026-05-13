@@ -29,6 +29,69 @@ logger = logging.getLogger(__name__)
 
 
 
+def _build_combined_turn_answer(
+    turn: AIInterviewTurn,
+    *,
+    max_length: int,
+) -> str:
+    metadata = turn.metadata or {}
+
+    followup_exchanges = (
+        metadata.get("followup_exchanges")
+        or []
+    )
+
+    base_answer = (
+        metadata.get("base_answer_text")
+        or turn.answer_text
+        or ""
+    ).strip()
+
+    parts = []
+
+    if base_answer:
+        parts.append(base_answer)
+
+    for i, exchange in enumerate(
+        followup_exchanges,
+        start=1,
+    ):
+        is_skipped = bool(
+            exchange.get("skipped")
+        )
+
+        fu_q = (
+            exchange.get("question")
+            or ""
+        ).strip()
+
+        fu_a = (
+            exchange.get("answer")
+            or ""
+        ).strip()
+
+        if not fu_a or is_skipped:
+            continue
+
+        parts.append(
+            f"[Clarification {i}] Interviewer: {fu_q}"
+        )
+
+        parts.append(
+            f"Candidate: {fu_a}"
+        )
+
+    combined = "\n\n".join(parts)
+
+    if len(combined) > max_length:
+        combined = combined[:max_length].rsplit(" ", 1)[0] + "..."
+
+    return combined
+
+
+
+
+
 
 def _build_evaluation_input(turn: AIInterviewTurn) -> Dict[str, Any]:
     session = turn.session
@@ -36,9 +99,10 @@ def _build_evaluation_input(turn: AIInterviewTurn) -> Dict[str, Any]:
     difficulty = session.difficulty
     round_type = session.round_type
 
-    answer_text = (turn.answer_text or "").strip()
-    if len(answer_text) > 4000:
-        answer_text = answer_text[:4000]
+    combined_answer = _build_combined_turn_answer(
+        turn,
+        max_length=4000,
+    )
 
     question_text = (turn.question_text or "").strip()
     if len(question_text) > 1000:
@@ -49,8 +113,8 @@ def _build_evaluation_input(turn: AIInterviewTurn) -> Dict[str, Any]:
         "role": role_name,
         "round_type": round_type,
         "difficulty": difficulty,
-        "question": turn.question_text,
-        "answer": turn.answer_text,
+        "question": question_text,
+        "answer": combined_answer,
         "expected_skills": [],  # TODO: fill from role metadata
     }
 
@@ -154,19 +218,7 @@ def evaluate_turn(self, turn_id: int) -> None:
 
     try:
         result = evaluate_turn_payload(payload)
-    except Exception as exc:
-        logger.exception(
-            "evaluate_turn: transient Gemini error for turn %s",
-            turn_id,
-            extra={
-                "turn_id": turn.id,
-                "session_id": turn.session_id,
-                "task_id": self.request.id,
-                "retry_count": self.request.retries,
-            },
-        )
-        raise self.retry(exc=exc)
-    
+
     except GeminiPermanentError as exc:
         logger.exception(
             "evaluate_turn: permanent Gemini error for turn %s",
@@ -178,7 +230,7 @@ def evaluate_turn(self, turn_id: int) -> None:
             },
         )
         evaluation.status = AIInterviewEvaluation.Status.FAILED
-        evaluation.suggestions = "Evaluation unavailable."
+        evaluation.suggestions = ["Evaluation unavailable."]
         evaluation.raw_response = {
             "reason": "MODEL_OUTPUT_INVALID",
             "retryable": False,
@@ -188,6 +240,21 @@ def evaluate_turn(self, turn_id: int) -> None:
             update_fields=["status", "suggestions", "raw_response", "updated_at"]
         )
         return
+
+    except Exception as exc:
+        logger.exception(
+            "evaluate_turn: transient error for turn %s",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+                "retry_count": self.request.retries,
+            },
+        )
+        raise self.retry(exc=exc)
+    
+    
 
     # Persist structured output.
     with transaction.atomic():
@@ -273,9 +340,10 @@ def _build_final_report_input(session: AIInterviewSession) -> Dict[str, Any]:
                 "confidence": eval_obj.confidence,
             }
 
-        answer_text = (t.answer_text or "").strip()
-        if len(answer_text) > 2000:
-            answer_text = answer_text[:2000]
+        combined_answer = _build_combined_turn_answer(
+            t,
+            max_length=2000,
+        )
 
         question_text = (t.question_text or "").strip()
         if len(question_text) > 500:
@@ -284,8 +352,8 @@ def _build_final_report_input(session: AIInterviewSession) -> Dict[str, Any]:
         interview_data.append(
             {
                 "turn_index": t.turn_index,
-                "question": t.question_text,
-                "answer": t.answer_text,
+                "question": question_text,
+                "answer": combined_answer,
                 "evaluation": eval_payload,  # may be None – Gemini must handle missing evals
             }
         )
@@ -357,6 +425,18 @@ def generate_final_report(self, session_id: int) -> None:
 
     report = AIInterviewReportService.ensure_final_report(session)
 
+    if report.status == AIInterviewFinalReport.Status.PROCESSING:
+        logger.info(
+            "generate_final_report: already processing for session %s",
+            session_id,
+            extra={
+                "session_id": session_id,
+                "task_id": self.request.id,
+            },
+        )
+        return
+
+
     if report.status == AIInterviewFinalReport.Status.SUCCESS:
         logger.info(
             "generate_final_report: report already SUCCESS for session %s, skipping",
@@ -367,6 +447,9 @@ def generate_final_report(self, session_id: int) -> None:
             },
         )
         return
+    
+    report.status = AIInterviewFinalReport.Status.PROCESSING
+    report.save(update_fields=["status", "updated_at"])
 
     payload = _build_final_report_input(session)
     logger.info(
@@ -414,11 +497,9 @@ def generate_final_report(self, session_id: int) -> None:
 
     report.overall_score = result.get("overall_score")
     report.summary = result.get("summary", "")
-    report.strengths = "\n".join(result.get("strengths") or [])
-    report.areas_for_improvement = "\n".join(
-        result.get("areas_for_improvement") or []
-    )
-    report.recommendations = "\n".join(result.get("recommendations") or [])
+    report.strengths = result.get("strengths") or []
+    report.areas_for_improvement = result.get("areas_for_improvement") or []
+    report.recommendations = result.get("recommendations") or []
     report.raw_response = result.get("raw")
     report.status = AIInterviewFinalReport.Status.SUCCESS
     report.save(

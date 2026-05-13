@@ -14,7 +14,7 @@ from datetime import timedelta
 from .models import AIInterviewSession, InterviewRuntimeState, AIInterviewFinalReport, AIInterviewTurn
 from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer, AIInterviewFinalReportSerializer, AIInterviewTurnEvaluationDetailSerializer, AIInterviewTurnWithEvaluationSerializer
 from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
-from .tasks import evaluate_turn
+from .tasks import evaluate_turn, generate_final_report
 
 # Adjust this import to where your auth class lives:
 # from core.authentication import MultiRoleJWTAuthentication
@@ -358,6 +358,52 @@ class RecordTurnFromAgentView(APIView):
             status=status.HTTP_201_CREATED,
         )
     
+
+
+
+
+
+class AgentNotifyCompletedView(APIView):
+    """
+    POST /api/ai-interview/session/<session_id>/agent-completed/
+
+    Called by the LiveKit agent when all interview questions are done.
+    Marks session as COMPLETED and triggers final report generation.
+    """
+    authentication_classes = [AgentTokenAuthentication]
+    permission_classes = []
+
+    def post(self, request, session_id: int):
+        session = get_object_or_404(AIInterviewSession, pk=session_id)
+
+        if session.status == AIInterviewSession.Status.COMPLETED:
+            # Already completed — idempotent
+            return Response({"status": "already_completed"}, status=status.HTTP_200_OK)
+
+        if session.status not in (
+            AIInterviewSession.Status.LIVE,
+            AIInterviewSession.Status.READY,
+        ):
+            logger.warning(
+                "AgentNotifyCompletedView: unexpected session status",
+                extra={"session_id": session_id, "status": session.status},
+            )
+            return Response(
+                {"detail": f"Cannot complete session from status: {session.status}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session.mark_completed()
+
+        generate_final_report.delay(session.id)
+
+        logger.info(
+            "AgentNotifyCompletedView: session %s marked COMPLETED, report queued",
+            session_id,
+        )
+
+        return Response({"status": "completed"}, status=status.HTTP_200_OK)
+
 
 
 

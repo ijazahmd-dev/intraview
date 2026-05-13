@@ -23,7 +23,7 @@ urlpatterns = [
     path("session/<int:session_id>/runtime-ownership/validate/",views.ValidateRuntimeOwnershipView.as_view(),name="ai-interview-runtime-validate",),
     path("session/<int:session_id>/runtime-ownership/release/",views.ReleaseRuntimeOwnershipView.as_view(),name="ai-interview-runtime-release",),
     
-    path("session/<int:pk>/",views.AIInterviewSessionDetailAPIView.as_view(),name="ai-session-detail",),
+    path("session/<int:pk>/",views.AIInterviewSessionDetailAPIView.as_view(),name="ai-session-detail",),path("session/<int:session_id>/agent-completed/",views.AgentNotifyCompletedView.as_view(),name="ai-interview-agent-completed",),
     path("session/<int:pk>/report/",views.AIInterviewFinalReportAPIView.as_view(),name="ai-session-report",),
     path("turns/<int:turn_id>/evaluation/", views.AIInterviewTurnEvaluationDetailAPIView.as_view(), name="ai-turn-evaluation-detail"),
     path("session/<int:pk>/evaluations/", views.AIInterviewSessionEvaluationsAPIView.as_view(), name="ai-session-evaluations"),

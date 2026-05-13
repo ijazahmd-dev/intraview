@@ -1955,6 +1955,11 @@ class InterviewRuntime:
         # Background tasks owned by runtime.
         self._background_tasks: set[asyncio.Task] = set()
 
+        # Event that keeps run() alive until interview is genuinely complete.
+        # Needed because ctx.connect() returns immediately in LiveKit agents v1.5+
+        # when the room is already connected via session.start().
+        self._interview_done: asyncio.Event = asyncio.Event()
+
     # ---------- initialization helpers ----------
 
     def _build_config_from_metadata(self) -> InterviewConfig:
@@ -2247,6 +2252,11 @@ class InterviewRuntime:
             self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
             self._background_tasks.add(self.heartbeat_task)
             await self.ctx.connect()
+            # Block here until the interview completes or runtime is shut down.
+            # ctx.connect() returns immediately in v1.5+ when room is already
+            # connected via session.start(), so we need this explicit wait.
+            await self._interview_done.wait()
+
         except asyncio.CancelledError:
             # Propagate cancellation cleanly.
             raise
@@ -2393,10 +2403,43 @@ class InterviewRuntime:
         async def _handle_item(ev: ConversationItemAddedEvent):
             if not self._runtime_alive:
                 return
+                
             item = ev.item
             role = getattr(item, "role", None)
-            text = getattr(item, "text", None)
+
+
+            text = None
+
+            #
+            # LiveKit v1.5 ChatMessage stores message text in content[]
+            #
+            content = getattr(item, "content", None)
+
+            if isinstance(content, list) and content:
+                text = " ".join(
+                    str(part).strip()
+                    for part in content
+                    if part is not None
+                ).strip()
+
+            #
+            # Fallback for older formats
+            #
+            if not text:
+                text = getattr(item, "text", None)
+
+            #
+            # Fallback for possible future formats
+            #
+            if not text:
+                text = getattr(item, "text_content", None)
+
+
             item_id = getattr(item, "id", None)
+
+
+
+
 
             # Deduplicate conversation items by ID if available.
             if item_id is not None:
@@ -2510,7 +2553,11 @@ class InterviewRuntime:
             # ----------------------------------------------------------------
             # User side: handle answers
             # ----------------------------------------------------------------
-            if role == "user" and self.tm.has_pending_question():
+            if (
+                role == "user"
+                and self.tm.has_pending_question()
+                and not self._generation_in_progress
+            ):
                 should_followup = False
                 async with self._turn_lock:
                     # Double-check after acquiring the lock to avoid races.
@@ -2819,6 +2866,8 @@ class InterviewRuntime:
                 }
             )
             await self._sync_runtime_state()
+            await self.backend.notify_interview_completed(self.cfg.session_id)
+            self._interview_done.set() 
 
     # ---------- session start & first question ----------
 
@@ -2981,6 +3030,8 @@ class InterviewRuntime:
                 # If candidate is disconnected, pause timeout behavior.
                 if len(self.room.remote_participants) == 0:
                     continue
+                if self._generation_in_progress:
+                    continue
 
                 # Enforce overall interview duration if configured.
                 if (
@@ -3018,6 +3069,8 @@ class InterviewRuntime:
                             }
                         )
                         await self._sync_runtime_state()
+                        await self.backend.notify_interview_completed(self.cfg.session_id)
+                        self._interview_done.set()  
                         break
 
                 if not self.tm.state.waiting_for_answer:
@@ -3138,7 +3191,9 @@ class InterviewRuntime:
             )
 
             self._runtime_alive = False
-
+            if not self._interview_done.is_set():
+                self._interview_done.set()
+            
             #
             # Cancel background tasks
             #
