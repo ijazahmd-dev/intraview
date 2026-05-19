@@ -710,9 +710,14 @@ class InterviewRuntime:
                 snapshot_update_at
                 != self._last_transcript_update_at
             ):
-                logger.debug(
-                    "Transcript still changing. "
-                    "Skipping stabilization commit."
+                logger.info(
+                    (
+                        "COMMIT ABORTED → "
+                        "transcript still changing "
+                        "snapshot=%s latest=%s"
+                    ),
+                    snapshot_update_at,
+                    self._last_transcript_update_at,
                 )
                 return
 
@@ -729,8 +734,22 @@ class InterviewRuntime:
                 return
 
             logger.info(
-                "Transcript stabilized. "
-                "Proceeding to commit."
+                (
+                    "TRANSCRIPT STABILIZED → "
+                    "snapshot=%s "
+                    "latest=%s "
+                    "buffer=%r "
+                    "words=%s"
+                ),
+                snapshot_update_at,
+                self._last_transcript_update_at,
+                self._active_transcript_text[:300],
+                len(
+                    re.findall(
+                        r"\b[\w'-]+\b",
+                        self._active_transcript_text,
+                    )
+                ),
             )
 
             await self._commit_stabilized_transcript(
@@ -764,6 +783,24 @@ class InterviewRuntime:
         answer_to_process: Optional[str] = None
 
         async with self._turn_lock:
+
+            logger.info(
+                (
+                    "COMMIT START → "
+                    "pending=%s "
+                    "waiting=%s "
+                    "candidate_speaking=%s "
+                    "followup_active=%s "
+                    "followup_count=%s "
+                    "buffer=%r"
+                ),
+                self.tm.has_pending_question(),
+                self.tm.state.waiting_for_answer,
+                self._candidate_is_speaking,
+                self.tm.state.is_followup_active,
+                self.tm.state.followup_count,
+                self._active_transcript_text[:300],
+            )
 
             if not self.tm.has_pending_question():
                 return
@@ -878,8 +915,22 @@ class InterviewRuntime:
             self._last_transcript_update_at = 0.0
 
             logger.info(
-                "Final stabilized transcript committed: %s",
-                answer_text,
+                (
+                    "FINAL ANSWER COMMITTED → "
+                    "answer=%r "
+                    "words=%s "
+                    "followup_active=%s "
+                    "followup_count=%s"
+                ),
+                answer_text[:300],
+                len(
+                    re.findall(
+                        r"\b[\w'-]+\b",
+                        answer_text,
+                    )
+                ),
+                self.tm.state.is_followup_active,
+                self.tm.state.followup_count,
             )
 
             #
@@ -947,6 +998,27 @@ class InterviewRuntime:
         )
 
         should_followup = False
+
+        logger.info(
+            (
+                "PROCESS ANSWER START → "
+                "turn=%s "
+                "is_followup=%s "
+                "followup_count=%s "
+                "answer_words=%s "
+                "answer=%r"
+            ),
+            turn_index_1based,
+            self.tm.state.is_followup_active,
+            self.tm.state.followup_count,
+            len(
+                re.findall(
+                    r"\b[\w'-]+\b",
+                    answer_text,
+                )
+            ),
+            answer_text[:300],
+        )
 
         await self._send_data(
             {
@@ -1064,6 +1136,37 @@ class InterviewRuntime:
             self.tm.mark_followup_phase_completed()
             self._followup_phase_closed = True
 
+
+
+        logger.warning(
+            (
+                "FOLLOWUP GATE CHECK → "
+                "should_followup=%s "
+                "followup_count=%s "
+                "budget_exhausted=%s "
+                "followup_active=%s "
+                "base_answer_words=%s "
+                "base_answer=%r"
+            ),
+            should_followup,
+            self.tm.state.followup_count,
+            self.tm.followup_budget_exhausted(
+                MAX_FOLLOWUPS_PER_QUESTION
+            ),
+            self.tm.state.is_followup_active,
+            len(
+                re.findall(
+                    r"\b[\w'-]+\b",
+                    self.tm.state.base_answer_text or "",
+                )
+            ),
+            (
+                self.tm.state.base_answer_text[:200]
+                if self.tm.state.base_answer_text
+                else None
+            ),
+        )
+
         #
         # NEXT ACTION
         #
@@ -1145,6 +1248,16 @@ class InterviewRuntime:
 
         # Extremely short answers usually need clarification.
         if word_count < 15:
+            logger.warning(
+                (
+                    "FOLLOWUP DECISION=True "
+                    "reason=short_answer "
+                    "words=%s "
+                    "text=%r"
+                ),
+                word_count,
+                text[:200],
+            )
             return True
 
         vague_markers = (
@@ -1158,7 +1271,28 @@ class InterviewRuntime:
             word_count < 35
             and any(m in lower for m in vague_markers)
         ):
+            logger.warning(
+                (
+                    "FOLLOWUP DECISION=True "
+                    "reason=vague_answer "
+                    "words=%s "
+                    "text=%r"
+                ),
+                word_count,
+                text[:200],
+            )
             return True
+
+        logger.info(
+            (
+                "FOLLOWUP DECISION=False "
+                "reason=sufficient_answer "
+                "words=%s "
+                "text=%r"
+            ),
+            word_count,
+            text[:200],
+        )
 
         return False
 
@@ -1313,9 +1447,31 @@ class InterviewRuntime:
             # ----------------------------------------------------------------
             # Assistant side: classify spoken message
             # ----------------------------------------------------------------
+
+            logger.warning(
+                (
+                    "ASSISTANT MESSAGE RECEIVED → "
+                    "pending_generation_type=%s "
+                    "generation_in_progress=%s "
+                    "waiting_for_answer=%s "
+                    "followup_active=%s "
+                    "followup_count=%s "
+                    "text=%r"
+                ),
+                self._pending_generation_type,
+                self._generation_in_progress,
+                self.tm.state.waiting_for_answer,
+                self.tm.state.is_followup_active,
+                self.tm.state.followup_count,
+                text[:200],
+            )
+        
             if role == "assistant":
 
                 if self._pending_generation_type == "QUESTION" and self.tm.can_ask_new_question():
+                    logger.warning(
+                        "ASSISTANT CLASSIFIED → QUESTION"
+                    )
                     # A base question has been spoken.
                     self._pending_generation_type = None
 
@@ -1354,6 +1510,9 @@ class InterviewRuntime:
 
                 # [NEW] Follow-up question has been spoken.
                 elif self._pending_generation_type == "FOLLOWUP":
+                    logger.warning(
+                        "ASSISTANT CLASSIFIED → FOLLOWUP"
+                    )
                     self._pending_generation_type = None
 
                     try:
@@ -1391,6 +1550,10 @@ class InterviewRuntime:
                     await self._sync_runtime_state()
 
                 elif self._pending_generation_type == "RETRY":
+
+                    logger.warning(
+                        "ASSISTANT CLASSIFIED → RETRY"
+                    )
 
                     #
                     # Retry of SAME question.
@@ -1453,9 +1616,18 @@ class InterviewRuntime:
                     # Ignore assistant messages not explicitly initiated by runtime.
                     # This prevents autonomous conversational continuation from
                     # interfering with deterministic interview flow.
-                    logger.warning(
-                        "Ignoring autonomous assistant message: %s",
-                        text,
+                    logger.error(
+                        (
+                            "ASSISTANT CLASSIFIED → AUTONOMOUS "
+                            "pending_generation_type=%s "
+                            "followup_active=%s "
+                            "waiting_for_answer=%s "
+                            "text=%r"
+                        ),
+                        self._pending_generation_type,
+                        self.tm.state.is_followup_active,
+                        self.tm.state.waiting_for_answer,
+                        text[:200],
                     )
                     return
                 return
@@ -1722,8 +1894,26 @@ class InterviewRuntime:
                 )
 
                 logger.info(
-                    "Transcript updated: %s",
-                    incoming_text,
+                    (
+                        "TRANSCRIPT UPDATED → "
+                        "incoming=%r "
+                        "merged=%r "
+                        "words=%s "
+                        "candidate_speaking=%s "
+                        "followup_active=%s "
+                        "waiting_for_answer=%s"
+                    ),
+                    incoming_text[:120],
+                    self._active_transcript_text[:300],
+                    len(
+                        re.findall(
+                            r"\b[\w'-]+\b",
+                            self._active_transcript_text,
+                        )
+                    ),
+                    self._candidate_is_speaking,
+                    self.tm.state.is_followup_active,
+                    self.tm.state.waiting_for_answer,
                 )
 
                 #
@@ -1888,6 +2078,24 @@ class InterviewRuntime:
             }
         )
 
+        logger.warning(
+            (
+                "FOLLOWUP GENERATED → "
+                "count=%s/%s "
+                "base_answer_words=%s "
+                "last_answer=%r"
+            ),
+            self.tm.state.followup_count + 1,
+            MAX_FOLLOWUPS_PER_QUESTION,
+            len(
+                re.findall(
+                    r"\b[\w'-]+\b",
+                    last_answer or "",
+                )
+            ),
+            (last_answer or "")[:200],
+        )
+
         await self._safe_generate_reply(
             instructions=instr,
             generation_type="FOLLOWUP",
@@ -1903,6 +2111,32 @@ class InterviewRuntime:
         Called after the follow-up phase is done (or skipped entirely).
         Called from within _turn_lock, so must not re-acquire it.
         """
+
+        logger.error(
+            (
+                "FINALIZE_BASE_TURN ENTERED → "
+                "turn=%s "
+                "followup_active=%s "
+                "followup_count=%s "
+                "base_answer=%r "
+                "followup_answer=%r"
+            ),
+            self.tm.current_turn_index_1based(),
+            self.tm.state.is_followup_active,
+            self.tm.state.followup_count,
+            (
+                self.tm.state.base_answer_text[:200]
+                if self.tm.state.base_answer_text
+                else None
+            ),
+            (
+                self.tm.state.followup_answer_text[:200]
+                if self.tm.state.followup_answer_text
+                else None
+            ),
+        )
+
+
         assert self.backend is not None
         assert self.cfg is not None
         assert self.tm is not None
@@ -1919,6 +2153,18 @@ class InterviewRuntime:
             return
         turn_index_1based = self.tm.current_turn_index_1based()
         question_text = self.tm.state.base_question_text or ""
+
+        logger.warning(
+            (
+                "FINALIZE TURN START → "
+                "turn=%s "
+                "followups=%s "
+                "base_answer_exists=%s"
+            ),
+            turn_index_1based,
+            self.tm.state.followup_count,
+            bool(self.tm.state.base_answer_text),
+        )
 
         parts = []
         base_answer = (
@@ -2059,6 +2305,28 @@ class InterviewRuntime:
         }
 
         try:
+
+            logger.warning(
+                (
+                    "POSTING TURN → "
+                    "session=%s "
+                    "turn=%s "
+                    "question=%r "
+                    "answer_words=%s "
+                    "answer=%r"
+                ),
+                self.cfg.session_id,
+                turn_index_1based,
+                question_text[:120],
+                len(
+                    re.findall(
+                        r"\b[\w'-]+\b",
+                        answer_text,
+                    )
+                ),
+                answer_text[:300],
+            )
+
             resp = await self.backend.post_turn(
                 session_id=self.cfg.session_id,
                 turn_index_1based=turn_index_1based,
