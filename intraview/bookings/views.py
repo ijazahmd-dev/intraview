@@ -556,9 +556,8 @@ class CandidatePastInterviewsAPIView(APIView):
 
 
 
-
 class BookingDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes     = [IsAuthenticated]
     authentication_classes = [CookieJWTAuthentication]
 
     def get(self, request, booking_id):
@@ -567,11 +566,13 @@ class BookingDetailAPIView(APIView):
                 "candidate",
                 "interviewer__interviewer_profile",
                 "availability",
+                "proposed_availability",   # ← needed for proposed_slot field
+                "candidate_evaluation",
             ),
             id=booking_id,
         )
 
-        # ✅ Only candidate or interviewer can view
+        # Only candidate or interviewer can view
         if booking.candidate != request.user and booking.interviewer != request.user:
             return Response(
                 {"detail": "Not allowed."},
@@ -580,9 +581,6 @@ class BookingDetailAPIView(APIView):
 
         serializer = BookingDetailSerializer(booking)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
 
 
 

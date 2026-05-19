@@ -33,6 +33,34 @@ class TurnState:
     # Stores the first (base) answer for backend metadata.
     base_answer_text: str = ""
 
+    # Current stabilized transcript buffer for the active prompt.
+    #
+    # This continuously evolves while the candidate speaks.
+    # Runtime commits this buffer only after transcript stabilization.
+    active_transcript_buffer: str = ""
+
+    # Last finalized/committed transcript for this turn.
+    #
+    # Prevents duplicate transcript commits caused by:
+    # - repeated STT events
+    # - delayed provider emissions
+    # - reconnect replay
+    last_committed_transcript: str = ""
+
+    # Timestamp of the latest transcript update.
+    #
+    # Used by runtime stabilization timers to determine when
+    # transcript input has gone silent long enough to commit.
+    last_transcript_at: float = 0.0
+
+    # Number of transcript updates received for current prompt.
+    #
+    # Useful for:
+    # - debugging STT fragmentation
+    # - transcript stabilization heuristics
+    # - analytics
+    transcript_update_count: int = 0
+
     # How many follow-up questions have been asked for the current base question.
     followup_count: int = 0
 
@@ -86,6 +114,7 @@ class TurnManager:
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
         self.state.is_finalizing_turn = False
+        self.reset_transcript_state()
 
         self.state.last_question_text = question_text
         self.state.waiting_for_answer = True
@@ -108,6 +137,28 @@ class TurnManager:
 
         if self.state.turn_index >= self.total_questions:
             self.state.done = True
+
+
+    def reset_current_turn_state(self):
+        """
+        Emergency reset for partially corrupted turn lifecycle.
+
+        Used when:
+        - generation crashes
+        - runtime aborts mid-turn
+        - ownership changes
+        - timeout recovery fails
+
+        Does NOT advance turn_index.
+        """
+
+        self.state.waiting_for_answer = False
+        self.state.last_question_text = None
+        self.state.last_question_time = 0.0
+        self.state.no_answer_retry_used = False
+        self.state.is_followup_active = False
+        self.state.is_finalizing_turn = False  
+        self.reset_transcript_state()      
 
     def current_turn_index_0based(self) -> int:
         return self.state.turn_index
@@ -137,6 +188,22 @@ class TurnManager:
 
         self.state.is_finalizing_turn = True
         return True
+    
+    def abort_turn_finalization(self):
+        """
+        Emergency recovery for stuck finalization.
+
+        Used when:
+        - backend turn post fails
+        - runtime crashes mid-finalize
+        - follow-up generation fails
+        - ownership changes
+
+        Prevents permanent deadlock where
+        is_finalizing_turn=True forever.
+        """
+
+        self.state.is_finalizing_turn = False
     
     def current_prompt_kind(self) -> str:
         """
@@ -192,8 +259,11 @@ class TurnManager:
         True if the follow-up budget has already been exhausted
         for the current base question.
         """
-        return self.state.followup_count >= max_followups
-    
+        return (
+            self.state.followup_phase_completed
+            or self.state.followup_count >= max_followups
+        )
+     
     def followup_phase_is_closed(self) -> bool:
         """
         True once runtime has decided the follow-up phase
@@ -218,10 +288,19 @@ class TurnManager:
             raise RuntimeError(
                 "Cannot ask follow-up without an active base question."
             )
+        # Production-safe recovery.
+        #
+        # Runtime may still briefly show waiting=True
+        # during async transitions.
+        #
+        # If we are already in followup mode,
+        # don't hard fail.
+        #
         if self.state.waiting_for_answer:
-            raise RuntimeError(
-                "Cannot ask follow-up while another prompt is still pending."
-            )
+
+            # Allow transition if runtime is replacing
+            # an already completed prompt.
+            self.state.waiting_for_answer = False
         self.state.followup_count += 1
         self.state.is_followup_active = True
 
@@ -229,6 +308,7 @@ class TurnManager:
         self.state.waiting_for_answer = True
         self.state.last_question_time = time.monotonic()
         self.state.no_answer_retry_used = False
+        self.reset_transcript_state()
 
     def mark_followup_answer_received(self, answer_text: str):
         """
@@ -244,19 +324,19 @@ class TurnManager:
             raise RuntimeError(
                 "Cannot record follow-up answer without active follow-up."
             )
+        
+        cleaned_answer = (answer_text or "").strip()
         self.state.followup_exchanges.append(
             {
                 "question": self.state.last_question_text or "",
-                "answer": answer_text,
+                "answer": cleaned_answer,
+                "answered": bool(cleaned_answer),
             }
         )
         self.state.waiting_for_answer = False
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
-        # Follow-up answer has now completed.
-        # Runtime may finalize or continue, but we are no longer
-        # actively waiting on a follow-up response.
-        self.state.is_followup_active = False
+
 
 
     def mark_followup_phase_completed(self):
@@ -272,24 +352,147 @@ class TurnManager:
 
     def record_base_answer(self, answer_text: str):
         """
-        Called when the candidate answers the base (counted) question,
-        before any follow-up decision is made.
+        Records base question answer.
 
-        Stores the answer for backend metadata and clears waiting state.
-        Does NOT call mark_answer_received() — runtime decides that later.
+        Production-safe:
+        - allows transcript improvement
+        - prevents duplicate corruption
+        - supports salvage/recovery
         """
-        if self.state.base_answer_text.strip():
-            raise RuntimeError(
-                "Base answer already recorded for current turn."
-            )
+
         if self.state.followup_phase_completed:
             raise RuntimeError(
-                "Cannot record new base answer after follow-up phase is closed."
+                "Cannot record new base answer after "
+                "follow-up phase is closed."
             )
-        self.state.base_answer_text = answer_text
+
+        cleaned = (answer_text or "").strip()
+
+        if not cleaned:
+            return
+
+        existing = (
+            self.state.base_answer_text or ""
+        ).strip()
+
+        #
+        # Keep longer/more complete answer.
+        #
+        # Helps realtime transcript refinement.
+        #
+        if len(cleaned) > len(existing):
+            self.state.base_answer_text = cleaned
+
         self.state.waiting_for_answer = False
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
+
+
+
+    def update_transcript_buffer(self, text: str):
+        """
+        Updates transcript buffer.
+
+        LiveKit transcripts are cumulative,
+        so we keep the latest version
+        instead of appending.
+        """
+
+        cleaned = (text or "").strip()
+
+        if not cleaned:
+            return
+
+        existing = (
+            self.state.active_transcript_buffer
+            or ""
+        ).strip()
+
+        #
+        # Ignore smaller regressions.
+        #
+        # Example:
+        #
+        # "I worked on auth system"
+        # ↓ provider glitch
+        # "I worked"
+        #
+        if (
+            existing
+            and len(cleaned) < len(existing)
+        ):
+            return
+
+        self.state.active_transcript_buffer = (
+            cleaned
+        )
+
+        self.state.last_transcript_at = (
+            time.monotonic()
+        )
+
+        self.state.transcript_update_count += 1
+
+
+    def current_transcript_buffer(self) -> str:
+        """
+        Returns current in-progress transcript buffer.
+        """
+
+        return self.state.active_transcript_buffer
+
+
+    def has_transcript_buffer(self) -> bool:
+        """
+        True if transcript buffer currently contains text.
+        """
+
+        return bool(
+            self.state.active_transcript_buffer.strip()
+        )
+
+
+    def mark_transcript_committed(self, text: str):
+        """
+        Marks transcript as finalized/committed.
+
+        Prevents duplicate turn processing from repeated
+        transcript emissions.
+        """
+
+        cleaned = (text or "").strip()
+
+        self.state.last_committed_transcript = cleaned
+        self.state.active_transcript_buffer = ""
+
+
+    def transcript_already_committed(self, text: str) -> bool:
+        """
+        Returns True if transcript was already finalized.
+
+        Helps runtime ignore duplicate transcript commits.
+        """
+
+        cleaned = (text or "").strip()
+
+        if not cleaned:
+            return False
+
+        return (
+            cleaned ==
+            self.state.last_committed_transcript
+        )
+
+
+    def reset_transcript_state(self):
+        """
+        Clears transcript assembly state for next prompt.
+        """
+
+        self.state.active_transcript_buffer = ""
+        self.state.last_committed_transcript = ""
+        self.state.last_transcript_at = 0.0
+        self.state.transcript_update_count = 0    
 
     def get_turn_metadata_extras(self) -> dict:
         """
@@ -302,6 +505,29 @@ class TurnManager:
             "followup_count": self.state.followup_count,
             "followup_phase_completed": self.state.followup_phase_completed,
             "followup_exchanges": list(self.state.followup_exchanges),
+        }
+    
+
+
+    def current_turn_snapshot(self) -> dict:
+        """
+        Debug/runtime snapshot of current turn state.
+
+        Useful for:
+        - structured logging
+        - crash diagnostics
+        - runtime recovery
+        - backend observability
+        """
+
+        return {
+            "turn_index": self.state.turn_index,
+            "waiting_for_answer": self.state.waiting_for_answer,
+            "is_followup_active": self.state.is_followup_active,
+            "followup_count": self.state.followup_count,
+            "followup_phase_completed": self.state.followup_phase_completed,
+            "is_finalizing_turn": self.state.is_finalizing_turn,
+            "done": self.state.done,
         }
 
     # ------------------------------------------------------------------ #
@@ -319,3 +545,4 @@ class TurnManager:
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
         self.state.is_finalizing_turn = False
+        self.reset_transcript_state()

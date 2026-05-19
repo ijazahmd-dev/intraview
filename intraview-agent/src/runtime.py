@@ -6,6 +6,7 @@ import logging
 import re          # [NEW] for word count in _should_ask_followup
 import time
 from typing import Optional, Set
+from difflib import SequenceMatcher
 
 from livekit.agents import (
     AgentSession,
@@ -13,6 +14,7 @@ from livekit.agents import (
     inference,
     room_io,
     ConversationItemAddedEvent,
+    UserStateChangedEvent,
 )
 from livekit.plugins import ai_coustics, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -24,6 +26,12 @@ from constants import (
     TIMEOUT_LOOP_INTERVAL_SECONDS,
     MAX_FOLLOWUPS_PER_QUESTION,
     ASSISTANT_GENERATION_TIMEOUT_SECONDS,
+    TRANSCRIPT_STABILIZATION_SECONDS,
+    MIN_TRANSCRIPT_COMMIT_WORDS,
+    TRANSCRIPT_BUFFER_MAX_SECONDS,
+    TRANSCRIPT_SIMILARITY_THRESHOLD,
+    MAX_TRANSCRIPT_UPDATES_PER_PROMPT,
+    NO_ANSWER_TIMEOUT_SECONDS,
 )
 from planner import InterviewConfig, QuestionPlanner
 from state import InterviewState, StateMachine
@@ -81,7 +89,7 @@ class InterviewRuntime:
 
         # Classify what we expect the next assistant message to be.
         # [NEW] Added "FOLLOWUP" as a valid value alongside "QUESTION".
-        self._pending_generation_type: Optional[str] = None  # "QUESTION" | "FOLLOWUP" | None
+        self._pending_generation_type: Optional[str] = None  # "QUESTION" | "FOLLOWUP" | "RETRY" | None
 
         # Hard runtime guard that prevents recursive follow-up generation.
         # Once True for a base question, runtime will never ask another follow-up.
@@ -105,6 +113,75 @@ class InterviewRuntime:
         # Needed because ctx.connect() returns immediately in LiveKit agents v1.5+
         # when the room is already connected via session.start().
         self._interview_done: asyncio.Event = asyncio.Event()
+
+        self._minimum_answer_words = 3
+        self._minimum_answer_chars = 12
+
+        # ---------------------------------------------------------
+        # Streaming transcript assembly state
+        # ---------------------------------------------------------
+
+        # Current assembled transcript for the active prompt.
+        self._active_transcript_text: str = ""
+
+        # Last normalized transcript snapshot.
+        #
+        # Used for duplicate/similarity suppression.
+        self._last_normalized_transcript: str = ""
+
+        # Timestamp of latest transcript update.
+        self._last_transcript_update_at: float = 0.0
+
+        # Timestamp when transcript buffering started.
+        #
+        # Prevents infinite open transcript sessions.
+        self._transcript_started_at: float = 0.0
+
+        # Number of transcript update events received
+        # for the current pending prompt.
+        self._transcript_update_count: int = 0
+
+        # Currently running stabilization task.
+        #
+        # Cancelled/restarted whenever new transcript arrives.
+        self._transcript_stabilization_task: Optional[asyncio.Task] = None
+
+        # ---------------------------------------------------------
+        # Production speech activity state
+        # ---------------------------------------------------------
+
+        #
+        # True while candidate is actively speaking.
+        #
+        # Source of truth:
+        # LiveKit turn/VAD events
+        #
+        # NOT transcript timing.
+        #
+        self._candidate_is_speaking: bool = False
+
+        #
+        # Timestamp of latest detected speech end.
+        #
+        # Used for silence grace window before
+        # transcript finalization.
+        #
+        self._last_speech_end_at: float = 0.0
+
+        # True while finalized answer
+        # processing is running.
+        #
+        # Prevents timeout retry race:
+        #
+        # transcript committed
+        # ↓
+        # processing running
+        # ↓
+        # timeout loop retries
+        #
+        self._processing_answer: bool = False
+
+        
 
     # ---------- initialization helpers ----------
 
@@ -312,7 +389,9 @@ class InterviewRuntime:
                 )
 
             finally:
-                self._generation_in_progress = False        
+                self._generation_in_progress = False
+
+
 
     # ---------- main entry ----------
 
@@ -395,8 +474,6 @@ class InterviewRuntime:
             await self._start_session_and_ask_first()
             self.timeout_task = asyncio.create_task(self._timeout_loop())
             self._background_tasks.add(self.timeout_task)
-            self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-            self._background_tasks.add(self.heartbeat_task)
             await self.ctx.connect()
             # Block here until the interview completes or runtime is shut down.
             # ctx.connect() returns immediately in v1.5+ when room is already
@@ -448,6 +525,553 @@ class InterviewRuntime:
                 "Resuming interview from backend runtime state: current_turn_index=%s",
                 idx,
             )
+
+
+
+    def _is_valid_user_answer(self, text: str) -> bool:
+        """
+        Filters fragmented / low-signal STT transcript events.
+
+        Prevents:
+        - empty transcripts
+        - tiny partial chunks
+        - accidental endpoint fragments
+        - premature turn finalization
+        """
+
+        if not text:
+            return False
+
+        cleaned = text.strip()
+
+        if not cleaned:
+            return False
+
+        if len(cleaned) < self._minimum_answer_chars:
+            return False
+
+        words = re.findall(r"\b[\w'-]+\b", cleaned)
+
+        if len(words) < self._minimum_answer_words:
+            return False
+
+        return True       
+
+
+
+    # ---------------------------------------------------------
+    # Transcript normalization / similarity helpers
+    # ---------------------------------------------------------
+
+    def _normalize_transcript(self, text: str) -> str:
+        """
+        Normalize transcript for similarity comparison.
+
+        Helps suppress:
+        - duplicate STT emissions
+        - punctuation-only changes
+        - casing differences
+        """
+
+        text = (text or "").strip().lower()
+
+        # Collapse whitespace
+        text = re.sub(r"\s+", " ", text)
+
+        # Remove repeated punctuation noise
+        text = re.sub(r"[^\w\s'-]", "", text)
+
+        return text.strip()
+
+
+    def _transcript_similarity(
+        self,
+        a: str,
+        b: str,
+    ) -> float:
+        """
+        Compute transcript similarity score.
+
+        Uses SequenceMatcher because:
+        - lightweight
+        - no external dependency
+        - sufficient for realtime transcript dedup
+        """
+
+        return SequenceMatcher(
+            None,
+            a,
+            b,
+        ).ratio()
+
+
+    def _reset_transcript_buffer(self):
+        """
+        Completely reset active transcript assembly state.
+
+        Called after:
+        - turn finalization
+        - timeout skip
+        - runtime shutdown
+        - transcript corruption protection
+        """
+
+        self._active_transcript_text = ""
+        self._last_normalized_transcript = ""
+        self._last_transcript_update_at = 0.0
+        self._transcript_started_at = 0.0
+        self._transcript_update_count = 0
+
+        if self._transcript_stabilization_task:
+
+            if not self._transcript_stabilization_task.done():
+                self._transcript_stabilization_task.cancel()
+
+        self._transcript_stabilization_task = None
+
+
+
+    def _candidate_recently_stopped_speaking(
+        self,
+    ) -> bool:
+        """
+        Returns True if candidate recently stopped speaking.
+
+        Used as a silence grace window before
+        transcript finalization.
+
+        Production logic:
+        user stops speaking
+        ↓
+        wait short silence window
+        ↓
+        if still silent:
+            finalize answer
+        """
+
+        if self._candidate_is_speaking:
+            return True
+
+        if self._last_speech_end_at <= 0:
+            return False
+
+        silence_duration = (
+            time.monotonic()
+            - self._last_speech_end_at
+        )
+
+        #
+        # Short natural pause tolerance.
+        #
+        return (
+            silence_duration
+            < TRANSCRIPT_STABILIZATION_SECONDS
+        )
+
+    async def _schedule_transcript_commit(
+        self,
+        total_q: int,
+    ):
+        """
+        Wait for transcript stabilization before committing answer.
+
+        IMPORTANT:
+        We only commit if transcript has remained unchanged
+        for the FULL stabilization duration.
+
+        Prevents:
+        - premature commits during natural pauses
+        - mid-answer truncation
+        - accidental follow-up generation
+        """
+
+        try:
+            #
+            # Snapshot latest transcript timestamp.
+            #
+            snapshot_update_at = (
+                self._last_transcript_update_at
+            )
+
+            await asyncio.sleep(
+                TRANSCRIPT_STABILIZATION_SECONDS
+            )
+
+            if not self._runtime_alive:
+                return
+
+            #
+            # New transcript arrived while waiting.
+            #
+            # Candidate is still speaking.
+            # Abort commit.
+            #
+            if (
+                snapshot_update_at
+                != self._last_transcript_update_at
+            ):
+                logger.debug(
+                    "Transcript still changing. "
+                    "Skipping stabilization commit."
+                )
+                return
+
+            #
+            # No transcript exists.
+            #
+            if not self._active_transcript_text.strip():
+                return
+
+            #
+            # Still waiting for answer?
+            #
+            if not self.tm.has_pending_question():
+                return
+
+            logger.info(
+                "Transcript stabilized. "
+                "Proceeding to commit."
+            )
+
+            await self._commit_stabilized_transcript(
+                total_q=total_q,
+            )
+
+        except asyncio.CancelledError:
+            return
+
+        except Exception:
+            logger.exception(
+                "Transcript stabilization task failed"
+            )
+
+
+    async def _commit_stabilized_transcript(
+        self,
+        total_q: int,
+    ):
+        """
+        Commit finalized stabilized transcript.
+
+        This is the ONLY place where:
+        - answers become finalized
+        - follow-up logic executes
+        - backend posting begins
+        """
+
+        assert self.tm is not None
+
+        answer_to_process: Optional[str] = None
+
+        async with self._turn_lock:
+
+            if not self.tm.has_pending_question():
+                return
+            
+            #
+            # Never finalize while candidate
+            # is still speaking.
+            #
+            # This solves:
+            # - long uninterrupted answers
+            # - delayed transcript commits
+            # - retry corruption
+            #
+
+
+            if (
+                self._candidate_recently_stopped_speaking()
+            ):
+                logger.info(
+                    "Waiting for speech stabilization."
+                )
+
+                #
+                # CRITICAL:
+                #
+                # We cannot simply return here.
+                #
+                # Why?
+                #
+                # schedule_transcript_commit()
+                # already completed.
+                #
+                # If we return now:
+                #
+                # transcript commit dies forever
+                # ↓
+                # timeout loop eventually skips
+                # ↓
+                # answer becomes empty
+                #
+                # Production fix:
+                #
+                # re-schedule another short commit
+                # attempt after stabilization window.
+                #
+
+                if (
+                    self._runtime_alive
+                    and self.tm.has_pending_question()
+                ):
+
+                    task = asyncio.create_task(
+                        self._schedule_transcript_commit(
+                            total_q=total_q
+                        )
+                    )
+
+                    self._transcript_stabilization_task = task
+                    self._background_tasks.add(task)
+
+                    def _cleanup_task(
+                        t: asyncio.Task
+                    ):
+                        self._background_tasks.discard(t)
+
+                    task.add_done_callback(
+                        _cleanup_task
+                    )
+
+                return
+
+
+            answer_text = (
+                self._active_transcript_text or ""
+            ).strip()
+
+            if not self._is_valid_user_answer(answer_text):
+
+                logger.info(
+                    "Discarding unstable transcript: %r",
+                    answer_text,
+                )
+
+                self._reset_transcript_buffer()
+                return
+
+            #
+            # Prevent duplicate finalized transcript commits.
+            #
+            if self.tm.transcript_already_committed(
+                answer_text
+            ):
+                logger.warning(
+                    "Skipping duplicate committed transcript."
+                )
+                return
+
+            self.tm.mark_transcript_committed(
+                answer_text
+            )
+            self.tm.state.waiting_for_answer = False
+            # Prevent retry race while finalized
+            # answer processing is running.
+            #
+            self._processing_answer = True
+
+            # Hard reset pending transcript timing.
+            #
+            # Prevents stale stabilization callbacks
+            # from re-processing the same answer.
+            #
+            self._last_transcript_update_at = 0.0
+
+            logger.info(
+                "Final stabilized transcript committed: %s",
+                answer_text,
+            )
+
+            #
+            # Reset BEFORE downstream generation/finalization.
+            #
+            self._reset_transcript_buffer()
+
+            #
+            # IMPORTANT:
+            # Save answer and process OUTSIDE lock.
+            #
+            answer_to_process = answer_text
+
+        #
+        # Process AFTER releasing _turn_lock.
+        #
+        if answer_to_process:
+
+            try:
+                await self._process_finalized_answer(
+                    answer_text=answer_to_process,
+                    total_q=total_q,
+                )
+
+            except Exception:
+                logger.exception(
+                    "Post-answer processing failed: "
+                    "session_id=%s",
+                    self.cfg.session_id
+                    if self.cfg else None,
+                )
+
+            finally:
+                #
+                # Always release processing guard.
+                #
+                self._processing_answer = False
+
+
+
+
+
+
+    async def _process_finalized_answer(
+        self,
+        *,
+        answer_text: str,
+        total_q: int,
+    ):
+        """
+        Process ONE finalized stabilized answer.
+
+        This was previously embedded directly inside
+        conversation_item_added().
+        """
+
+        assert self.tm is not None
+
+        turn_index_1based = (
+            self.tm.current_turn_index_1based()
+        )
+
+        question_text = (
+            self.tm.state.last_question_text or ""
+        )
+
+        should_followup = False
+
+        await self._send_data(
+            {
+                "type": "answer",
+                "index": turn_index_1based,
+                "question": question_text,
+                "answer": answer_text,
+                "is_followup": (
+                    self.tm.state.is_followup_active
+                ),
+            }
+        )
+
+        #
+        # FOLLOW-UP ANSWER
+        #
+        #
+        # FOLLOW-UP ANSWER
+        #
+        if self.tm.state.is_followup_active:
+
+            self.tm.mark_followup_answer_received(
+                answer_text=answer_text
+            )
+
+            try:
+                self.state_machine.transition(
+                    InterviewState.PROCESSING
+                )
+            except ValueError:
+                logger.warning(
+                    "Illegal state transition to PROCESSING "
+                    "from %s",
+                    self.state_machine.value.name,
+                )
+
+            await self._send_data(
+                {
+                    "type": "state",
+                    "state": (
+                        self.state_machine.value.name
+                    ),
+                    "current_index": (
+                        turn_index_1based
+                    ),
+                    "max_questions": total_q,
+                }
+            )
+
+            await self._sync_runtime_state()
+
+            #
+            # CRITICAL FIX:
+            # Never recursively ask followups forever.
+            #
+            if self.tm.followup_budget_exhausted(
+                MAX_FOLLOWUPS_PER_QUESTION
+            ):
+                should_followup = False
+            else:
+                should_followup = (
+                    self._should_ask_followup(
+                        answer_text
+                    )
+                )
+
+        #
+        # BASE QUESTION ANSWER
+        #
+        else:
+
+            self.tm.record_base_answer(
+                answer_text=answer_text
+            )
+
+            try:
+                self.state_machine.transition(
+                    InterviewState.PROCESSING
+                )
+            except ValueError:
+                logger.warning(
+                    "Illegal state transition to PROCESSING "
+                    "from %s",
+                    self.state_machine.value.name,
+                )
+
+            await self._send_data(
+                {
+                    "type": "state",
+                    "state": (
+                        self.state_machine.value.name
+                    ),
+                    "current_index": (
+                        turn_index_1based
+                    ),
+                    "max_questions": total_q,
+                }
+            )
+
+            await self._sync_runtime_state()
+
+            should_followup = (
+                self._should_ask_followup(
+                    answer_text
+                )
+            )
+
+        #
+        # HARD FOLLOW-UP LIMIT
+        #
+        if self.tm.followup_budget_exhausted(
+            MAX_FOLLOWUPS_PER_QUESTION
+        ):
+            should_followup = False
+            self.tm.mark_followup_phase_completed()
+            self._followup_phase_closed = True
+
+        #
+        # NEXT ACTION
+        #
+        if should_followup:
+            await self._ask_followup(total_q)
+        else:
+            await self._finalize_base_turn(total_q)        
+
 
     # ---------- follow-up decision (NEW) ----------
 
@@ -520,7 +1144,7 @@ class InterviewRuntime:
 
 
         # Extremely short answers usually need clarification.
-        if word_count < 20:
+        if word_count < 15:
             return True
 
         vague_markers = (
@@ -545,6 +1169,79 @@ class InterviewRuntime:
         assert self.cfg is not None
         assert self.planner is not None
         assert self.tm is not None
+
+
+
+        @self.session.on("user_state_changed")
+        def _handle_user_state(
+            ev: UserStateChangedEvent,
+        ):
+            """
+            Production speech activity tracking.
+
+            IMPORTANT:
+            We track speaking state from
+            LiveKit turn/VAD events.
+
+            We DO NOT rely on transcript timing
+            anymore.
+            """
+
+            try:
+
+                new_state = str(
+                    ev.new_state
+                ).lower()
+
+                #
+                # User actively speaking
+                #
+                if new_state == "speaking":
+
+                    if (
+                        not self._candidate_is_speaking
+                    ):
+                        logger.info(
+                            "Candidate started speaking."
+                        )
+
+                    self._candidate_is_speaking = True
+
+                #
+                # User finished speaking
+                #
+                elif new_state == "listening":
+
+                    #
+                    # Ignore false listening transitions
+                    # while generation is active.
+                    #
+                    if self._generation_in_progress:
+                        return
+                    
+
+                    if (
+                        self._candidate_is_speaking
+                    ):
+                        logger.info(
+                            "Candidate stopped speaking."
+                        )
+
+                    self._candidate_is_speaking = (
+                        False
+                    )
+
+                    self._last_speech_end_at = (
+                        time.monotonic()
+                    )
+
+            except Exception:
+                logger.exception(
+                    "user_state_changed "
+                    "handler failed."
+                )
+
+
 
         async def _handle_item(ev: ConversationItemAddedEvent):
             if not self._runtime_alive:
@@ -603,6 +1300,16 @@ class InterviewRuntime:
                 text,
             )
 
+            logger.warning(
+                "Assistant item received → "
+                "pending_generation_type=%s "
+                "generation_in_progress=%s "
+                "text=%s",
+                self._pending_generation_type,
+                self._generation_in_progress,
+                text[:120],
+            )
+
             # ----------------------------------------------------------------
             # Assistant side: classify spoken message
             # ----------------------------------------------------------------
@@ -619,6 +1326,9 @@ class InterviewRuntime:
                             "Illegal state transition to LISTENING from %s",
                             self.state_machine.value.name,
                         )
+
+
+                    self._reset_transcript_buffer()    
 
                     self.tm.mark_question_asked(question_text=text)
                     self._followup_phase_closed = False
@@ -654,6 +1364,11 @@ class InterviewRuntime:
                             self.state_machine.value.name,
                         )
 
+                    #
+                    # Prevent transcript carry-over
+                    # between turns/followups.
+                    #
+                    self._reset_transcript_buffer()
                     self.tm.mark_followup_asked(question_text=text)
                     await self._send_data(
                         {
@@ -674,6 +1389,55 @@ class InterviewRuntime:
                         }
                     )
                     await self._sync_runtime_state()
+
+                elif self._pending_generation_type == "RETRY":
+
+                    #
+                    # Retry of SAME question.
+                    #
+                    # IMPORTANT:
+                    # Do NOT call mark_question_asked()
+                    # because that resets base_answer_text
+                    # and corrupts turn finalization.
+                    #
+                    self._pending_generation_type = None
+
+                    try:
+                        self.state_machine.transition(
+                            InterviewState.LISTENING
+                        )
+                    except ValueError:
+                        logger.warning(
+                            "Illegal state transition "
+                            "to LISTENING from %s",
+                            self.state_machine.value.name,
+                        )
+
+                    #
+                    # Reset transcript buffer before retry.
+                    #
+                    # Prevents stale partial answer
+                    # from causing immediate commit
+                    # after retry question.
+                    #
+                    self._reset_transcript_buffer()
+                    self.tm.state.last_question_time = (
+                        time.monotonic()
+                    )
+                    self.tm.state.waiting_for_answer = True
+
+                    await self._send_data(
+                        {
+                            "type": "state",
+                            "state": self.state_machine.value.name,
+                            "current_index": (
+                                self.tm.current_turn_index_1based()
+                            ),
+                            "max_questions": total_q,
+                        }
+                    )
+
+                    await self._sync_runtime_state()    
 
                 else:
                     # # Assistant filler / closing messages – forward as info or ignore.
@@ -696,106 +1460,351 @@ class InterviewRuntime:
                     return
                 return
 
-            # ----------------------------------------------------------------
-            # User side: handle answers
-            # ----------------------------------------------------------------
+
             if (
                 role == "user"
                 and self.tm.has_pending_question()
-                and not self._generation_in_progress
             ):
-                should_followup = False
-                async with self._turn_lock:
-                    # Double-check after acquiring the lock to avoid races.
-                    if not self.tm.has_pending_question():
-                        return
 
-                    answer_text = text
-                    turn_index_1based = self.tm.current_turn_index_1based()
-                    question_text = self.tm.state.last_question_text or ""
+                incoming_text = (text or "").strip()
 
-                    await self._send_data(
-                        {
-                            "type": "answer",
-                            "index": turn_index_1based,
-                            "question": question_text,
-                            "answer": answer_text,
-                            "is_followup": self.tm.state.is_followup_active,  # [NEW]
-                        }
+                if not incoming_text:
+                    return
+
+                normalized = self._normalize_transcript(
+                    incoming_text
+                )
+
+                if not normalized:
+                    return
+
+                #
+                # Transcript session start
+                #
+                if not self._transcript_started_at:
+
+                    self._transcript_started_at = (
+                        time.monotonic()
                     )
 
-                    # [NEW] Branch: are we answering a follow-up or a base question?
-                    if self.tm.state.is_followup_active:
-                        # Record the follow-up answer (does NOT increment turn_index).
-                        self.tm.mark_followup_answer_received(answer_text=answer_text)
+                #
+                # Hard safety ceiling
+                #
+                self._transcript_update_count += 1
 
-                        try:
-                            self.state_machine.transition(InterviewState.PROCESSING)
-                        except ValueError:
-                            logger.warning(
-                                "Illegal state transition to PROCESSING from %s",
-                                self.state_machine.value.name,
-                            )
+                if (
+                    self._transcript_update_count >
+                    MAX_TRANSCRIPT_UPDATES_PER_PROMPT
+                ):
+                    logger.warning(
+                        "Too many transcript updates. "
+                        "Force resetting transcript buffer."
+                    )
 
-                        await self._send_data(
-                            {
-                                "type": "state",
-                                "state": self.state_machine.value.name,
-                                "current_index": turn_index_1based,
-                                "max_questions": total_q,
-                            }
-                        )
-                        await self._sync_runtime_state()
+                    self._reset_transcript_buffer()
+                    return
 
-                        # Decide: another follow-up or finalize?
-                        should_followup = self._should_ask_followup(answer_text)
+                #
+                # Similarity suppression
+                #
+                similarity = self._transcript_similarity(
+                    normalized,
+                    self._last_normalized_transcript,
+                )
 
-                    else:
-                        # Base question answered.
-                        # Record answer locally first (does NOT increment turn_index yet).
-                        self.tm.record_base_answer(answer_text=answer_text)  # [NEW]
+                if (
+                    similarity >=
+                    TRANSCRIPT_SIMILARITY_THRESHOLD
+                ):
+                    return
 
-                        try:
-                            self.state_machine.transition(InterviewState.PROCESSING)
-                        except ValueError:
-                            logger.warning(
-                                "Illegal state transition to PROCESSING from %s",
-                                self.state_machine.value.name,
-                            )
+                #
+                # Update transcript buffer
+                #
+                self._last_normalized_transcript = (
+                    normalized
+                )
 
-                        await self._send_data(
-                            {
-                                "type": "state",
-                                "state": self.state_machine.value.name,
-                                "current_index": turn_index_1based,
-                                "max_questions": total_q,
-                            }
-                        )
-                        await self._sync_runtime_state()
+                #
+                # IMPORTANT:
+                # Accumulate transcript chunks instead of replacing.
+                #
+                # Prevents partial answer commits when STT emits
+                # speech in multiple bursts.
+                #
+                ##################################
+                # if self._active_transcript_text:
 
-                        # [NEW] Decide: ask a follow-up or finalize immediately?
-                        # if self._should_ask_followup(answer_text):
-                        #     await self._ask_followup(total_q)
-                        # else:
-                        #     await self._finalize_base_turn(total_q)
-                        should_followup = self._should_ask_followup(answer_text)
+                #     self._active_transcript_text = (
+                #         self._active_transcript_text
+                #         + " "
+                #         + incoming_text
+                #     )
 
-                try:
-                    if self.tm.followup_budget_exhausted(
-                        MAX_FOLLOWUPS_PER_QUESTION
+                # else:
+
+                #     self._active_transcript_text = (
+                #         incoming_text
+                #     )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                ##################################
+                # LiveKit transcripts are typically cumulative,
+                # not independent chunks.
+                #
+                # Replace transcript with the latest
+                # version instead of appending.
+                #
+                # Example:
+                #
+                # "I worked"
+                # "I worked on"
+                # "I worked on auth"
+                #
+                # We want ONLY latest transcript.
+                #
+                existing = (
+                    self._active_transcript_text or ""
+                ).strip()
+
+                incoming = incoming_text.strip()
+
+                #
+                # Production-safe transcript merge.
+                #
+                # Handles:
+                #
+                # 1. cumulative transcripts
+                # 2. chunked transcripts
+                # 3. overlapping partial rewrites
+                # 4. repeated STT emissions
+                #
+                # Examples:
+                #
+                # cumulative:
+                # "I worked"
+                # "I worked on auth"
+                #
+                # chunked:
+                # "I worked"
+                # "on auth"
+                #
+                # overlapping:
+                # "I worked on auth"
+                # "worked on auth with JWT"
+                #
+
+                if not existing:
+
+                    self._active_transcript_text = incoming
+
+                else:
+
+                    existing_lower = existing.lower()
+                    incoming_lower = incoming.lower()
+
+                    #
+                    # CASE 1:
+                    # cumulative transcript
+                    #
+                    if incoming_lower.startswith(
+                        existing_lower
                     ):
-                        should_followup = False
 
-                    if should_followup:
-                        await self._ask_followup(total_q)
+                        self._active_transcript_text = (
+                            incoming
+                        )
+
+                    #
+                    # CASE 2:
+                    # duplicate transcript
+                    #
+                    elif incoming_lower in existing_lower:
+
+                        pass
+
+                    #
+                    # CASE 3:
+                    # overlap merge
+                    #
                     else:
-                        await self._finalize_base_turn(total_q)
 
-                except Exception:
-                    logger.exception(
-                        "Post-answer generation failed: session_id=%s",
-                        self.cfg.session_id,
-                    )       
+                        overlap_found = False
+
+                        existing_words = (
+                            existing.split()
+                        )
+
+                        incoming_words = (
+                            incoming.split()
+                        )
+
+                        #
+                        # Find longest overlap.
+                        #
+                        max_overlap = min(
+                            len(existing_words),
+                            len(incoming_words),
+                            12,
+                        )
+
+                        for n in range(
+                            max_overlap,
+                            0,
+                            -1,
+                        ):
+
+                            existing_tail = " ".join(
+                                existing_words[-n:]
+                            ).lower()
+
+                            incoming_head = " ".join(
+                                incoming_words[:n]
+                            ).lower()
+
+                            if (
+                                existing_tail
+                                == incoming_head
+                            ):
+
+                                merged = (
+                                    existing_words
+                                    + incoming_words[n:]
+                                )
+
+                                self._active_transcript_text = (
+                                    " ".join(merged)
+                                )
+
+                                overlap_found = True
+                                break
+
+                        #
+                        # CASE 4:
+                        # fully independent chunk
+                        #
+                        if not overlap_found:
+
+                            self._active_transcript_text = (
+                                existing
+                                + " "
+                                + incoming
+                            ).strip()
+
+
+
+
+
+
+
+
+
+
+
+
+
+                self._last_transcript_update_at = (
+                    time.monotonic()
+                )
+
+                logger.info(
+                    "Transcript updated: %s",
+                    incoming_text,
+                )
+
+                #
+                # Safety timeout against endless transcript growth
+                #
+                elapsed = (
+                    time.monotonic()
+                    - self._transcript_started_at
+                )
+
+                word_count = len(
+                    re.findall(
+                        r"\b[\w'-]+\b",
+                        self._active_transcript_text,
+                    )
+                )
+
+                force_commit = (
+                    elapsed >= TRANSCRIPT_BUFFER_MAX_SECONDS
+                    and word_count >= MIN_TRANSCRIPT_COMMIT_WORDS
+                )
+
+                #
+                # Cancel previous stabilization task
+                #
+                if self._transcript_stabilization_task:
+
+                    if (
+                        not self._transcript_stabilization_task.done()
+                    ):
+                        self._transcript_stabilization_task.cancel()
+
+                #
+                # Immediate forced commit
+                #
+                if force_commit:
+
+                    logger.warning(
+                        "Force committing transcript due to "
+                        "buffer timeout."
+                    )
+
+                    # IMPORTANT:
+                    # Cancel stabilization timer BEFORE force commit.
+                    #
+                    # Prevents delayed stabilization callbacks
+                    # from firing after forced commit already finalized.
+                    if self._transcript_stabilization_task:
+
+                        if (
+                            not self._transcript_stabilization_task.done()
+                        ):
+                            self._transcript_stabilization_task.cancel()
+
+                    await self._commit_stabilized_transcript(
+                        total_q=total_q,
+                    )
+
+                    return
+
+                #
+                # Start stabilization timer
+                #
+                task = asyncio.create_task(
+                    self._schedule_transcript_commit(
+                        total_q=total_q,
+                    )
+                )
+
+                self._transcript_stabilization_task = task
+
+                self._background_tasks.add(task)
+
+                def _cleanup_task(t: asyncio.Task):
+                    self._background_tasks.discard(t)
+
+                task.add_done_callback(_cleanup_task)
+
+                return
+            
+            
 
         @self.session.on("conversation_item_added")
         def _on_item(ev: ConversationItemAddedEvent):
@@ -899,9 +1908,147 @@ class InterviewRuntime:
         assert self.tm is not None
         assert self.planner is not None
 
+        # Prevent duplicate finalization caused by:
+        # - transcript races
+        # - timeout overlap
+        # - duplicate callbacks
+        if not self.tm.try_begin_turn_finalization():
+            logger.warning(
+                "Skipping duplicate turn finalization."
+            )
+            return
         turn_index_1based = self.tm.current_turn_index_1based()
         question_text = self.tm.state.base_question_text or ""
-        answer_text = self.tm.state.base_answer_text
+
+        parts = []
+        base_answer = (
+            self.tm.state.base_answer_text or ""
+        ).strip()
+
+        if base_answer:
+            parts.append(base_answer)
+
+        for ex in self.tm.state.followup_exchanges:
+            ans = (
+                ex.get("answer") or ""
+            ).strip()
+
+            if ans and ans != "[NO_RESPONSE]":
+                parts.append(ans)
+
+        answer_text = " ".join(parts).strip()
+
+        if not answer_text:
+
+            #
+            # Try salvaging from active transcript buffer.
+            #
+            # Covers race:
+            #
+            # user speaking
+            # ↓
+            # stabilization not committed yet
+            # ↓
+            # finalize triggered
+            #
+            salvaged = (
+                self._active_transcript_text.strip()
+            )
+
+            if (
+                salvaged
+                and self._is_valid_user_answer(
+                    salvaged
+                )
+            ):
+
+                logger.info(
+                    "Salvaged answer from transcript "
+                    "buffer: %r",
+                    salvaged[:80],
+                )
+
+                answer_text = salvaged
+
+                self._reset_transcript_buffer()
+
+                self.tm.state.base_answer_text = (
+                    answer_text
+                )
+
+            else:
+
+                logger.warning(
+                    "Skipping backend turn post "
+                    "because answer is empty. "
+                    "Advancing to next question."
+                )
+
+                self._reset_transcript_buffer()
+
+                self.tm.abort_turn_finalization()
+
+                self.tm.mark_followup_phase_completed()
+
+                self._followup_phase_closed = True
+
+                self.tm.mark_answer_received()
+
+                await self._sync_runtime_state()
+
+                # CRITICAL: Ask the next question even when skipping an empty turn.
+                # Without this, the interview gets permanently stuck because no
+                # pending question exists and Gemini generates autonomous questions
+                # indefinitely.
+                if self.tm.can_ask_new_question():
+                    _idx = self.tm.current_turn_index_0based()
+                    _base_q = self.planner.base_question_for_turn(_idx)
+                    _instr = self.planner.build_llm_instruction(
+                        turn_index=_idx,
+                        base_q=_base_q,
+                        last_answer=None,
+                    )
+                    try:
+                        self.state_machine.transition(InterviewState.ASKING)
+                    except ValueError:
+                        logger.warning(
+                            "Illegal state transition to ASKING from %s",
+                            self.state_machine.value.name,
+                        )
+                    await self._send_data(
+                        {
+                            "type": "state",
+                            "state": self.state_machine.value.name,
+                            "current_index": self.tm.current_turn_index_1based(),
+                            "max_questions": total_q,
+                        }
+                    )
+                    await self._sync_runtime_state()
+                    await self._safe_generate_reply(
+                        instructions=_instr,
+                        generation_type="QUESTION",
+                    )
+                else:
+                    try:
+                        self.state_machine.transition(InterviewState.ENDING)
+                        self.state_machine.transition(InterviewState.COMPLETED)
+                    except ValueError:
+                        pass
+                    self.tm.state.done = True
+                    await self._send_data(
+                        {
+                            "type": "state",
+                            "state": self.state_machine.value.name,
+                            "current_index": self.tm.current_turn_index_1based(),
+                            "max_questions": total_q,
+                        }
+                    )
+                    await self._sync_runtime_state()
+                    await self.backend.notify_interview_completed(
+                        self.cfg.session_id
+                    )
+                    self._interview_done.set()
+                return
 
         # Merge base metadata with follow-up extras.
         metadata = {
@@ -919,14 +2066,28 @@ class InterviewRuntime:
                 answer_text=answer_text,
                 metadata=metadata,
             )
+            logger.info(
+                "POSTING TURN → session=%s turn=%s",
+                self.cfg.session_id,
+                turn_index_1based,
+            )
             if resp.status_code >= 400:
                 logger.error(
                     "Backend turn post failed: status=%s body=%s",
                     resp.status_code,
                     resp.text,
                 )
+            else:
+                logger.info(
+                    "TURN POST SUCCESS → session=%s turn=%s",
+                    self.cfg.session_id,
+                    turn_index_1based,
+                )    
         except Exception:
             logger.exception("Error posting turn to backend")
+            # Recover finalize fence.
+            self.tm.abort_turn_finalization()
+            return
 
         # Hard close follow-up lifecycle before advancing.
         self.tm.mark_followup_phase_completed()
@@ -1179,6 +2340,20 @@ class InterviewRuntime:
                 if self._generation_in_progress:
                     continue
 
+                # Finalized answer currently processing.
+                #
+                # Prevent retry race after transcript
+                # commit but before next question.
+                #
+                if self._processing_answer:
+
+                    logger.debug(
+                        "Suppressing timeout: "
+                        "answer processing."
+                    )
+
+                    continue
+
                 # Enforce overall interview duration if configured.
                 if (
                     self.cfg.duration_seconds is not None
@@ -1222,6 +2397,66 @@ class InterviewRuntime:
                 if not self.tm.state.waiting_for_answer:
                     continue
 
+                #
+                # Production speech guard.
+                #
+                # Never retry/skip while candidate
+                # is actively speaking.
+                #
+                # We rely on LiveKit speech/VAD events,
+                # NOT transcript timing.
+                #
+                if self._candidate_is_speaking:
+
+                    logger.debug(
+                        "Suppressing timeout: "
+                        "candidate still speaking."
+                    )
+
+                    continue
+
+
+                #
+                # Candidate recently stopped speaking.
+                #
+                # Give natural pause window before
+                # retrying/skipping.
+                #
+                if self._candidate_recently_stopped_speaking():
+
+                    logger.debug(
+                        "Suppressing timeout: "
+                        "speech recently ended."
+                    )
+
+                    continue
+
+
+                #
+                # Transcript still stabilizing.
+                #
+                # Prevent retry while STT is still
+                # assembling final answer text.
+                #
+                if (
+                    self._active_transcript_text.strip()
+                    and self._last_transcript_update_at > 0
+                    and (
+                        time.monotonic()
+                        - self._last_transcript_update_at
+                    ) < (
+                        TRANSCRIPT_STABILIZATION_SECONDS
+                        + 1.0
+                    )
+                ):
+
+                    logger.debug(
+                        "Suppressing timeout: "
+                        "transcript stabilizing."
+                    )
+
+                    continue
+
                 # Retry once if no answer
                 if self.tm.should_retry_for_no_answer():
                     try:
@@ -1233,11 +2468,16 @@ class InterviewRuntime:
                         )
 
                     self.tm.mark_retry_used()
+
+
                     await self._send_data(
                         {
                             "type": "info",
                             "reason": "no_answer_retry",
-                            "message": "I didn't hear a response. Please answer the question when you're ready.",
+                            "message": (
+                                "I didn't hear a response. "
+                                "Please answer the question when you're ready."
+                            ),
                             "index": self.tm.current_turn_index_1based(),
                         }
                     )
@@ -1256,16 +2496,34 @@ class InterviewRuntime:
                     )
                     await self._safe_generate_reply(
                         instructions=retry_instr,
-                        generation_type=(
-                            "FOLLOWUP"
-                            if self.tm.state.is_followup_active
-                            else "QUESTION"
-                        ),
+                        generation_type="RETRY",
                     )
                     await self._sync_runtime_state()
                     continue
 
                 if self.tm.should_timeout_and_skip():
+
+                    #
+                    # Candidate is actively speaking.
+                    #
+                    # Transcript stabilization may not have committed yet.
+                    # Never skip while transcript buffer exists.
+                    #
+                    if self._active_transcript_text.strip():
+
+                        logger.info(
+                            "Suppressing timeout skip: "
+                            "candidate has active transcript."
+                        )
+
+                        #
+                        # Give candidate more time.
+                        #
+                        self.tm.state.last_question_time = (
+                            time.monotonic()
+                        )
+
+                        continue
 
                     skip_confirmed = False
 
@@ -1295,7 +2553,7 @@ class InterviewRuntime:
 
                         # If timed out on a follow-up, finalize using existing base answer.
                         if self.tm.state.is_followup_active:
-                            self.tm.mark_followup_answer_received(answer_text="")
+                            self.tm.mark_followup_answer_received(answer_text="[NO_RESPONSE]")
                             self.tm.mark_followup_phase_completed()
                             self._followup_phase_closed = True
 
@@ -1305,6 +2563,15 @@ class InterviewRuntime:
                     # _finalize_base_turn() internally calls generate_reply().
                     # Never run generation while holding _turn_lock.
                     if skip_confirmed:
+
+                        # IMPORTANT:
+                        # Clear any partially accumulated transcript
+                        # before advancing to next question.
+                        #
+                        # Prevents stale transcript carry-over
+                        # after timeout skips.
+                        self._reset_transcript_buffer()
+
                         await self._finalize_base_turn(total_q)
 
         except asyncio.CancelledError:
@@ -1409,19 +2676,7 @@ class InterviewRuntime:
                         "Runtime guard shutdown failed"
                     )
 
-            #
-            # Release ownership
-            #
-            if self.backend and self.cfg:
 
-                try:
-                    await self.backend.release_runtime_ownership(
-                        self.cfg.session_id
-                    )
-                except Exception:
-                    logger.exception(
-                        "Failed releasing runtime ownership"
-                    )
 
             #
             # Close backend client

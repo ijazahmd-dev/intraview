@@ -38,3 +38,8 @@ urlpatterns = [
     path("admin/payments/orders/<int:pk>/",views_admin.AdminPaymentOrderDetailAPIView.as_view(),name="admin-payment-order-detail",),
     path("admin/payments/orders/export-csv/",views_admin.AdminPaymentOrderExportCSVAPIView.as_view(),name="admin-payment-order-export-csv",),
 ]
+
+
+
+
+# stripe listen --forward-to localhost:8000/api/payments/interviewer-subscriptions/webhook/stripe/

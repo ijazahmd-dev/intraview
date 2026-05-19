@@ -7,6 +7,7 @@ from interviewers.models import InterviewerAvailability,InterviewerProfile
 from .models import InterviewBooking, RescheduleStatus
 
 from wallet.models import TokenTransaction, TokenTransactionType
+from feedbacks.models import CandidateEvaluation
 from subscriptions.services.entitlement_service import SubscriptionEntitlementService
 
 
@@ -186,17 +187,25 @@ class CandidatePastInterviewSerializer(serializers.ModelSerializer):
 
 
 
-
 class BookingDetailSerializer(serializers.ModelSerializer):
-    interviewer_id = serializers.IntegerField(source="interviewer.id", read_only=True)
-    interviewer_name = serializers.CharField(
-        source="interviewer.interviewer_profile.display_name",
-        read_only=True,
-        default=""
-    )
+    interviewer_id       = serializers.IntegerField(source="interviewer.id", read_only=True)
+    interviewer_name     = serializers.SerializerMethodField()
+    interviewer_headline = serializers.SerializerMethodField()
 
-    candidate_id = serializers.IntegerField(source="candidate.id", read_only=True)
+    candidate_id    = serializers.IntegerField(source="candidate.id", read_only=True)
     candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+
+    start_time = serializers.SerializerMethodField()
+    end_time   = serializers.SerializerMethodField()
+
+    # Reschedule fields
+    reschedule_status = serializers.CharField(read_only=True)
+    reschedule_note   = serializers.CharField(source="reschedule_reason", read_only=True)
+    reschedule_count  = serializers.IntegerField(read_only=True)
+    proposed_slot     = serializers.SerializerMethodField()
+
+    # Feedback link — null if no evaluation exists yet
+    feedback_evaluation_id = serializers.SerializerMethodField()
 
     class Meta:
         model = InterviewBooking
@@ -207,6 +216,8 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
             "start_datetime",
             "end_datetime",
+            "start_time",
+            "end_time",
 
             "cancellation_reason",
             "cancelled_at",
@@ -216,13 +227,63 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
             "interviewer_id",
             "interviewer_name",
+            "interviewer_headline",
+
+            # reschedule
+            "reschedule_status",
+            "reschedule_note",
+            "reschedule_count",
+            "proposed_slot",
+
+            # feedback
+            "feedback_evaluation_id",
 
             "created_at",
             "updated_at",
         ]
 
+    def get_interviewer_name(self, obj):
+        try:
+            return obj.interviewer.interviewer_profile.display_name or ""
+        except Exception:
+            return ""
+
+    def get_interviewer_headline(self, obj):
+        try:
+            return obj.interviewer.interviewer_profile.headline or ""
+        except Exception:
+            return ""
+
+    def get_start_time(self, obj):
+        if obj.start_datetime:
+            return obj.start_datetime.strftime("%I:%M %p")
+        return None
+
+    def get_end_time(self, obj):
+        if obj.end_datetime:
+            return obj.end_datetime.strftime("%I:%M %p")
+        return None
+
+    def get_proposed_slot(self, obj):
+        slot = obj.proposed_availability
+        if not slot:
+            return None
+        return {
+            "id":         slot.id,
+            "date":       str(slot.date),
+            "start_time": slot.start_time.strftime("%I:%M %p"),
+            "end_time":   slot.end_time.strftime("%I:%M %p"),
+        }
+
+    def get_feedback_evaluation_id(self, obj):
+        try:
+            return obj.candidate_evaluation.id
+        except CandidateEvaluation.DoesNotExist:
+            return None
         
-    
+
+
+
 
 
 class CandidateRescheduleSerializer(serializers.Serializer):

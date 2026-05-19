@@ -2,6 +2,8 @@
 
 import { LiveKitVideoPanel } from "./LiveKitVideoPanel";
 import { useNavigate } from "react-router-dom";
+import { useAgentTranscript } from "../hooks/useAgentTranscript";
+import { AgentTranscriptPanel } from "./AgentTranscriptPanel"; 
 
 export function LoadingView({ message }) {
   return (
@@ -156,9 +158,9 @@ export function ConnectingView({ sessionInfo }) {
 
 
 
-// Add this ABOVE LiveInterviewView in LiveInterviewViews.jsx
 
-import { useAgentTranscript } from "../hooks/useAgentTranscript";
+
+
 
 function LiveInterviewInner({
   sessionInfo,
@@ -166,7 +168,7 @@ function LiveInterviewInner({
   onEnd,
   isEnding,
 }) {
-  const { currentQuestion, transcript } = useAgentTranscript();
+  const { currentQuestion, transcript, questionHistory } = useAgentTranscript();
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -201,65 +203,12 @@ function LiveInterviewInner({
         </div>
       </div>
 
-      {/* Current question banner */}
-      {currentQuestion && (
-        <div className="rounded-xl bg-teal-500/10 border border-teal-500/30 px-4 py-3">
-          <p className="text-[10px] font-semibold text-teal-400 uppercase tracking-wide mb-1">
-            Current Question
-          </p>
-          <p className="text-[13px] text-gray-100 leading-relaxed">
-            {currentQuestion.text}
-          </p>
-        </div>
-      )}
-
-      {/* Transcript panel */}
-      {transcript.length > 0 && (
-        <div className="rounded-xl bg-gray-800/60 border border-gray-700 p-3 max-h-40 overflow-y-auto flex flex-col gap-2">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-            Transcript
-          </p>
-          {transcript.map((msg) => (
-            <div
-              key={msg.id}
-              className={`text-[11px] leading-relaxed ${
-                msg.role === "agent"
-                  ? "text-teal-300"
-                  : "text-gray-300"
-              }`}
-            >
-              <span className="font-semibold mr-1">
-                {msg.role === "agent" ? "AI:" : "You:"}
-              </span>
-              {msg.text}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tips sidebar — shown only when no transcript yet */}
-      {transcript.length === 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-            <p className="text-[11px] font-semibold text-gray-200 mb-1">
-              What to expect
-            </p>
-            <p className="text-[11px] text-gray-400">
-              You'll hear a question, then answer out loud. Try to respond in
-              1–2 minutes per question.
-            </p>
-          </div>
-          <div className="rounded-xl bg-gray-800 border border-gray-700 p-3">
-            <p className="text-[11px] font-semibold text-gray-200 mb-1">
-              Tip
-            </p>
-            <p className="text-[11px] text-gray-400">
-              Use STAR (Situation, Task, Action, Result) to structure
-              behavioral answers clearly.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* AgentTranscriptPanel handles current question + transcript + history */}
+      <AgentTranscriptPanel
+        currentQuestion={currentQuestion}
+        transcript={transcript}
+        questionHistory={questionHistory}
+      />
     </div>
   );
 }

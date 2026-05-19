@@ -7,14 +7,14 @@ This file prevents scattering magic numbers across the codebase.
 """
 
 # How long to wait for a candidate answer before a gentle retry.
-NO_ANSWER_TIMEOUT_SECONDS: float = 15.0
+NO_ANSWER_TIMEOUT_SECONDS: float = 60.0
 
 # Maximum multiplier for total no-answer wait after retry.
 # 40s (initial) + 40s (retry) = 80s total window.
 NO_ANSWER_MAX_MULTIPLIER: int = 2
 
 # How often the timeout loop wakes up to inspect state.
-TIMEOUT_LOOP_INTERVAL_SECONDS: float = 2.0
+TIMEOUT_LOOP_INTERVAL_SECONDS: float = 0.8
 
 # How long a room can stay empty before we *consider* abandonment (future use).
 EMPTY_ROOM_GRACE_SECONDS: float = 60.0
@@ -101,3 +101,52 @@ MAX_CONCURRENT_GENERATIONS: int = 1
 # Prevents permanently stuck finalization state if
 # runtime crashes mid-finalize.
 TURN_FINALIZATION_TIMEOUT_SECONDS: float = 15.0
+
+# ---------------------------------------------------------
+# Streaming transcript assembly / stabilization
+# ---------------------------------------------------------
+
+# How long transcript input must remain unchanged
+# before runtime considers the transcript "stable"
+# and safe to finalize.
+#
+# Example:
+# - user stops speaking
+# - STT provider emits final chunks
+# - no new transcript arrives for this duration
+# => runtime commits transcript
+TRANSCRIPT_STABILIZATION_SECONDS: float = 2.2
+
+# Minimum transcript size before runtime considers
+# the answer meaningful enough to commit.
+#
+# Prevents:
+# - tiny accidental utterances
+# - microphone clicks
+# - partial STT fragments
+MIN_TRANSCRIPT_COMMIT_WORDS: int = 4
+
+# Maximum duration transcript buffer may stay open
+# before runtime forcefully commits/reset state.
+#
+# Prevents:
+# - endless streaming sessions
+# - stuck STT pipelines
+# - memory growth
+TRANSCRIPT_BUFFER_MAX_SECONDS: float = 120.0
+
+# Similarity threshold used to suppress duplicate
+# transcript commits caused by repeated STT emissions.
+#
+# Runtime compares normalized transcript strings.
+#
+# 1.0 = exact identical
+# 0.0 = completely different
+TRANSCRIPT_SIMILARITY_THRESHOLD: float = 0.92
+
+# Maximum transcript updates accepted for a single
+# pending prompt before runtime defensively resets
+# transcript assembly state.
+#
+# Protects against runaway STT event storms.
+MAX_TRANSCRIPT_UPDATES_PER_PROMPT: int = 250

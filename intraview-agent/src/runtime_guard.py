@@ -3,9 +3,11 @@
 import asyncio
 import logging
 from typing import Optional
-MAX_HEARTBEAT_FAILURES = 3
 
 from backend_client import BackendClient
+from constants import (
+    MAX_HEARTBEAT_FAILURES,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,7 @@ class RuntimeGuard:
 
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._running: bool = False
+        self._stopping: bool = False
 
         self._heartbeat_failures: int = 0
 
@@ -126,6 +129,33 @@ class RuntimeGuard:
                 f"session {self.session_id}"
             )
 
+
+
+
+    def runtime_snapshot(self) -> dict:
+        """
+        RuntimeGuard observability snapshot.
+
+        Useful for:
+        - structured logging
+        - debugging
+        - admin diagnostics
+        - runtime health monitoring
+        """
+
+        return {
+            "session_id": self.session_id,
+            "runtime_id": self.runtime_id,
+            "runtime_generation": self.runtime_generation,
+            "running": self._running,
+            "stopping": self._stopping,
+            "heartbeat_failures": self._heartbeat_failures,
+            "heartbeat_task_alive": (
+                self._heartbeat_task is not None
+                and not self._heartbeat_task.done()
+            ),
+        }    
+
     # ------------------------------------------------------------------
     # Heartbeat loop
     # ------------------------------------------------------------------
@@ -159,6 +189,14 @@ class RuntimeGuard:
                     self._heartbeat_failures = 0
 
                 except RuntimeOwnershipLost:
+
+                    logger.error(
+                        "Runtime ownership lost during heartbeat loop: "
+                        "session_id=%s runtime_id=%s",
+                        self.session_id,
+                        self.runtime_id,
+                    )
+
                     raise
 
                 except Exception:
@@ -210,6 +248,21 @@ class RuntimeGuard:
         """
 
         if self._running:
+            logger.warning(
+                "RuntimeGuard.start() called while already running: "
+                "session_id=%s runtime_id=%s",
+                self.session_id,
+                self.runtime_id,
+            )
+            return
+
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            logger.warning(
+                "Heartbeat task already exists before start(): "
+                "session_id=%s runtime_id=%s",
+                self.session_id,
+                self.runtime_id,
+            )
             return
 
         await self.acquire_ownership()
@@ -217,7 +270,12 @@ class RuntimeGuard:
         self._running = True
 
         self._heartbeat_task = asyncio.create_task(
-            self._heartbeat_loop()
+            self._heartbeat_loop(),
+            name=(
+                f"runtime-heartbeat-"
+                f"{self.session_id}-"
+                f"{self.runtime_id}"
+            ),
         )
 
     async def stop(self):
@@ -225,6 +283,10 @@ class RuntimeGuard:
         Gracefully stop runtime ownership lifecycle.
         """
 
+        if self._stopping:
+            return
+
+        self._stopping = True
         self._running = False
 
         if self._heartbeat_task:
@@ -253,3 +315,6 @@ class RuntimeGuard:
             self.session_id,
             self.runtime_id,
         )
+
+        self._heartbeat_task = None
+        self._stopping = False

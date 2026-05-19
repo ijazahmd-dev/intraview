@@ -67,6 +67,27 @@ class SubmitInterviewerReviewAPIView(APIView):
             )
 
 
+            from notifications.events import emit_event
+            from notifications.constants import EventType
+            from django.db import transaction
+
+            def emit_feedback_submitted():
+                emit_event(
+                    EventType.FEEDBACK_SUBMITTED,
+                    actor_id=request.user.id,
+                    payload={
+                        "booking_id": booking.id,
+                        "candidate_id": booking.candidate_id,
+                        "interviewer_id": booking.interviewer_id,
+                        "submitted_by": "candidate",
+                        "evaluation_id": review.id,
+                    },
+                    correlation_id=f"booking:{booking.id}:feedback-submitted:candidate",
+                )
+
+            transaction.on_commit(emit_feedback_submitted)
+
+
             return Response({
 
                 "message": "Review submitted successfully",

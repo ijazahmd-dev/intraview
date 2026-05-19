@@ -51,6 +51,27 @@ class SubmitCandidateEvaluationAPIView(APIView):
                     validated_data=serializer.validated_data
                 )
 
+                from notifications.events import emit_event
+                from notifications.constants import EventType
+                from django.db import transaction
+
+                def emit_feedback_submitted():
+                    emit_event(
+                        EventType.FEEDBACK_SUBMITTED,
+                        actor_id=request.user.id,
+                        payload={
+                            "booking_id": booking.id,
+                            "candidate_id": booking.candidate_id,
+                            "interviewer_id": booking.interviewer_id,
+                            "submitted_by": "interviewer",
+                            "evaluation_id": evaluation.id,
+                        },
+                        correlation_id=f"booking:{booking.id}:feedback-submitted:interviewer",
+                    )
+
+                transaction.on_commit(emit_feedback_submitted)
+                
+
                 return Response(
                     {
                         "message": "Evaluation submitted successfully.",

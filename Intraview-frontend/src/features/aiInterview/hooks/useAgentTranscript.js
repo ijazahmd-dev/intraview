@@ -1,70 +1,150 @@
+// // src/features/aiInterview/hooks/useAgentTranscript.js
+
+// import { useEffect, useRef, useState } from "react";
+// import { useDataChannel } from "@livekit/components-react";
+
+// /**
+//  * Message shape from the agent data channel:
+//  * {
+//  *   role: "agent" | "user",
+//  *   type: "question" | "answer" | "remark",
+//  *   text: string,
+//  *   turn_index: number,
+//  * }
+//  */
+
+// export function useAgentTranscript() {
+//   const [messages, setMessages] = useState([]);
+//   const seenRef = useRef(new Set());
+
+//   const { message } = useDataChannel((msg) => {
+//     try {
+//       const raw = new TextDecoder().decode(msg.payload);
+//       const parsed = JSON.parse(raw);
+
+//       if (
+//         !parsed ||
+//         typeof parsed.text !== "string" ||
+//         !parsed.role ||
+//         !parsed.type
+//       ) {
+//         return;
+//       }
+
+//       // Deduplicate by turn_index + role + type to avoid replay on reconnect
+//       const key = `${parsed.role}-${parsed.type}-${parsed.turn_index ?? "x"}-${parsed.text.slice(0, 30)}`;
+//       if (seenRef.current.has(key)) return;
+//       seenRef.current.add(key);
+
+//       const entry = {
+//         id: key,
+//         role: parsed.role,       // "agent" | "user"
+//         type: parsed.type,       // "question" | "answer" | "remark"
+//         text: parsed.text.trim(),
+//         turn_index: parsed.turn_index ?? null,
+//         timestamp: Date.now(),
+//       };
+
+//       setMessages((prev) => [...prev, entry]);
+//     } catch {
+//       // Silently ignore non-JSON data channel messages
+//     }
+//   });
+
+//   // Derived: current question = last agent message of type "question"
+//   const currentQuestion = [...messages]
+//     .reverse()
+//     .find((m) => m.role === "agent" && m.type === "question") ?? null;
+
+//   // Derived: full chronological transcript (all messages)
+//   const transcript = messages;
+
+//   // Derived: question history = all agent questions except the current one
+//   const questionHistory = messages.filter(
+//     (m) =>
+//       m.role === "agent" &&
+//       m.type === "question" &&
+//       m.id !== currentQuestion?.id
+//   );
+
+//   const resetTranscript = () => {
+//     setMessages([]);
+//     seenRef.current = new Set();
+//   };
+
+//   return {
+//     messages,
+//     currentQuestion,
+//     transcript,
+//     questionHistory,
+//     resetTranscript,
+//   };
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // src/features/aiInterview/hooks/useAgentTranscript.js
 
 import { useEffect, useRef, useState } from "react";
-import { useDataChannel } from "@livekit/components-react";
-
-/**
- * Message shape from the agent data channel:
- * {
- *   role: "agent" | "user",
- *   type: "question" | "answer" | "remark",
- *   text: string,
- *   turn_index: number,
- * }
- */
+import { useTranscriptions } from "@livekit/components-react";
 
 export function useAgentTranscript() {
-  const [messages, setMessages] = useState([]);
+  const transcriptions = useTranscriptions(); // ← correct hook
   const seenRef = useRef(new Set());
+  const [messages, setMessages] = useState([]);
 
-  const { message } = useDataChannel((msg) => {
-    try {
-      const raw = new TextDecoder().decode(msg.payload);
-      const parsed = JSON.parse(raw);
+  useEffect(() => {
+    for (const segment of transcriptions) {
+      // segment shape: { id, text, isFinal, participant, firstReceivedTime }
+      if (!segment.isFinal) continue; // skip partial transcripts
+      if (seenRef.current.has(segment.id)) continue;
+      seenRef.current.add(segment.id);
 
-      if (
-        !parsed ||
-        typeof parsed.text !== "string" ||
-        !parsed.role ||
-        !parsed.type
-      ) {
-        return;
-      }
-
-      // Deduplicate by turn_index + role + type to avoid replay on reconnect
-      const key = `${parsed.role}-${parsed.type}-${parsed.turn_index ?? "x"}-${parsed.text.slice(0, 30)}`;
-      if (seenRef.current.has(key)) return;
-      seenRef.current.add(key);
+      const isAgent =
+        segment.participant?.identity?.startsWith("agent:") ||
+        segment.participant?.isAgent;
 
       const entry = {
-        id: key,
-        role: parsed.role,       // "agent" | "user"
-        type: parsed.type,       // "question" | "answer" | "remark"
-        text: parsed.text.trim(),
-        turn_index: parsed.turn_index ?? null,
-        timestamp: Date.now(),
+        id: segment.id,
+        role: isAgent ? "agent" : "user",
+        type: "remark", // you can refine this later
+        text: segment.text.trim(),
+        turn_index: null,
+        timestamp: segment.firstReceivedTime ?? Date.now(),
       };
 
       setMessages((prev) => [...prev, entry]);
-    } catch {
-      // Silently ignore non-JSON data channel messages
     }
-  });
+  }, [transcriptions]);
 
-  // Derived: current question = last agent message of type "question"
   const currentQuestion = [...messages]
     .reverse()
-    .find((m) => m.role === "agent" && m.type === "question") ?? null;
+    .find((m) => m.role === "agent") ?? null;
 
-  // Derived: full chronological transcript (all messages)
   const transcript = messages;
 
-  // Derived: question history = all agent questions except the current one
   const questionHistory = messages.filter(
-    (m) =>
-      m.role === "agent" &&
-      m.type === "question" &&
-      m.id !== currentQuestion?.id
+    (m) => m.role === "agent" && m.id !== currentQuestion?.id
   );
 
   const resetTranscript = () => {
@@ -72,11 +152,5 @@ export function useAgentTranscript() {
     seenRef.current = new Set();
   };
 
-  return {
-    messages,
-    currentQuestion,
-    transcript,
-    questionHistory,
-    resetTranscript,
-  };
+  return { messages, currentQuestion, transcript, questionHistory, resetTranscript };
 }

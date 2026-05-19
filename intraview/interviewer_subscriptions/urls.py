@@ -24,12 +24,6 @@ urlpatterns = [
     # admin urls
     path("", include(router.urls)),
 
-
-
-
-
-
-
     path(
         "plans/",
         views.InterviewerSubscriptionPlanListAPIView.as_view(),

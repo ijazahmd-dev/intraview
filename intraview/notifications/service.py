@@ -81,8 +81,13 @@ class NotificationService:
 
         elif event_type == EventType.INTERVIEW_REMINDER_30M.value:
             cls._handle_interview_reminder_30m(ctx)   
+
         elif event_type == EventType.RESCHEDULE_SLOT_REQUESTED.value:
-            cls._handle_reschedule_slot_requested(ctx)     
+            cls._handle_reschedule_slot_requested(ctx)    
+
+        elif event_type == EventType.FEEDBACK_SUBMITTED.value:
+            cls._handle_feedback_submitted(ctx)
+     
 
         # Add other events here as you go: INTERVIEW_COMPLETED, etc.
 
@@ -114,6 +119,7 @@ class NotificationService:
                         "body": f"Your interview is scheduled at {start_time}.",
                         "booking_id": booking_id,
                         "role": "candidate",
+                        "redirect_url": f"/candidate/bookings-detail/{booking_id}",
                     },
                 )
             )
@@ -128,6 +134,7 @@ class NotificationService:
                         "body": f"A candidate booked an interview at {start_time}.",
                         "booking_id": booking_id,
                         "role": "interviewer",
+                        "redirect_url": f"/interviewer/dashboard/bookings/{booking_id}",
                     },
                 )
             )
@@ -158,6 +165,7 @@ class NotificationService:
                     "body": f"Payment for interview #{booking_id} has been processed.",
                     "booking_id": booking_id,
                     "amount": amount,
+                    "redirect_url": f"/interviewer/payout/history",
                 },
             )
         ]
@@ -187,6 +195,7 @@ class NotificationService:
                     "title": "Payout failed",
                     "body": f"Payout for interview #{booking_id} could not be completed. Reason: {reason}",
                     "booking_id": booking_id,
+                    "redirect_url": f"/interviewer/payout/history",
                 },
             )
         ]
@@ -200,24 +209,54 @@ class NotificationService:
           - booking_id
           - candidate_id
           - interviewer_id
+          - candidate_pending   (bool) — candidate hasn't submitted their review yet
+          - interviewer_pending (bool) — interviewer hasn't submitted evaluation yet
         """
-        candidate_id = ctx.payload.get("candidate_id")
         booking_id = ctx.payload.get("booking_id")
+        candidate_id = ctx.payload.get("candidate_id")
+        interviewer_id = ctx.payload.get("interviewer_id")
+        candidate_pending = ctx.payload.get("candidate_pending", False)
+        interviewer_pending = ctx.payload.get("interviewer_pending", False)
 
-        if not candidate_id:
+        if not booking_id:
             return
 
-        notifications = [
-            (
-                candidate_id,
-                NotificationChannel.IN_APP.value,
-                {
-                    "title": "Feedback requested",
-                    "body": "Please submit feedback for your recent interview.",
-                    "booking_id": booking_id,
-                },
+        notifications: List[Tuple[int, str, Dict[str, Any]]] = []
+
+        # Notify candidate if they haven't submitted their review
+        if candidate_pending and candidate_id:
+            notifications.append(
+                (
+                    candidate_id,
+                    NotificationChannel.IN_APP.value,
+                    {
+                        "title": "Feedback requested",
+                        "body": "Please submit your review for your recent interview.",
+                        "booking_id": booking_id,
+                        "role": "candidate",
+                        "redirect_url": f"/candidate/bookings/{booking_id}/review",
+                    },
+                )
             )
-        ]
+
+        # Notify interviewer if they haven't submitted their evaluation
+        if interviewer_pending and interviewer_id:
+            notifications.append(
+                (
+                    interviewer_id,
+                    NotificationChannel.IN_APP.value,
+                    {
+                        "title": "Evaluation pending",
+                        "body": "Please submit your evaluation for a recently completed interview.",
+                        "booking_id": booking_id,
+                        "role": "interviewer",
+                        "redirect_url": f"/interviewer/bookings/{booking_id}/evaluate",
+                    },
+                )
+            )
+
+        if not notifications:
+            return
 
         cls._create_logs_for(ctx, notifications)
 
@@ -250,6 +289,7 @@ class NotificationService:
                         "booking_id": booking_id,
                         "role": "candidate",
                         "start_time": start_time,
+                        "redirect_url": f"/candidate/dashboard/upcoming",
                     },
                 )
             )
@@ -312,11 +352,70 @@ class NotificationService:
                     "preferred_window": preferred_window,
                     "start_time": start_time,
                     "action": "open_slots",
+                    "redirect_url": f"/interviewer/dashboard/availability",
                 },
             )
         ]
 
         cls._create_logs_for(ctx, notifications)
+
+
+    @classmethod
+    def _handle_feedback_submitted(cls, ctx: EventContext) -> None:
+        """
+        payload expects:
+          - booking_id
+          - candidate_id
+          - interviewer_id
+          - submitted_by  ("candidate" or "interviewer")
+        """
+        booking_id = ctx.payload.get("booking_id")
+        candidate_id = ctx.payload.get("candidate_id")
+        interviewer_id = ctx.payload.get("interviewer_id")
+        submitted_by = ctx.payload.get("submitted_by")  # "candidate" or "interviewer"
+        evaluation_id = ctx.payload.get("evaluation_id")
+
+        if not booking_id:
+            return
+
+        notifications: List[Tuple[int, str, Dict[str, Any]]] = []
+
+        # If candidate submitted → notify interviewer
+        if submitted_by == "candidate" and interviewer_id:
+            notifications.append(
+                (
+                    interviewer_id,
+                    NotificationChannel.IN_APP.value,
+                    {
+                        "title": "Candidate submitted feedback",
+                        "body": f"The candidate has submitted feedback for interview #{booking_id}.",
+                        "booking_id": booking_id,
+                        "role": "interviewer",
+                        "redirect_url": f"/interviewer/evaluations/{evaluation_id}",
+                    },
+                )
+            )
+
+        # If interviewer submitted → notify candidate
+        if submitted_by == "interviewer" and candidate_id:
+            notifications.append(
+                (
+                    candidate_id,
+                    NotificationChannel.IN_APP.value,
+                    {
+                        "title": "Your interview feedback is ready",
+                        "body": f"The interviewer has submitted feedback for interview #{booking_id}. Check your results.",
+                        "booking_id": booking_id,
+                        "role": "candidate",
+                        "redirect_url": f"/candidate/feedback/{evaluation_id}",
+                    },
+                )
+            )
+
+        if not notifications:
+            return
+
+        cls._create_logs_for(ctx, notifications)    
 
 
 

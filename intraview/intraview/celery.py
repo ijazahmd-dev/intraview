@@ -33,7 +33,7 @@ app.conf.beat_schedule = {
     },
     # Every hour: feedback reminders (tune to your needs)
     "feedback-reminders-hourly": {
-        "task": "notifications.tasks.send_feedback_reminders",
+        "task": "feedbacks.tasks.send_feedback_reminders",
         "schedule": crontab(minute="0", hour="*"),
     },
 }
