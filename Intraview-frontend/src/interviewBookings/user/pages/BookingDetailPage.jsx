@@ -670,7 +670,7 @@
 
 
 
-// src/pages/candidate/BookingDetailPage.jsx
+// src/interviewBookings/user/pages/BookingDetailPage.jsx
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -682,6 +682,8 @@ import {
 } from 'lucide-react';
 import { candidateBookingsApi } from '../../candidateBookingsApi';
 import RescheduleRequestModal from '../components/RescheduleRequestModal';
+
+import ReportIssueModal from '../../../features/issues/components/RaiseIssueModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -696,6 +698,8 @@ const STATUS_CONFIG = {
   CANDIDATE_NO_SHOW:       { label: 'No Show',                  color: 'bg-orange-100 text-orange-700 border-orange-200' },
   INTERVIEWER_NO_SHOW:     { label: 'Interviewer No Show',      color: 'bg-orange-100 text-orange-700 border-orange-200' },
 };
+
+
 
 const StatusBadge = ({ status }) => {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.CANCELLED;
@@ -730,6 +734,7 @@ const BookingDetailPage = () => {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
+  const [reportIssueOpen, setReportIssueOpen] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('action') === 'reschedule') setRescheduleModalOpen(true);
@@ -1063,7 +1068,21 @@ const BookingDetailPage = () => {
                   </button>
                 )}
 
-                {!canCancel && !canReschedule && !hasFeedback && (
+                {/* Report Issue — visible on completed or cancelled sessions */}
+                {(isCompleted || isCancelled) && (
+                  <button
+                    onClick={() => setReportIssueOpen(true)}
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Report Issue
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+                )}
+
+                {!canCancel && !canReschedule && !hasFeedback && !isCompleted && !isCancelled && (
                   <p className="text-sm text-gray-400 text-center py-4">
                     No actions available
                   </p>
@@ -1136,6 +1155,14 @@ const BookingDetailPage = () => {
           }}
         />
       )}
+
+      {/* Report Issue Modal */}
+      <ReportIssueModal
+        bookingId={booking?.id}
+        open={reportIssueOpen}
+        onClose={() => setReportIssueOpen(false)}
+      />
+
     </div>
   );
 };

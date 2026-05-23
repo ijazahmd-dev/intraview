@@ -91,6 +91,14 @@ class InterviewRuntime:
         # [NEW] Added "FOLLOWUP" as a valid value alongside "QUESTION".
         self._pending_generation_type: Optional[str] = None  # "QUESTION" | "FOLLOWUP" | "RETRY" | None
 
+        # Explicit ownership marker for the assistant message
+        # we are currently expecting from LiveKit.
+        #
+        # This stays alive until the assistant item is actually
+        # consumed in _attach_conversation_handler().
+        self._generation_owner_seq: int = 0
+        self._active_generation_owner: Optional[dict] = None
+
         # Hard runtime guard that prevents recursive follow-up generation.
         # Once True for a base question, runtime will never ask another follow-up.
         self._followup_phase_closed: bool = False
@@ -330,6 +338,14 @@ class InterviewRuntime:
             self._generation_in_progress = True
             self._pending_generation_type = generation_type
 
+            # Create a deterministic ownership record for this generation.
+            self._generation_owner_seq += 1
+            self._active_generation_owner = {
+                "seq": self._generation_owner_seq,
+                "type": generation_type,
+                "started_at": time.monotonic(),
+            }
+
             try:
                 logger.info(
                     "Starting generation: session_id=%s type=%s",
@@ -390,6 +406,32 @@ class InterviewRuntime:
 
             finally:
                 self._generation_in_progress = False
+                if (
+                    self._active_generation_owner
+                    and self._active_generation_owner.get("type")
+                    == generation_type
+                ):
+                    owner_age = (
+                        time.monotonic()
+                        - self._active_generation_owner["started_at"]
+                    )
+
+                    #
+                    # Generation finished but
+                    # assistant item never arrived.
+                    #
+                    if owner_age > 15:
+                        logger.warning(
+                            (
+                                "Clearing stale generation owner → "
+                                "type=%s age=%s"
+                            ),
+                            generation_type,
+                            owner_age,
+                        )
+
+                        self._active_generation_owner = None
+                        self._pending_generation_type = None
 
 
 
@@ -628,6 +670,32 @@ class InterviewRuntime:
                 self._transcript_stabilization_task.cancel()
 
         self._transcript_stabilization_task = None
+        if self.tm is not None:
+            self.tm.reset_transcript_state()
+
+
+
+    def _build_turn_answer_text(self) -> str:
+        """
+        Build the canonical committed answer text for the current turn.
+
+        This is the single source of truth for follow-up decisions and
+        debug logging.
+        """
+        assert self.tm is not None
+
+        parts = []
+
+        base_answer = (self.tm.state.base_answer_text or "").strip()
+        if base_answer:
+            parts.append(base_answer)
+
+        for ex in self.tm.state.followup_exchanges:
+            ans = (ex.get("answer") or "").strip()
+            if ans and ans != "[NO_RESPONSE]":
+                parts.append(ans)
+
+        return " ".join(parts).strip()    
 
 
 
@@ -690,7 +758,7 @@ class InterviewRuntime:
             # Snapshot latest transcript timestamp.
             #
             snapshot_update_at = (
-                self._last_transcript_update_at
+                self.tm.state.last_transcript_at
             )
 
             await asyncio.sleep(
@@ -708,7 +776,7 @@ class InterviewRuntime:
             #
             if (
                 snapshot_update_at
-                != self._last_transcript_update_at
+                != self.tm.state.last_transcript_at
             ):
                 logger.info(
                     (
@@ -874,7 +942,7 @@ class InterviewRuntime:
 
 
             answer_text = (
-                self._active_transcript_text or ""
+                self.tm.current_transcript_buffer() or ""
             ).strip()
 
             if not self._is_valid_user_answer(answer_text):
@@ -901,9 +969,40 @@ class InterviewRuntime:
             self.tm.mark_transcript_committed(
                 answer_text
             )
+
+            #
+            # HARD FINALIZATION FENCE
+            #
+            # Once transcript is finalized:
+            #
+            # - retries must stop
+            # - skip timeout must stop
+            # - duplicate transcript commits must stop
+            #
+            # If finalization already started,
+            # another path already owns this turn.
+            #
+            if not self.tm.try_begin_turn_finalization():
+
+                logger.warning(
+                    (
+                        "COMMIT BLOCKED → "
+                        "turn already finalizing "
+                        "answer=%r"
+                    ),
+                    answer_text[:120],
+                )
+
+                return
+
+            #
+            # Turn no longer waiting for answer.
+            #
             self.tm.state.waiting_for_answer = False
-            # Prevent retry race while finalized
-            # answer processing is running.
+
+            #
+            # Prevent timeout loop races while
+            # downstream processing is happening.
             #
             self._processing_answer = True
 
@@ -1078,11 +1177,11 @@ class InterviewRuntime:
                 MAX_FOLLOWUPS_PER_QUESTION
             ):
                 should_followup = False
+                self.tm.mark_followup_phase_completed()
+                self._followup_phase_closed = True
             else:
-                should_followup = (
-                    self._should_ask_followup(
-                        answer_text
-                    )
+                should_followup = self._should_ask_followup(
+                    self._build_turn_answer_text()
                 )
 
         #
@@ -1120,10 +1219,8 @@ class InterviewRuntime:
 
             await self._sync_runtime_state()
 
-            should_followup = (
-                self._should_ask_followup(
-                    answer_text
-                )
+            should_followup = self._should_ask_followup(
+                self._build_turn_answer_text()
             )
 
         #
@@ -1198,24 +1295,9 @@ class InterviewRuntime:
         # This prevents recursive follow-ups when the candidate
         # gradually answers across multiple turns.
 
-        if self.tm.state.followup_exchanges:
-            combined_parts = [
-                self.tm.state.base_answer_text,
-                *[
-                    ex["answer"]
-                    for ex in self.tm.state.followup_exchanges
-                    if ex.get("answer")
-                ],
-            ]
-
-            text = " ".join(
-                part.strip()
-                for part in combined_parts
-                if part and part.strip()
-            )
-
-        else:
-            text = (answer_text or "").strip()
+        text = (answer_text or "").strip()
+        if not text:
+            text = self._build_turn_answer_text()
 
         if not text:
             return False
@@ -1247,7 +1329,7 @@ class InterviewRuntime:
 
 
         # Extremely short answers usually need clarification.
-        if word_count < 15:
+        if word_count < 8:
             logger.warning(
                 (
                     "FOLLOWUP DECISION=True "
@@ -1268,7 +1350,7 @@ class InterviewRuntime:
             "many things",
         )
         if (
-            word_count < 35
+            word_count < 25
             and any(m in lower for m in vague_markers)
         ):
             logger.warning(
@@ -1350,7 +1432,10 @@ class InterviewRuntime:
                     # Ignore false listening transitions
                     # while generation is active.
                     #
-                    if self._generation_in_progress:
+                    if (
+                        self._generation_in_progress
+                        and self._pending_generation_type
+                    ):
                         return
                     
 
@@ -1468,12 +1553,61 @@ class InterviewRuntime:
         
             if role == "assistant":
 
-                if self._pending_generation_type == "QUESTION" and self.tm.can_ask_new_question():
+                owner = self._active_generation_owner
+
+                expected_generation_type = None
+
+                if owner is not None:
+                    owner_age = (
+                        time.monotonic()
+                        - owner["started_at"]
+                    )
+
+                    # ownership survives short LiveKit delay
+                    if owner_age <= 15:
+                        expected_generation_type = owner["type"]
+
+                if (
+                    expected_generation_type is None
+                    and self._pending_generation_type
+                ):
+                    expected_generation_type = (
+                        self._pending_generation_type
+                    )
+
+                logger.warning(
+                    (
+                        "ASSISTANT MESSAGE RECEIVED → "
+                        "expected_generation_type=%s "
+                        "pending_generation_type=%s "
+                        "owner_seq=%s "
+                        "generation_in_progress=%s "
+                        "waiting_for_answer=%s "
+                        "followup_active=%s "
+                        "followup_count=%s "
+                        "text=%r"
+                    ),
+                    expected_generation_type,
+                    self._pending_generation_type,
+                    (
+                        self._active_generation_owner.get("seq")
+                        if self._active_generation_owner
+                        else None
+                    ),
+                    self._generation_in_progress,
+                    self.tm.state.waiting_for_answer,
+                    self.tm.state.is_followup_active,
+                    self.tm.state.followup_count,
+                    text[:200],
+    )
+
+                if expected_generation_type == "QUESTION" and self.tm.can_ask_new_question():
                     logger.warning(
                         "ASSISTANT CLASSIFIED → QUESTION"
                     )
                     # A base question has been spoken.
                     self._pending_generation_type = None
+                    self._active_generation_owner = None
 
                     try:
                         self.state_machine.transition(InterviewState.LISTENING)
@@ -1509,11 +1643,12 @@ class InterviewRuntime:
                     await self._sync_runtime_state()
 
                 # [NEW] Follow-up question has been spoken.
-                elif self._pending_generation_type == "FOLLOWUP":
+                elif expected_generation_type == "FOLLOWUP":
                     logger.warning(
                         "ASSISTANT CLASSIFIED → FOLLOWUP"
                     )
                     self._pending_generation_type = None
+                    self._active_generation_owner = None
 
                     try:
                         self.state_machine.transition(InterviewState.LISTENING)
@@ -1549,7 +1684,7 @@ class InterviewRuntime:
                     )
                     await self._sync_runtime_state()
 
-                elif self._pending_generation_type == "RETRY":
+                elif expected_generation_type == "RETRY":
 
                     logger.warning(
                         "ASSISTANT CLASSIFIED → RETRY"
@@ -1564,6 +1699,7 @@ class InterviewRuntime:
                     # and corrupts turn finalization.
                     #
                     self._pending_generation_type = None
+                    self._active_generation_owner = None
 
                     try:
                         self.state_machine.transition(
@@ -1602,20 +1738,31 @@ class InterviewRuntime:
 
                     await self._sync_runtime_state()    
 
-                else:
-                    # # Assistant filler / closing messages – forward as info or ignore.
-                    # await self._send_data(
-                    #     {
-                    #         "type": "info",
-                    #         "reason": "assistant_message",
-                    #         "message": text,
-                    #     }
-                    # )
+                elif self._active_generation_owner is not None:
+                    logger.error(
+                        (
+                            "ASSISTANT CLASSIFIED → OWNER_MISMATCH "
+                            "expected_generation_type=%s "
+                            "pending_generation_type=%s "
+                            "owner_seq=%s "
+                            "followup_active=%s "
+                            "waiting_for_answer=%s "
+                            "text=%r"
+                        ),
+                        expected_generation_type,
+                        self._pending_generation_type,
+                        (
+                            self._active_generation_owner.get("seq")
+                            if self._active_generation_owner
+                            else None
+                        ),
+                        self.tm.state.is_followup_active,
+                        self.tm.state.waiting_for_answer,
+                        text[:200],
+                    )
+                    return
 
-                    #replaced
-                    # Ignore assistant messages not explicitly initiated by runtime.
-                    # This prevents autonomous conversational continuation from
-                    # interfering with deterministic interview flow.
+                else:
                     logger.error(
                         (
                             "ASSISTANT CLASSIFIED → AUTONOMOUS "
@@ -1887,7 +2034,7 @@ class InterviewRuntime:
 
 
 
-
+                self.tm.update_transcript_buffer(self._active_transcript_text)
 
                 self._last_transcript_update_at = (
                     time.monotonic()
@@ -2112,6 +2259,8 @@ class InterviewRuntime:
         Called from within _turn_lock, so must not re-acquire it.
         """
 
+        combined_answer_text = self._build_turn_answer_text()
+
         logger.error(
             (
                 "FINALIZE_BASE_TURN ENTERED → "
@@ -2119,7 +2268,7 @@ class InterviewRuntime:
                 "followup_active=%s "
                 "followup_count=%s "
                 "base_answer=%r "
-                "followup_answer=%r"
+                "combined_answer=%r"
             ),
             self.tm.current_turn_index_1based(),
             self.tm.state.is_followup_active,
@@ -2130,8 +2279,8 @@ class InterviewRuntime:
                 else None
             ),
             (
-                self.tm.state.followup_answer_text[:200]
-                if self.tm.state.followup_answer_text
+                combined_answer_text[:200]
+                if combined_answer_text
                 else None
             ),
         )
@@ -2142,15 +2291,7 @@ class InterviewRuntime:
         assert self.tm is not None
         assert self.planner is not None
 
-        # Prevent duplicate finalization caused by:
-        # - transcript races
-        # - timeout overlap
-        # - duplicate callbacks
-        if not self.tm.try_begin_turn_finalization():
-            logger.warning(
-                "Skipping duplicate turn finalization."
-            )
-            return
+
         turn_index_1based = self.tm.current_turn_index_1based()
         question_text = self.tm.state.base_question_text or ""
 
@@ -2198,7 +2339,7 @@ class InterviewRuntime:
             # finalize triggered
             #
             salvaged = (
-                self._active_transcript_text.strip()
+                self.tm.current_transcript_buffer().strip()
             )
 
             if (
@@ -2232,13 +2373,16 @@ class InterviewRuntime:
 
                 self._reset_transcript_buffer()
 
-                self.tm.abort_turn_finalization()
-
                 self.tm.mark_followup_phase_completed()
 
                 self._followup_phase_closed = True
 
                 self.tm.mark_answer_received()
+
+                #
+                # Empty turn fully handled.
+                #
+                self.tm.complete_turn_finalization()
 
                 await self._sync_runtime_state()
 
@@ -2363,6 +2507,11 @@ class InterviewRuntime:
 
         # Now increment turn_index (base question fully finalized).
         self.tm.mark_answer_received()
+
+        #
+        # Finalization complete.
+        #
+        self.tm.complete_turn_finalization()
 
         # try:
         #     self.state_machine.transition(InterviewState.PROCESSING)
@@ -2613,11 +2762,19 @@ class InterviewRuntime:
                 # Prevent retry race after transcript
                 # commit but before next question.
                 #
-                if self._processing_answer:
+                if (
+                    self._processing_answer
+                    or self.tm.state.is_finalizing_turn
+                ):
 
                     logger.debug(
-                        "Suppressing timeout: "
-                        "answer processing."
+                        (
+                            "Suppressing timeout → "
+                            "processing_answer=%s "
+                            "is_finalizing_turn=%s"
+                        ),
+                        self._processing_answer,
+                        self.tm.state.is_finalizing_turn,
                     )
 
                     continue

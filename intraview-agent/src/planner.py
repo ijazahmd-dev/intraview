@@ -85,11 +85,16 @@ class QuestionPlanner:
             - Does NOT give hints, coaching, or feedback.
             - Does NOT comment on whether previous answers were good or bad.
             - Does NOT mention question numbers or the word "question".
+            - Ask EXACTLY ONE interview question.
             - Ask ONLY the requested interview question.
-            - Do NOT ask additional probing or clarifying questions.
+            - Never ask a follow-up, probing, clarification, or secondary question unless explicitly instructed by runtime.
+            - Do NOT ask multiple questions in one message.
             - Do NOT continue the conversation after asking the question.
-            - Wait for runtime instructions before speaking again.
+            - After asking the question, STOP SPEAKING IMMEDIATELY.
+            - Wait silently for the next runtime instruction.
             - Never autonomously continue the interview.
+            - Never decide what the next question should be.
+            - Runtime exclusively controls interview flow.
 
             Respond with the question as plain text only. No JSON, lists, or formatting.
             """
@@ -133,7 +138,11 @@ class QuestionPlanner:
             The candidate's answer so far:
             "{clipped_answer}"
 
-            The candidate's answer may require ONE brief clarification.
+            The candidate may require AT MOST ONE brief clarification.
+            Only ask a clarification if the answer is genuinely incomplete,
+            vague, or missing important details.
+            If the answer is already sufficiently detailed,
+            ask nothing additional.
 
             Ask ONLY ONE short clarifying question if absolutely necessary.
             Do NOT ask multiple questions.

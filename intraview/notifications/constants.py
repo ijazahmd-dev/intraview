@@ -18,6 +18,12 @@ class EventType(str, Enum):
 
     RESCHEDULE_SLOT_REQUESTED = "RESCHEDULE_SLOT_REQUESTED"
 
+    ISSUE_RAISED = "ISSUE_RAISED"
+    ISSUE_RESOLVED = "ISSUE_RESOLVED"
+    ISSUE_REJECTED = "ISSUE_REJECTED"
+    ISSUE_ACTION_TAKEN = "ISSUE_ACTION_TAKEN"
+    ISSUE_WAITING_RESPONSE = "ISSUE_WAITING_RESPONSE"
+
 
 class NotificationChannel(str, Enum):
     IN_APP = "IN_APP"      # purely internal, later can map to Novu in-app

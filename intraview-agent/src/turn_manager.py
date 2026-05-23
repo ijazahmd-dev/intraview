@@ -113,7 +113,7 @@ class TurnManager:
         self.state.is_followup_active = False
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
-        self.state.is_finalizing_turn = False
+        self.complete_turn_finalization()
         self.reset_transcript_state()
 
         self.state.last_question_text = question_text
@@ -133,7 +133,7 @@ class TurnManager:
         self.state.last_question_text = None
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
-        self.state.is_finalizing_turn = False
+        self.complete_turn_finalization()
 
         if self.state.turn_index >= self.total_questions:
             self.state.done = True
@@ -157,7 +157,7 @@ class TurnManager:
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
         self.state.is_followup_active = False
-        self.state.is_finalizing_turn = False  
+        self.complete_turn_finalization() 
         self.reset_transcript_state()      
 
     def current_turn_index_0based(self) -> int:
@@ -175,7 +175,7 @@ class TurnManager:
 
         Returns:
         - True  -> caller owns finalization
-        - False -> another coroutine already finalized
+        - False -> another coroutine already finalized, or no live turn exists
 
         Prevents:
         - duplicate backend turn posts
@@ -183,7 +183,13 @@ class TurnManager:
         - timeout/transcript races
         """
 
+        if self.state.done:
+            return False
+
         if self.state.is_finalizing_turn:
+            return False
+
+        if not self.state.waiting_for_answer:
             return False
 
         self.state.is_finalizing_turn = True
@@ -204,6 +210,20 @@ class TurnManager:
         """
 
         self.state.is_finalizing_turn = False
+
+
+    def complete_turn_finalization(self):
+        """
+        Marks successful completion of turn finalization.
+
+        This is the normal success path counterpart to
+        abort_turn_finalization().
+
+        Runtime should call this only after:
+        - backend turn post succeeds, or
+        - a deliberate skip path has fully resolved
+        """
+        self.state.is_finalizing_turn = False    
     
     def current_prompt_kind(self) -> str:
         """
@@ -544,5 +564,5 @@ class TurnManager:
         self.state.is_followup_active = False
         self.state.followup_phase_completed = False
         self.state.followup_exchanges = []
-        self.state.is_finalizing_turn = False
+        self.complete_turn_finalization()
         self.reset_transcript_state()

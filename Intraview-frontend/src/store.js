@@ -18,6 +18,10 @@ import notificationsSlice from './features/notification/notificationsSlice';
 import aiInterviewRolesSlice from './features/aiInterview/slice/aiInterviewRolesSlice';
 import aiInterviewSessionReducer from './features/aiInterview/slice/aiInterviewSessionSlice';
 import aiInterviewEvaluationReducer from "./features/aiInterview/slice/aiInterviewEvaluationSlice";
+import adminIssuesReducer from "./features/issues/slices/adminIssuesSlice";
+import candidateIssuesReducer from "./features/issues/slices/issuesSlice";
+import interviewerIssuesReducer from "./features/issues/slices/interviewerIssuesSlice";
+
 
 export const store = configureStore({
   reducer: {
@@ -41,5 +45,10 @@ export const store = configureStore({
     aiInterviewRoles: aiInterviewRolesSlice,
     aiInterviewSession: aiInterviewSessionReducer,
     aiInterviewEvaluation: aiInterviewEvaluationReducer,
+    adminIssues: adminIssuesReducer,
+    issues: candidateIssuesReducer,
+    interviewerIssues: interviewerIssuesReducer
+    
+
   },
 });

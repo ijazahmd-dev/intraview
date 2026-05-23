@@ -87,6 +87,20 @@ class NotificationService:
 
         elif event_type == EventType.FEEDBACK_SUBMITTED.value:
             cls._handle_feedback_submitted(ctx)
+        elif event_type == EventType.ISSUE_RAISED.value:
+            cls._handle_issue_raised(ctx)
+
+        elif event_type == EventType.ISSUE_RESOLVED.value:
+            cls._handle_issue_resolved(ctx)
+
+        elif event_type == EventType.ISSUE_REJECTED.value:
+            cls._handle_issue_rejected(ctx)
+
+        elif event_type == EventType.ISSUE_ACTION_TAKEN.value:
+            cls._handle_issue_action_taken(ctx)
+
+        elif event_type == EventType.ISSUE_WAITING_RESPONSE.value:
+            cls._handle_issue_waiting_response(ctx)    
      
 
         # Add other events here as you go: INTERVIEW_COMPLETED, etc.
@@ -415,7 +429,159 @@ class NotificationService:
         if not notifications:
             return
 
-        cls._create_logs_for(ctx, notifications)    
+        cls._create_logs_for(ctx, notifications)   
+
+
+
+
+    @classmethod
+    def _handle_issue_raised(cls, ctx: EventContext) -> None:
+        """
+        payload:
+          - issue_id
+          - booking_id
+          - raised_by_id
+          - against_user_id
+          - issue_type
+          - priority
+          - redirect_url
+        """
+        issue_id = ctx.payload.get("issue_id")
+        booking_id = ctx.payload.get("booking_id")
+        raised_by_id = ctx.payload.get("raised_by_id")
+        against_user_id = ctx.payload.get("against_user_id")
+        redirect_url = ctx.payload.get("redirect_url")
+
+        notifications = []
+
+        # Notify the user who raised the issue (confirmation)
+        if raised_by_id:
+            notifications.append(
+                (
+                    raised_by_id,
+                    NotificationChannel.IN_APP.value,
+                    {
+                        "title": "Issue submitted",
+                        "body": f"Your issue for interview #{booking_id} has been submitted. Our team will review it shortly.",
+                        "issue_id": issue_id,
+                        "booking_id": booking_id,
+                        "redirect_url": redirect_url,
+                    },
+                )
+            )
+
+        # You can also notify admins here later via a separate channel/email
+
+        if notifications:
+            cls._create_logs_for(ctx, notifications)
+
+    @classmethod
+    def _handle_issue_resolved(cls, ctx: EventContext) -> None:
+        issue_id = ctx.payload.get("issue_id")
+        booking_id = ctx.payload.get("booking_id")
+        raised_by_id = ctx.payload.get("raised_by_id")
+        resolution = ctx.payload.get("resolution")
+        redirect_url = ctx.payload.get("redirect_url")
+
+        if not raised_by_id:
+            return
+
+        notifications = [
+            (
+                raised_by_id,
+                NotificationChannel.IN_APP.value,
+                {
+                    "title": "Issue resolved",
+                    "body": f"Your issue for interview #{booking_id} has been resolved.",
+                    "issue_id": issue_id,
+                    "booking_id": booking_id,
+                    "resolution": resolution,
+                    "redirect_url": redirect_url,
+                },
+            )
+        ]
+
+        cls._create_logs_for(ctx, notifications)
+
+    @classmethod
+    def _handle_issue_rejected(cls, ctx: EventContext) -> None:
+        issue_id = ctx.payload.get("issue_id")
+        booking_id = ctx.payload.get("booking_id")
+        raised_by_id = ctx.payload.get("raised_by_id")
+        admin_notes = ctx.payload.get("admin_notes")
+        redirect_url = ctx.payload.get("redirect_url")
+
+        if not raised_by_id:
+            return
+
+        notifications = [
+            (
+                raised_by_id,
+                NotificationChannel.IN_APP.value,
+                {
+                    "title": "Issue rejected",
+                    "body": f"Your issue for interview #{booking_id} was rejected. Please see details for more information.",
+                    "issue_id": issue_id,
+                    "booking_id": booking_id,
+                    "admin_notes": admin_notes,
+                    "redirect_url": redirect_url,
+                },
+            )
+        ]
+
+        cls._create_logs_for(ctx, notifications)
+
+    @classmethod
+    def _handle_issue_action_taken(cls, ctx: EventContext) -> None:
+        issue_id = ctx.payload.get("issue_id")
+        booking_id = ctx.payload.get("booking_id")
+        raised_by_id = ctx.payload.get("raised_by_id")
+        redirect_url = ctx.payload.get("redirect_url")
+
+        if not raised_by_id:
+            return
+
+        notifications = [
+            (
+                raised_by_id,
+                NotificationChannel.IN_APP.value,
+                {
+                    "title": "Action taken on your issue",
+                    "body": f"An action has been taken on your issue for interview #{booking_id}.",
+                    "issue_id": issue_id,
+                    "booking_id": booking_id,
+                    "redirect_url": redirect_url,
+                },
+            )
+        ]
+
+        cls._create_logs_for(ctx, notifications)
+
+    @classmethod
+    def _handle_issue_waiting_response(cls, ctx: EventContext) -> None:
+        issue_id = ctx.payload.get("issue_id")
+        booking_id = ctx.payload.get("booking_id")
+        raised_by_id = ctx.payload.get("raised_by_id")
+        redirect_url = ctx.payload.get("redirect_url")
+
+        if not raised_by_id:
+            return
+
+        notifications = [
+            (
+                raised_by_id,
+                NotificationChannel.IN_APP.value,
+                {
+                    "title": "More information requested",
+                    "body": f"We need more information to review your issue for interview #{booking_id}.",
+                    "issue_id": issue_id,
+                    "booking_id": booking_id,
+                    "redirect_url": redirect_url,
+                },
+            )
+        ]
+
+        cls._create_logs_for(ctx, notifications)     
 
 
 

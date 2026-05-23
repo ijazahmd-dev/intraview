@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'feedbacks',
     'notifications',
     'ai_interviews',
+    'issues',
 
     'rest_framework',
     "channels",
@@ -396,6 +397,11 @@ NOVU_WORKFLOW_IDS = {
     "INTERVIEW_REMINDER_30M": "interview-reminder-30m",
     "RESCHEDULE_SLOT_REQUESTED": "reschedule-slot-requested",
     "FEEDBACK_SUBMITTED": "feedback-submitted",
+    "ISSUE_RAISED": "issue-raised",
+    "ISSUE_RESOLVED": "issue-resolved",
+    "ISSUE_REJECTED": "issue-rejected",
+    "ISSUE_ACTION_TAKEN": "issue-action-taken",
+    "ISSUE_WAITING_RESPONSE": "issue-waiting-response",
 }
 
 

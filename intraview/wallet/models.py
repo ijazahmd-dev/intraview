@@ -20,6 +20,7 @@ class TokenTransactionType(models.TextChoices):
     ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT", "Admin Adjustment"
     SUBSCRIPTION_GRANT = "SUBSCRIPTION_GRANT", "Subscription Grant"
     BOOKING_CANCEL_INTERVIEWER = "BOOKING_CANCEL_INTERVIEWER", "Booking Cancel Interviewer"
+    COMPENSATION = "COMPENSATION", "Compensation"
 
     PAYOUT_LOCK = "PAYOUT_LOCK", "Payout Token Lock"
     PAYOUT_DEBIT = "PAYOUT_DEBIT", "Payout Debit"

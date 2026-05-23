@@ -39,6 +39,10 @@ class CustomUser(AbstractUser):
     is_email_verified = models.BooleanField(default=False)
     auth_provider = models.CharField(max_length=50, choices=AUTH_PROVIDER_CHOICES,default='email')
     last_otp_sent_at = models.DateTimeField(null=True,blank=True)
+    interviewer_warning_count = models.PositiveIntegerField(default=0)
+
+    is_suspended = models.BooleanField(default=False)
+    suspended_until = models.DateTimeField(null=True, blank=True)
 
 
     USERNAME_FIELD = "email"

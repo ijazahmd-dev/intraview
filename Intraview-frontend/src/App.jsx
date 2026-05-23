@@ -81,6 +81,12 @@ import RoleBasedInterviewPage from "./features/aiInterview/pages/RoleBasedInterv
 import RoleInterviewSetupPage from "./features/aiInterview/pages/RoleInterviewSetupPage";
 import LiveInterviewPage from "./features/aiInterview/pages/LiveInterviewPage";
 import InterviewResultsPage from "./features/aiInterview/pages/InterviewResultsPage";
+import MyIssuesPage from "./features/issues/candidate/pages/MyIssuesPage";
+import CandidateIssueDetailPage from "./features/issues/candidate/pages/CandidateIssueDetailPage";
+import InterviewerMyIssuesPage from "./features/issues/interviewer/pages/InterviewerMyIssuesPage";
+import InterviewerIssueDetailPage from "./features/issues/interviewer/pages/InterviewerIssueDetailPage";
+import AdminIssuesPage from "./features/issues/admin/pages/AdminIssuesPage";
+import AdminIssueDetailPage from "./features/issues/admin/pages/AdminIssueDetailPage";
 
 
 
@@ -225,6 +231,14 @@ function AppInner() {
                     
 
                     <Route path="/notifications" element={< NotificationsPage />} />
+
+
+                    <Route path="/my-issues" element={<MyIssuesPage />} />
+                    <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
+                    <Route path="/interviewer/my-issues" element={<InterviewerMyIssuesPage />} />
+                    <Route path="/interviewer/my-issues/:issueId" element={<InterviewerIssueDetailPage />} />
+                    <Route path="admin/issues" element={<AdminIssuesPage />} />
+                    <Route path="admin/issues/:issueId" element={<AdminIssueDetailPage />} />
 
                     
                                                 
