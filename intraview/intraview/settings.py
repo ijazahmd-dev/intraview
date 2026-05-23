@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'notifications',
     'ai_interviews',
     'issues',
+    'progress',
 
     'rest_framework',
     "channels",

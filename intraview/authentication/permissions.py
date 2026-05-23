@@ -3,6 +3,20 @@ from .models import InterviewerStatus
 from interviewers.models import VerificationStatus
 
 
+class IsCandidateRole(BasePermission):
+    """
+    Allows access only to authenticated users with role='user' (candidates).
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and getattr(user, "role", None) == "user"
+        )
+
+
 class IsAdminRole(BasePermission):
     """
     Allows access only to authenticated users with role='admin'.

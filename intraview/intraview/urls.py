@@ -38,6 +38,7 @@ urlpatterns = [
     path("api/", include("notifications.urls")),
     path("api/ai-interview/", include("ai_interviews.urls", namespace="ai_interviews")),
     path("api/issues/", include("issues.urls", namespace="issues")),
+    path("api/progress/", include("progress.urls")),
 
 
 ]
