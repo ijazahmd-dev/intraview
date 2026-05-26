@@ -88,6 +88,7 @@ import InterviewerIssueDetailPage from "./features/issues/interviewer/pages/Inte
 import AdminIssuesPage from "./features/issues/admin/pages/AdminIssuesPage";
 import AdminIssueDetailPage from "./features/issues/admin/pages/AdminIssueDetailPage";
 import CandidateProgressPage from "./features/progress/pages/CandidateProgressPage";
+import AdminDashboardPage from "./features/adminDashboard/pages/AdminDashboardPage";
 
 
 
@@ -307,6 +308,12 @@ function AppInner() {
         <Route path="/admin/payout/queue" element={<AdminProtectedRoute> <AdminPayoutQueuePage /> </AdminProtectedRoute>} />
         <Route path="/admin/payout/:id" element={<AdminProtectedRoute> <AdminPayoutDetailPage /> </AdminProtectedRoute>} />
         <Route path="/admin/payout/history" element={<AdminProtectedRoute> <AdminPayoutHistoryPage /> </AdminProtectedRoute>} />
+
+        <Route path="/admin/dashboard" element={
+          <AdminProtectedRoute>
+            <AdminDashboardPage />
+          </AdminProtectedRoute>
+        } />
 
 
 

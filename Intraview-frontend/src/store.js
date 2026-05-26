@@ -22,6 +22,7 @@ import adminIssuesReducer from "./features/issues/slices/adminIssuesSlice";
 import candidateIssuesReducer from "./features/issues/slices/issuesSlice";
 import interviewerIssuesReducer from "./features/issues/slices/interviewerIssuesSlice";
 import progressReducer from "./features/progress/progressSlice";
+import adminDashboardReducer from "./features/adminDashboard/adminDashboardSlice";
 
 
 export const store = configureStore({
@@ -49,7 +50,8 @@ export const store = configureStore({
     aiInterviewEvaluation: aiInterviewEvaluationReducer,
     adminIssues: adminIssuesReducer,
     issues: candidateIssuesReducer,
-    interviewerIssues: interviewerIssuesReducer
+    interviewerIssues: interviewerIssuesReducer,
+    adminDashboard: adminDashboardReducer,
 
 
   },

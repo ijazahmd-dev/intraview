@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'ai_interviews',
     'issues',
     'progress',
+    'admin_dashboard',
 
     'rest_framework',
     "channels",
