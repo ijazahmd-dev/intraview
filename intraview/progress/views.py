@@ -48,7 +48,7 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
     """
 
     authentication_classes = [CookieJWTAuthentication]
-    permission_classes = [IsAuthenticated, IsCandidateRole]
+    permission_classes = [IsAuthenticated]
 
     # ────────────────────────────────────────────────────────
     # 1. Overview Statistics
@@ -63,7 +63,7 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
         average score, practice hours, readiness score & level.
         """
         data = CandidateProgressService.get_overview_stats(request.user)
-        serializer = OverviewStatsSerializer(data)
+        serializer = OverviewStatsSerializer(instance=data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # ────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
         data = CandidateProgressService.get_growth_analytics(
             request.user, source=source
         )
-        serializer = GrowthDataPointSerializer(data, many=True)
+        serializer = GrowthDataPointSerializer( instance=data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # ────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
         Designed to power a frontend radar chart.
         """
         data = CandidateProgressService.get_skill_breakdown(request.user)
-        serializer = SkillBreakdownSerializer(data)
+        serializer = SkillBreakdownSerializer(instance=data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # ────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
             strength_threshold=strength_th,
             weakness_threshold=weakness_th,
         )
-        serializer = StrengthsWeaknessesSerializer(data)
+        serializer = StrengthsWeaknessesSerializer(instance=data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     # ────────────────────────────────────────────────────────
@@ -167,8 +167,8 @@ class CandidateProgressDashboardViewSet(viewsets.ViewSet):
         page = paginator.paginate_queryset(history_list, request)
 
         if page is not None:
-            serializer = InterviewHistoryItemSerializer(page, many=True)
+            serializer = InterviewHistoryItemSerializer( instance=page, many=True)
             return paginator.get_paginated_response(serializer.data)
 
-        serializer = InterviewHistoryItemSerializer(history_list, many=True)
+        serializer = InterviewHistoryItemSerializer( instance=history_list, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

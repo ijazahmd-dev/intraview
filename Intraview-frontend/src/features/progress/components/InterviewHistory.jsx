@@ -1,146 +1,402 @@
-import React from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { setHistorySource, setHistoryPage } from "../progressSlice";
-import { motion } from "framer-motion";
-import { Bot, Users, ExternalLink, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+// src/features/progress/components/InterviewHistory.jsx
+import { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { fetchInterviewHistory, setHistorySource, setHistoryPage } from "../progressSlice";
+import { Users, Bot, ChevronLeft, ChevronRight, Calendar, Star, ThumbsUp } from "lucide-react";
 
-const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric"
-    });
+const SOURCE_TABS = [
+  { key: "all",  label: "All" },
+  { key: "peer", label: "Peer" },
+  { key: "ai",   label: "AI" },
+];
+
+const HIRE_COLORS = {
+  YES:        { bg: "#f0fdf4", color: "#16a34a", label: "Hire" },
+  NO:         { bg: "#fff1f2", color: "#e11d48", label: "No Hire" },
+  MAYBE:      { bg: "#fffbeb", color: "#d97706", label: "Maybe" },
+  STRONG_YES: { bg: "#f0fdf4", color: "#15803d", label: "Strong Hire" },
 };
 
-const HistoryCard = ({ session }) => {
-    const isPeer = session.source === "peer";
+function formatDate(dt) {
+  if (!dt) return "—";
+  return new Date(dt).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
 
-    return (
-        <div className="group bg-white flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+function ScoreStars({ score }) {
+  if (score == null) return <span className="no-score">No score</span>;
+  const max = score > 5 ? 10 : 5;
+  const normalized = (score / max) * 5;
+  return (
+    <div className="score-display">
+      <Star size={13} fill="#f59e0b" stroke="none" />
+      <span className="score-num">{score.toFixed(1)}</span>
+      <span className="score-max">/ {max}</span>
+    </div>
+  );
+}
 
-            {/* Visual Indicator */}
-            <div className={`p-4 rounded-xl shrink-0 ${isPeer ? 'bg-indigo-50 text-indigo-600' : 'bg-purple-50 text-purple-600'}`}>
-                {isPeer ? <Users size={24} /> : <Bot size={24} />}
+function HistoryCard({ item, index }) {
+  const isPeer = item.interview_type === "peer";
+  const hire = item.hire_recommendation ? HIRE_COLORS[item.hire_recommendation] : null;
+
+  return (
+    <div className="history-card" style={{ animationDelay: `${index * 60}ms` }}>
+      <div className="hcard-icon-wrap" style={{ background: isPeer ? "#f5f3ff" : "#f0f9ff" }}>
+        {isPeer
+          ? <Users size={18} strokeWidth={1.8} color="#6366f1" />
+          : <Bot size={18} strokeWidth={1.8} color="#0ea5e9" />
+        }
+      </div>
+
+      <div className="hcard-body">
+        <div className="hcard-top">
+          <div>
+            <p className="hcard-interviewer">{item.interviewer_name || "Unknown"}</p>
+            <div className="hcard-meta">
+              <Calendar size={11} />
+              <span>{formatDate(item.completed_date)}</span>
+              <span className={`type-chip ${isPeer ? "peer-chip" : "ai-chip"}`}>
+                {isPeer ? "Peer" : "AI"}
+              </span>
             </div>
-
-            {/* Core Info */}
-            <div className="flex-1 text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
-                    <span className="text-sm font-bold text-slate-800">
-                        {isPeer ? "Peer Interview" : "AI Roleplay"}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500">
-                        {isPeer ? "Mock" : "Practice"}
-                    </span>
-                </div>
-                <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-slate-500">
-                    <Calendar size={14} />
-                    <span>{formatDate(session.date)}</span>
-                    {!isPeer && <span className="ml-1">• {session.duration} min</span>}
-                </div>
-            </div>
-
-            {/* Score & Recommendation */}
-            <div className="flex items-center gap-6 sm:px-6 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 sm:border-l border-slate-100 pt-4 sm:pt-0">
-                <div className="text-center">
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Score</p>
-                    <p className="text-xl font-bold text-slate-800">{session.overall_score || "N/A"}</p>
-                </div>
-
-                <div className="text-center min-w-[120px]">
-                    <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Feedback</p>
-                    {isPeer && session.hire_recommendation ? (
-                        <p className={`text-sm font-semibold ${session.hire_recommendation.toLowerCase() === 'hire' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                            {session.hire_recommendation}
-                        </p>
-                    ) : (
-                        <div className="flex items-center justify-center gap-1 text-blue-600 text-sm font-semibold cursor-pointer hover:underline group-hover:text-blue-700">
-                            View Report <ExternalLink size={14} />
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const InterviewHistory = ({ data, totalPages, currentPage }) => {
-    const dispatch = useDispatch();
-    const source = useSelector(state => state.progress.history.source);
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mt-8"
-        >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                <div>
-                    <h2 className="text-lg font-bold text-slate-800">Interview History</h2>
-                    <p className="text-sm text-slate-500">Review your past sessions and feedback</p>
-                </div>
-
-                <div className="flex bg-slate-100 rounded-lg p-1">
-                    {["all", "peer", "ai"].map((opt) => (
-                        <button
-                            key={opt}
-                            onClick={() => dispatch(setHistorySource(opt))}
-                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${source === opt
-                                    ? "bg-white text-slate-800 shadow-sm"
-                                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-200"
-                                }`}
-                        >
-                            {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {data && data.length > 0 ? (
-                <>
-                    <div className="space-y-4">
-                        {data.map((session, idx) => (
-                            <HistoryCard key={idx} session={session} />
-                        ))}
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-4 mt-8">
-                            <button
-                                onClick={() => dispatch(setHistoryPage(currentPage - 1))}
-                                disabled={currentPage === 1}
-                                className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <span className="text-sm font-medium text-slate-600">
-                                Page {currentPage} of {totalPages}
-                            </span>
-                            <button
-                                onClick={() => dispatch(setHistoryPage(currentPage + 1))}
-                                disabled={currentPage === totalPages}
-                                className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="bg-white rounded-2xl p-12 shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                        <Calendar className="text-slate-400" size={32} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-2">No history found</h3>
-                    <p className="text-slate-500 max-w-sm">
-                        You haven't completed any {source !== 'all' ? source : ''} mock interviews yet.
-                    </p>
-                </div>
+          </div>
+          <div className="hcard-right">
+            <ScoreStars score={item.overall_score} />
+            {hire && (
+              <span className="hire-badge" style={{ background: hire.bg, color: hire.color }}>
+                <ThumbsUp size={10} />
+                {hire.label}
+              </span>
             )}
-        </motion.div>
-    );
-};
+          </div>
+        </div>
 
-export default InterviewHistory;
+        {item.feedback_summary && (
+          <p className="hcard-summary">"{item.feedback_summary}"</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function InterviewHistory() {
+  const dispatch = useDispatch();
+  const { data, status, source, page, count, next, previous } = useSelector(
+    (s) => s.progress.history
+  );
+  const loading = status === "loading" || status === "idle";
+  const totalPages = Math.ceil(count / 10) || 1;
+
+  useEffect(() => {
+    dispatch(fetchInterviewHistory({ source, page }));
+  }, [source, page]);
+
+  const handleSource = (s) => {
+    dispatch(setHistorySource(s));
+    dispatch(fetchInterviewHistory({ source: s, page: 1 }));
+  };
+
+  const handlePage = (p) => {
+    dispatch(setHistoryPage(p));
+    dispatch(fetchInterviewHistory({ source, page: p }));
+  };
+
+  return (
+    <div className="history-section">
+      <div className="history-header">
+        <div>
+          <h3 className="section-title">Interview History</h3>
+          <p className="section-sub">
+            {count > 0 ? `${count} interview${count !== 1 ? "s" : ""} completed` : "Your past sessions"}
+          </p>
+        </div>
+        <div className="source-tabs">
+          {SOURCE_TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`source-tab ${source === t.key ? "active" : ""}`}
+              onClick={() => handleSource(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="history-list">
+        {loading ? (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="history-card skeleton-hcard" style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="skel skel-icon" />
+              <div className="skel-body-wrap">
+                <div className="skel skel-line" style={{ width: "40%", height: 14 }} />
+                <div className="skel skel-line" style={{ width: "60%", height: 11, marginTop: 8 }} />
+                <div className="skel skel-line" style={{ width: "80%", height: 11, marginTop: 10 }} />
+              </div>
+            </div>
+          ))
+        ) : data.length === 0 ? (
+          <div className="empty-history">
+            <p>No interviews found for this filter.</p>
+          </div>
+        ) : (
+          data.map((item, i) => (
+            <HistoryCard key={`${item.interview_type}-${item.booking_id}`} item={item} index={i} />
+          ))
+        )}
+      </div>
+
+      {!loading && totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="pg-btn"
+            disabled={!previous}
+            onClick={() => handlePage(page - 1)}
+          >
+            <ChevronLeft size={15} />
+            Prev
+          </button>
+          <div className="pg-numbers">
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i + 1}
+                className={`pg-num ${page === i + 1 ? "active-pg" : ""}`}
+                onClick={() => handlePage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <button
+            className="pg-btn"
+            disabled={!next}
+            onClick={() => handlePage(page + 1)}
+          >
+            Next
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+
+      <style>{`
+        .history-section {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          padding: 24px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+          animation: cardIn 0.4s 0.25s ease both;
+        }
+        .history-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+        .section-title {
+          font-size: 17px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 4px;
+        }
+        .section-sub {
+          font-size: 13px;
+          color: #94a3b8;
+          margin: 0;
+        }
+        .source-tabs {
+          display: flex;
+          gap: 4px;
+          background: #f8fafc;
+          border-radius: 10px;
+          padding: 4px;
+        }
+        .source-tab {
+          padding: 6px 14px;
+          border-radius: 7px;
+          font-size: 12.5px;
+          font-weight: 500;
+          border: none;
+          cursor: pointer;
+          color: #64748b;
+          background: transparent;
+          transition: all 0.15s;
+        }
+        .source-tab.active {
+          background: #fff;
+          color: #14b8a6;
+          font-weight: 600;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .history-list { display: flex; flex-direction: column; gap: 10px; }
+        .history-card {
+          display: flex;
+          gap: 14px;
+          padding: 16px;
+          border: 1px solid #f1f5f9;
+          border-radius: 14px;
+          background: #fafcfe;
+          animation: cardIn 0.3s ease both;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .history-card:hover {
+          border-color: #e0f2fe;
+          box-shadow: 0 2px 12px rgba(14,165,233,0.07);
+        }
+        .hcard-icon-wrap {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .hcard-body { flex: 1; min-width: 0; }
+        .hcard-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .hcard-interviewer {
+          font-size: 14px;
+          font-weight: 600;
+          color: #0f172a;
+          margin: 0 0 4px;
+        }
+        .hcard-meta {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11.5px;
+          color: #94a3b8;
+        }
+        .type-chip {
+          padding: 2px 7px;
+          border-radius: 99px;
+          font-size: 10.5px;
+          font-weight: 600;
+          margin-left: 2px;
+        }
+        .peer-chip { background: #f5f3ff; color: #6366f1; }
+        .ai-chip   { background: #f0f9ff; color: #0ea5e9; }
+        .hcard-right {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 5px;
+          flex-shrink: 0;
+        }
+        .score-display {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .score-num { font-size: 14px; font-weight: 700; color: #0f172a; }
+        .score-max { font-size: 11px; color: #94a3b8; }
+        .no-score  { font-size: 12px; color: #cbd5e1; }
+        .hire-badge {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 10.5px;
+          font-weight: 600;
+          padding: 3px 8px;
+          border-radius: 99px;
+        }
+        .hcard-summary {
+          font-size: 12px;
+          color: #64748b;
+          margin: 8px 0 0;
+          font-style: italic;
+          line-height: 1.5;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+        /* Skeleton */
+        .skeleton-hcard { pointer-events: none; background: #f8fafc; }
+        .skel {
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s infinite;
+          border-radius: 6px;
+        }
+        .skel-icon { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; }
+        .skel-body-wrap { flex: 1; }
+        .skel-line { margin-bottom: 0; }
+        /* Empty */
+        .empty-history {
+          text-align: center;
+          padding: 48px 0;
+          color: #94a3b8;
+          font-size: 14px;
+        }
+        /* Pagination */
+        .pagination {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 20px;
+          padding-top: 20px;
+          border-top: 1px solid #f1f5f9;
+        }
+        .pg-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 7px 14px;
+          border-radius: 9px;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          color: #64748b;
+          font-size: 12.5px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .pg-btn:hover:not(:disabled) {
+          border-color: #14b8a6;
+          color: #14b8a6;
+        }
+        .pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pg-numbers { display: flex; gap: 4px; }
+        .pg-num {
+          width: 32px; height: 32px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          color: #64748b;
+          font-size: 12.5px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .pg-num:hover { border-color: #14b8a6; color: #14b8a6; }
+        .active-pg {
+          background: #14b8a6 !important;
+          border-color: #14b8a6 !important;
+          color: #fff !important;
+          font-weight: 700;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}

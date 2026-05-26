@@ -9,8 +9,17 @@ No direct model mutation — this is read-only analytics.
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.db.models import Avg, Count, Q, F, StdDev
-from django.db.models.functions import TruncMonth
+from django.db.models import (
+    Avg,
+    Count,
+    Q,
+    F,
+    StdDev,
+    Sum,
+    ExpressionWrapper,
+    DurationField,
+)
+from django.db.models.functions import TruncMonth, Extract
 from django.utils import timezone
 
 from bookings.models import InterviewBooking
@@ -28,9 +37,9 @@ READINESS_LEVELS = [
 
 # ─── Readiness score weights ────────────────────────────────
 READINESS_WEIGHT_PERFORMANCE = 0.40
-READINESS_WEIGHT_CONSISTENCY = 0.20
-READINESS_WEIGHT_TREND = 0.20
-READINESS_WEIGHT_SESSION_COUNT = 0.20
+READINESS_WEIGHT_CONSISTENCY = 0.25
+READINESS_WEIGHT_TREND = 0.25
+READINESS_WEIGHT_SESSION_COUNT = 0.10
 
 # Session count cap for scoring (after this, full marks for volume)
 SESSION_COUNT_CAP = 20
@@ -83,11 +92,24 @@ class CandidateProgressService:
         ).aggregate(avg_score=Avg("overall_score"))
 
         # Practice hours from booking durations
-        peer_hours = 0.0
-        for b in peer_bookings.only("start_datetime", "end_datetime"):
-            if b.start_datetime and b.end_datetime:
-                delta = (b.end_datetime - b.start_datetime).total_seconds()
-                peer_hours += max(0, delta) / 3600
+        # Practice hours from booking durations
+        duration_expr = ExpressionWrapper(
+            F("end_datetime") - F("start_datetime"),
+            output_field=DurationField(),
+        )
+
+        peer_seconds = (
+            peer_bookings
+            .annotate(duration=duration_expr)
+            .aggregate(
+                total_seconds=Sum(
+                    Extract("duration", "epoch")
+                )
+            )["total_seconds"]
+            or 0
+        )
+
+        peer_hours = round(peer_seconds / 3600, 1)
 
         # ── AI interview stats ────────────────────────────────
         ai_sessions = AIInterviewSession.objects.filter(
@@ -97,12 +119,11 @@ class CandidateProgressService:
         ai_count = ai_sessions.count()
 
         # AI practice hours from duration_minutes
-        ai_hours_agg = ai_sessions.aggregate(
-            total_mins=Count("id")  # placeholder — sum below
-        )
-        ai_hours = 0.0
-        for s in ai_sessions.only("duration_minutes"):
-            ai_hours += (s.duration_minutes or 0) / 60
+        ai_minutes = ai_sessions.aggregate(
+            total=Sum("duration_minutes")
+        )["total"] or 0
+
+        ai_hours = round(ai_minutes / 60, 1)
 
         # AI average score from final reports
         ai_score_agg = AIInterviewFinalReport.objects.filter(

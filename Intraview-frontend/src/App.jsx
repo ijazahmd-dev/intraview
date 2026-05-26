@@ -30,10 +30,10 @@ import InterviewerDashboardHome from "./interviewerDashboard/interviewer/pages/I
 import InterviewerProfilePage from "./interviewerProfile/interviewer/pages/InterviewerProfilePage";
 import InterviewerAvailabilityPage from "./interviewerProfile/interviewer/pages/InterviewerAvailabilityPage";
 
-import { useEffect } from "react"; 
-import { useDispatch, useSelector } from "react-redux"; 
-import { fetchUser } from "./authentication/authSlice";  
-import { fetchAdmin } from "./authentication/adminAuthSlice";  
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchUser } from "./authentication/authSlice";
+import { fetchAdmin } from "./authentication/adminAuthSlice";
 import { fetchInterviewer } from "./authentication/interviewerAuthSlice";
 import AdminInterviewerVerificationsPage from "./interviewerProfile/admin/pages/AdminInterviewerVerificationsPage";
 import InterviewerVerificationPage from "./interviewerProfile/interviewer/pages/InterviewerVerificationPage";
@@ -87,6 +87,8 @@ import InterviewerMyIssuesPage from "./features/issues/interviewer/pages/Intervi
 import InterviewerIssueDetailPage from "./features/issues/interviewer/pages/InterviewerIssueDetailPage";
 import AdminIssuesPage from "./features/issues/admin/pages/AdminIssuesPage";
 import AdminIssueDetailPage from "./features/issues/admin/pages/AdminIssueDetailPage";
+import CandidateProgressPage from "./features/progress/pages/CandidateProgressPage";
+
 
 
 
@@ -122,172 +124,55 @@ function AppInner() {
       <Routes>
 
         <Route path="/" element={<Navigate to="/home" />} />
-                    <Route path="/signup" element={<Signup />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password" element={<ResetPassword />} /> 
-                    <Route path="/home" element={
-                                                // <ProtectedRoute>
-                                                    <Home/>
-                                                // </ProtectedRoute>
-                                                } />
-                    <Route path="/subscriptions" element={<UserSubscriptionsPage />} /> 
-                    <Route path="/subscriptions/success" element={<SubscriptionSuccess />} />
-                    <Route path="/subscriptions/cancel" element={<SubscriptionCancel />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/home" element={
+          // <ProtectedRoute>
+          <Home />
+          // </ProtectedRoute>
+        } />
+        <Route path="/subscriptions" element={<UserSubscriptionsPage />} />
+        <Route path="/subscriptions/success" element={<SubscriptionSuccess />} />
+        <Route path="/subscriptions/cancel" element={<SubscriptionCancel />} />
 
-                    <Route path="/tokens" element={<TokenBundlesPage />} />   
-                    <Route path="/payment/success" element={<PaymentSuccess />} />
-                    <Route path="/payment/cancel" element={<PaymentCancel />} />   
+        <Route path="/tokens" element={<TokenBundlesPage />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/cancel" element={<PaymentCancel />} />
 
-                    <Route path="/candidate/wallet" element={<CandidateWalletPage />} />    
+        <Route path="/candidate/wallet" element={<CandidateWalletPage />} />
 
-                    <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
-                    <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
-                    <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
-                    <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
-                    <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />    
-
-
-
-                    <Route path="/candidate">
-                      <Route path="profile" element={<ProfilePage />} />
-                      <Route path="resume" element={<ResumePage />} />
-                      <Route path="settings" element={<SettingsPage />} /> 
-                    </Route>   
-
-                    {/* want to register this page named RoleBasedAiInterviewPage.jsx */}
-                    <Route path="/ai-interview/roles" element={<RoleBasedInterviewPage />} />
-                    <Route path="/ai-interview/role/:slug" element={<RoleInterviewSetupPage />} />
-
-
-                    <Route path="/ai-interview/live/:sessionId" element={<LiveInterviewPage />} />
-
-                    <Route path="/ai-interview/results/:sessionId" element={<InterviewResultsPage />} />
-
-                    
-
-                    <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />   
-                    <Route path="/interview/completed/:bookingId" element={<InterviewCompleted />}/>       
+        <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
+        <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
+        <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
+        <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
+        <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />
 
 
 
 
+        <Route path="/candidate">
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="resume" element={<ResumePage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+
+        {/* want to register this page named RoleBasedAiInterviewPage.jsx */}
+        <Route path="/ai-interview/roles" element={<RoleBasedInterviewPage />} />
+        <Route path="/ai-interview/role/:slug" element={<RoleInterviewSetupPage />} />
+
+
+        <Route path="/ai-interview/live/:sessionId" element={<LiveInterviewPage />} />
+
+        <Route path="/ai-interview/results/:sessionId" element={<InterviewResultsPage />} />
 
 
 
+        <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />
+        <Route path="/interview/completed/:bookingId" element={<InterviewCompleted />} />
 
-
-                    {/* Interviewer flow */}
-                    <Route path="/interviewer/login" element={<InterviewerLogin />} />
-                    <Route path="/interviewer/request" element={<InterviewerOptions/>} /> 
-                    <Route path="/interviewer/apply" element={<InterviewerApply />} />
-                    <Route path="/interviewer/status" element={<InterviewerStatus />} />
-
-                    {/* Interviewer onboarding flow */}
-                    <Route
-                        path="/interviewer/onboarding"
-                        element={<InterviewerOnboardingLayout />}
-                    >
-                        <Route path="profile" element={<ProfileStep />} />
-                        <Route path="availability" element={<AvailabilityStep />} />
-                        <Route path="verification" element={<VerificationStep />} />
-                        {/* tutorials step could just reuse verification or be a simple content page */}
-                        <Route path="tutorials" element={<VerificationStep />} />
-                        <Route path="complete" element={<CompleteStep />} />
-                    </Route>
-
-
-                    <Route  
-                        path="/interviewer/dashboard"
-                        element={<InterviewerDashboardLayout />}
-                        >
-                        <Route index element={<InterviewerDashboardHome />} />
-                        <Route path="profile" element={<InterviewerProfilePage />} />
-                        <Route path="availability" element={<InterviewerAvailabilityPage />} />
-                        <Route path="verification" element={<InterviewerVerificationPage />} /> 
-                        <Route path="upcoming" element={<UpcomingSessionsPage />} />
-                        <Route path="completed" element={<CompletedSessionsPage />} />
-                        <Route path="bookings/:bookingId" element={<InterviewerBookingDetailPage />} />
-                        <Route path="wallet" element={<InterviewerWalletPage />} />
-                        <Route path="subscriptions" element={<InterviewerSubscriptionsPage />} />
-                    </Route>
-
-                    <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
-                    <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
-                    <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
-
-                    <Route path="/interviewer/payout/request" element={<PayoutRequestPage />} />
-                    <Route path="/interviewer/payout/history" element={<PayoutHistoryPage />} />
-                    <Route path="/interviewer/payout/:id" element={<PayoutDetailPage />} />
-
-                    {/* feedback routes */}
-                    <Route path="/interviewer/evaluations" element={< EvaluationsDashboard />} />
-                    <Route path="/interviewer/evaluations/:evaluationId" element={< FeedbackDetail />} />
-                    <Route path="/interviewer/bookings/:bookingId/evaluate" element={< SubmitEvaluationWrapper />} />
-                    <Route path="/candidate/bookings/:bookingId/review" element={ <SubmitInterviewerReviewPage />} />
-                    <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
-                    <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
-
-                    
-
-                    <Route path="/notifications" element={< NotificationsPage />} />
-
-
-                    <Route path="/my-issues" element={<MyIssuesPage />} />
-                    <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
-                    <Route path="/interviewer/my-issues" element={<InterviewerMyIssuesPage />} />
-                    <Route path="/interviewer/my-issues/:issueId" element={<InterviewerIssueDetailPage />} />
-                    <Route path="admin/issues" element={<AdminIssuesPage />} />
-                    <Route path="admin/issues/:issueId" element={<AdminIssueDetailPage />} />
-
-                    
-                                                
-                                        
-
-
-
-
-
-
-                    {/* Admin side Routes */}
-                    <Route path="/admin/login" element={<AdminLogin />} />
-                    <Route
-                        path="/admin/users"
-                        element={
-                            <AdminProtectedRoute>
-                                <AdminUsersPage />
-                            </AdminProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/interviewers"
-                        element={
-                            <AdminProtectedRoute>
-                                <AdminInterviewerApplications />
-                            </AdminProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/admin/interviewers/:id"
-                        element={
-                            <AdminProtectedRoute>
-                                <AdminInterviewerApplicationDetail />
-                            </AdminProtectedRoute>
-                        }
-                    />
-                    <Route path="/admin/interviewers/verifications"element={
-                          <AdminProtectedRoute>
-                            <AdminInterviewerVerificationsPage />
-                          </AdminProtectedRoute>
-                    }/>
-                    <Route path="/admin/subscription-plans" element={ <AdminProtectedRoute><AdminSubscriptionPlansPage /></AdminProtectedRoute> } />
-                    <Route path="/admin/interviewer-subscription-plans" element={ <AdminProtectedRoute><AdminInterviewerSubscriptionPlansPage /></AdminProtectedRoute> } />
-
-                    <Route path="/admin/token-packs" element={ <AdminProtectedRoute><AdminTokenPacksPage /></AdminProtectedRoute>   } />
-
-                    <Route path="/admin/payout/queue" element={ <AdminProtectedRoute> <AdminPayoutQueuePage /> </AdminProtectedRoute> } />
-                    <Route path="/admin/payout/:id" element={ <AdminProtectedRoute> <AdminPayoutDetailPage /> </AdminProtectedRoute> } />
-                    <Route path="/admin/payout/history" element={ <AdminProtectedRoute> <AdminPayoutHistoryPage /> </AdminProtectedRoute> } />
+        <Route path="/candidate/progress" element={<CandidateProgressPage />} />
 
 
 
@@ -297,8 +182,142 @@ function AppInner() {
 
 
 
-             
-                    
+
+
+
+
+
+
+        {/* Interviewer flow */}
+        <Route path="/interviewer/login" element={<InterviewerLogin />} />
+        <Route path="/interviewer/request" element={<InterviewerOptions />} />
+        <Route path="/interviewer/apply" element={<InterviewerApply />} />
+        <Route path="/interviewer/status" element={<InterviewerStatus />} />
+
+        {/* Interviewer onboarding flow */}
+        <Route
+          path="/interviewer/onboarding"
+          element={<InterviewerOnboardingLayout />}
+        >
+          <Route path="profile" element={<ProfileStep />} />
+          <Route path="availability" element={<AvailabilityStep />} />
+          <Route path="verification" element={<VerificationStep />} />
+          {/* tutorials step could just reuse verification or be a simple content page */}
+          <Route path="tutorials" element={<VerificationStep />} />
+          <Route path="complete" element={<CompleteStep />} />
+        </Route>
+
+
+        <Route
+          path="/interviewer/dashboard"
+          element={<InterviewerDashboardLayout />}
+        >
+          <Route index element={<InterviewerDashboardHome />} />
+          <Route path="profile" element={<InterviewerProfilePage />} />
+          <Route path="availability" element={<InterviewerAvailabilityPage />} />
+          <Route path="verification" element={<InterviewerVerificationPage />} />
+          <Route path="upcoming" element={<UpcomingSessionsPage />} />
+          <Route path="completed" element={<CompletedSessionsPage />} />
+          <Route path="bookings/:bookingId" element={<InterviewerBookingDetailPage />} />
+          <Route path="wallet" element={<InterviewerWalletPage />} />
+          <Route path="subscriptions" element={<InterviewerSubscriptionsPage />} />
+        </Route>
+
+        <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
+        <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
+        <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
+
+        <Route path="/interviewer/payout/request" element={<PayoutRequestPage />} />
+        <Route path="/interviewer/payout/history" element={<PayoutHistoryPage />} />
+        <Route path="/interviewer/payout/:id" element={<PayoutDetailPage />} />
+
+        {/* feedback routes */}
+        <Route path="/interviewer/evaluations" element={< EvaluationsDashboard />} />
+        <Route path="/interviewer/evaluations/:evaluationId" element={< FeedbackDetail />} />
+        <Route path="/interviewer/bookings/:bookingId/evaluate" element={< SubmitEvaluationWrapper />} />
+        <Route path="/candidate/bookings/:bookingId/review" element={<SubmitInterviewerReviewPage />} />
+        <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
+        <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
+
+
+
+        <Route path="/notifications" element={< NotificationsPage />} />
+
+
+        <Route path="/my-issues" element={<MyIssuesPage />} />
+        <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
+        <Route path="/interviewer/my-issues" element={<InterviewerMyIssuesPage />} />
+        <Route path="/interviewer/my-issues/:issueId" element={<InterviewerIssueDetailPage />} />
+        <Route path="admin/issues" element={<AdminIssuesPage />} />
+        <Route path="admin/issues/:issueId" element={<AdminIssueDetailPage />} />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        {/* Admin side Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminProtectedRoute>
+              <AdminUsersPage />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/interviewers"
+          element={
+            <AdminProtectedRoute>
+              <AdminInterviewerApplications />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/interviewers/:id"
+          element={
+            <AdminProtectedRoute>
+              <AdminInterviewerApplicationDetail />
+            </AdminProtectedRoute>
+          }
+        />
+        <Route path="/admin/interviewers/verifications" element={
+          <AdminProtectedRoute>
+            <AdminInterviewerVerificationsPage />
+          </AdminProtectedRoute>
+        } />
+        <Route path="/admin/subscription-plans" element={<AdminProtectedRoute><AdminSubscriptionPlansPage /></AdminProtectedRoute>} />
+        <Route path="/admin/interviewer-subscription-plans" element={<AdminProtectedRoute><AdminInterviewerSubscriptionPlansPage /></AdminProtectedRoute>} />
+
+        <Route path="/admin/token-packs" element={<AdminProtectedRoute><AdminTokenPacksPage /></AdminProtectedRoute>} />
+
+        <Route path="/admin/payout/queue" element={<AdminProtectedRoute> <AdminPayoutQueuePage /> </AdminProtectedRoute>} />
+        <Route path="/admin/payout/:id" element={<AdminProtectedRoute> <AdminPayoutDetailPage /> </AdminProtectedRoute>} />
+        <Route path="/admin/payout/history" element={<AdminProtectedRoute> <AdminPayoutHistoryPage /> </AdminProtectedRoute>} />
+
+
+
+
+
+
+
+
+
+
+
 
       </Routes>
     </>
@@ -310,17 +329,28 @@ function AppInner() {
 
 
 function App() {
-    return (
-      <>
-        <BrowserRouter>
-            <AppInner />
-        </BrowserRouter>
-        
-        </>
-    );
+  return (
+    <>
+      <BrowserRouter>
+        <AppInner />
+      </BrowserRouter>
+
+    </>
+  );
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+// npm install --include=dev -D @vitejs/plugin-react@5.1.0
 
 
 

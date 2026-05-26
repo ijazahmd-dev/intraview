@@ -21,13 +21,15 @@ import aiInterviewEvaluationReducer from "./features/aiInterview/slice/aiIntervi
 import adminIssuesReducer from "./features/issues/slices/adminIssuesSlice";
 import candidateIssuesReducer from "./features/issues/slices/issuesSlice";
 import interviewerIssuesReducer from "./features/issues/slices/interviewerIssuesSlice";
+import progressReducer from "./features/progress/progressSlice";
 
 
 export const store = configureStore({
   reducer: {
     // your reducers go here
     interviewer: interviewerReducer,
-    adminInterviewer:admininterviewerReducer,
+    progress: progressReducer,
+    adminInterviewer: admininterviewerReducer,
     interviewerAuth: interviewerAuthReducer,
     auth: authReducer,
     adminAuth: adminAuthReducer,
@@ -48,7 +50,7 @@ export const store = configureStore({
     adminIssues: adminIssuesReducer,
     issues: candidateIssuesReducer,
     interviewerIssues: interviewerIssuesReducer
-    
+
 
   },
 });
