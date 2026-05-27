@@ -42,7 +42,7 @@ from interviewer_subscriptions.models import (
 )
 from interviewers.models import InterviewerVerification, VerificationStatus
 
-from .constants import (
+from admin_dashboard.constants import (
     RISKY_MIN_AVG_RATING,
     RISKY_MIN_COMPLAINT_COUNT,
     RISKY_CANCELLATION_RATE_THRESHOLD,

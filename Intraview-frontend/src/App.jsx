@@ -89,6 +89,7 @@ import AdminIssuesPage from "./features/issues/admin/pages/AdminIssuesPage";
 import AdminIssueDetailPage from "./features/issues/admin/pages/AdminIssueDetailPage";
 import CandidateProgressPage from "./features/progress/pages/CandidateProgressPage";
 import AdminDashboardPage from "./features/adminDashboard/pages/AdminDashboardPage";
+import AdminSessionsPage from "./features/adminSessions/pages/AdminSessionsPage";
 
 
 
@@ -312,6 +313,12 @@ function AppInner() {
         <Route path="/admin/dashboard" element={
           <AdminProtectedRoute>
             <AdminDashboardPage />
+          </AdminProtectedRoute>
+        } />
+
+        <Route path="/admin/sessions" element={
+          <AdminProtectedRoute>
+            <AdminSessionsPage />
           </AdminProtectedRoute>
         } />
 

@@ -12,10 +12,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .permissions import AdminCookieJWTAuthentication, IsAdminRole
-from .constants import VALID_PERIODS, DEFAULT_PERIOD
+from admin_dashboard.permissions import AdminCookieJWTAuthentication, IsAdminRole
+from admin_dashboard.constants import VALID_PERIODS, DEFAULT_PERIOD
 
-from .services import (
+from admin_dashboard.services import (
     OverviewService,
     RevenueService,
     InterviewAnalyticsService,
@@ -26,7 +26,7 @@ from .services import (
     GrowthService,
 )
 
-from .serializers import (
+from admin_dashboard.serializers import (
     OverviewSerializer,
     RevenueSerializer,
     InterviewAnalyticsSerializer,
