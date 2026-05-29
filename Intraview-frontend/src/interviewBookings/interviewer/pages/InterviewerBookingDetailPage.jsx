@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Target, Layers, BookOpen, MessageSquare, Briefcase } from 'lucide-react';
 import { interviewerBookingsApi } from '../../interviewerBookingsApi';
 import ReportIssueModal from '../../../features/issues/components/RaiseIssueModal';
-import { INTERVIEW_TYPE_LABELS, DIFFICULTY_LABELS, CANDIDATE_GOALS } from '../components/SessionConfigModal';
+import { INTERVIEW_TYPE_LABELS, DIFFICULTY_LABELS, CANDIDATE_GOALS } from "../../user/components/SessionConfigModal";
 
 const InterviewerBookingDetailPage = () => {
   const { bookingId } = useParams();
