@@ -1,5 +1,6 @@
 // src/pages/candidate/components/sections/LinksSection.jsx
 import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
 import { Github, Linkedin, Globe, Loader2, AlertCircle } from 'lucide-react';
@@ -52,19 +53,17 @@ const LinksSection = () => {
     errors,
     setFieldValue,
   } = useProfileForm(initialData, async (data) => {
-    // Validate all URLs
-    if (data.github_url && !validateUrls.github(data.github_url)) {
-      // Return error but don't submit
-      return;
-    }
-    if (data.linkedin_url && !validateUrls.linkedin(data.linkedin_url)) {
-      return;
-    }
-    if (data.portfolio_url && !validateUrls.portfolio(data.portfolio_url)) {
-      return;
-    }
+    // Validate all URLs before submitting
+    if (data.github_url && !validateUrls.github(data.github_url)) return;
+    if (data.linkedin_url && !validateUrls.linkedin(data.linkedin_url)) return;
+    if (data.portfolio_url && !validateUrls.portfolio(data.portfolio_url)) return;
 
-    await handleUpdateProfile(data);
+    const result = await handleUpdateProfile(data);
+    if (result && !result.error) {
+      toast.success('Links saved!');
+    } else if (result?.error) {
+      toast.error('Failed to save links.');
+    }
   });
 
   // Sync form when profile data changes
@@ -78,7 +77,7 @@ const LinksSection = () => {
   // Real-time URL validation
   const getUrlError = (fieldName, value) => {
     if (!value) return null;
-    
+
     switch (fieldName) {
       case 'github_url':
         if (!validateUrls.github(value)) {
@@ -136,11 +135,10 @@ const LinksSection = () => {
             onBlur={handleBlur}
             disabled={disabled}
             placeholder="https://github.com/username"
-            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${
-              githubError
+            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${githubError
                 ? 'border-rose-200 focus:ring-rose-500'
                 : 'border-slate-200 focus:ring-indigo-500'
-            }`}
+              }`}
           />
           {githubError && (
             <div className="mt-1 flex items-start gap-2">
@@ -170,11 +168,10 @@ const LinksSection = () => {
             onBlur={handleBlur}
             disabled={disabled}
             placeholder="https://www.linkedin.com/in/username"
-            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${
-              linkedinError
+            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${linkedinError
                 ? 'border-rose-200 focus:ring-rose-500'
                 : 'border-slate-200 focus:ring-indigo-500'
-            }`}
+              }`}
           />
           {linkedinError && (
             <div className="mt-1 flex items-start gap-2">
@@ -204,11 +201,10 @@ const LinksSection = () => {
             onBlur={handleBlur}
             disabled={disabled}
             placeholder="https://yourportfolio.com"
-            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${
-              portfolioError
+            className={`w-full px-3 py-2 rounded-2xl border bg-white focus:outline-none focus:ring-2 focus:border-indigo-500 text-sm transition-all ${portfolioError
                 ? 'border-rose-200 focus:ring-rose-500'
                 : 'border-slate-200 focus:ring-indigo-500'
-            }`}
+              }`}
           />
           {portfolioError && (
             <div className="mt-1 flex items-start gap-2">

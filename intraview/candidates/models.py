@@ -43,8 +43,10 @@ class CandidateProfile(models.Model):
     
 
     full_name = models.CharField(max_length=100, blank=True)
+    headline = models.CharField(max_length=150, blank=True)  # e.g. "Aspiring ML Engineer"
+    bio = models.TextField(blank=True)  # About me section
     phone = models.CharField(max_length=20, blank=True)
-    location = models.CharField(max_length=120, blank=True) 
+    location = models.CharField(max_length=120, blank=True)
     timezone = models.CharField(max_length=50, default="Asia/Kolkata")
     
 
@@ -111,32 +113,33 @@ class CandidateProfile(models.Model):
         super().save(*args, **kwargs)
     
     def update_profile_completion(self):
-        """✅ IMPROVED - Better calculation logic"""
-        total_fields = 12  
+        """Calculate profile completion percentage based on filled fields."""
+        total_fields = 14
         filled_fields = 0
-        
-  
+
         if self.full_name: filled_fields += 1
+        if self.headline: filled_fields += 1
+        if self.bio: filled_fields += 1
         if self.phone: filled_fields += 1
         if self.location: filled_fields += 1
         if self.target_role: filled_fields += 1
         if self.experience_level: filled_fields += 1
-        if self.years_experience is not None: filled_fields += 1  
+        if self.years_experience is not None: filled_fields += 1
         if self.skills: filled_fields += 1
         if self.resume_file or self.resume_url: filled_fields += 1
         if self.linkedin_url: filled_fields += 1
         if self.github_url: filled_fields += 1
-        if self.preferred_interview_types or "": filled_fields += 1
-        if self.interviewer_notes or "": filled_fields += 1
-        1
+        if self.preferred_interview_types: filled_fields += 1
+        if self.interviewer_notes: filled_fields += 1
+
         self.profile_completion = round((filled_fields / total_fields) * 100, 2)
     
     def get_profile_picture_url(self):
-        """✅ ADDED - Safe picture URL getter"""
-        if self.profile_picture:
-            return self.profile_picture.url
+        """Return profile picture URL or a generated avatar fallback."""
+        if self.user.profile_picture_url:
+            return self.user.profile_picture_url
         name = (self.full_name or self.user.get_full_name() or self.user.email).strip()
-        return f"https://ui-avatars.com/api/?name={name}"
+        return f"https://ui-avatars.com/api/?name={name}&background=random"
 
 
     

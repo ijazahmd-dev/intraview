@@ -1,5 +1,6 @@
 // src/pages/candidate/components/sections/PreferencesSection.jsx
 import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -54,7 +55,12 @@ const PreferencesSection = () => {
     isDirty,
     resetForm,
   } = useProfileForm(initialData, async (data) => {
-    await handleUpdateProfile(data);
+    const result = await handleUpdateProfile(data);
+    if (result && !result.error) {
+      toast.success('Preferences saved!');
+    } else if (result?.error) {
+      toast.error('Failed to save preferences.');
+    }
   });
 
   useEffect(() => {
@@ -108,11 +114,10 @@ const PreferencesSection = () => {
                   type="button"
                   onClick={() => toggleInterviewType(item.value)}
                   disabled={disabled}
-                  className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all text-left ${
-                    isSelected
+                  className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all text-left ${isSelected
                       ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
                       : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300'
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </button>
@@ -143,11 +148,10 @@ const PreferencesSection = () => {
                   setFieldValue('preferred_difficulty', item.value)
                 }
                 disabled={disabled}
-                className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all ${
-                  formData.preferred_difficulty === item.value
+                className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all ${formData.preferred_difficulty === item.value
                     ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
                     : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 {item.label}
               </button>
@@ -172,11 +176,10 @@ const PreferencesSection = () => {
                 type="button"
                 onClick={() => setFieldValue('preferred_duration', item.value)}
                 disabled={disabled}
-                className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all ${
-                  formData.preferred_duration === item.value
+                className={`p-3 rounded-2xl text-sm font-medium border-2 transition-all ${formData.preferred_duration === item.value
                     ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
                     : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 {item.label}
               </button>

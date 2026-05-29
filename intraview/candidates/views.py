@@ -440,17 +440,31 @@ class CandidateProfileViewSet(viewsets.ModelViewSet):
             )
         
         try:
-            # ✅ FIXED: Use CloudinaryStorage + Django
+            import cloudinary.uploader
             user = request.user
-            user.profile_picture_url = profile_picture
-            user.save()
-            
-            # ✅ FIXED: Log ID, not email
-            logger.info(f"Profile picture uploaded: user_id={request.user.id}")
-            
+
+            # Upload the image file to Cloudinary and get a public URL
+            upload_result = cloudinary.uploader.upload(
+                profile_picture,
+                folder="profile_pictures",
+                public_id=f"user_{user.id}",
+                overwrite=True,
+                resource_type="image",
+            )
+            picture_url = upload_result.get("secure_url") or upload_result.get("url")
+
+            if not picture_url:
+                raise ValueError("Cloudinary did not return a URL")
+
+            # Save the URL string to the URLField
+            user.profile_picture_url = picture_url
+            user.save(update_fields=["profile_picture_url"])
+
+            logger.info(f"Profile picture uploaded: user_id={user.id}")
+
             return Response({
                 "message": "Profile picture uploaded successfully",
-                "picture_url": user.profile_picture_url.url if hasattr(user.profile_picture_url, 'url') else str(user.profile_picture_url)
+                "picture_url": picture_url,
             }, status=status.HTTP_201_CREATED)
         
         except Exception as e:

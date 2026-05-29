@@ -1,5 +1,5 @@
-// src/pages/candidate/components/sections/BasicInfoSection.jsx
 import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
 import { Loader2 } from 'lucide-react';
@@ -31,7 +31,12 @@ const BasicInfoSection = () => {
     isDirty,
     resetForm,
   } = useProfileForm(initialData, async (data) => {
-    await handleUpdateProfile(data);
+    const result = await handleUpdateProfile(data);
+    if (result && !result.error) {
+      toast.success('Basic info saved!');
+    } else if (result?.error) {
+      toast.error('Failed to save — please check your inputs.');
+    }
   });
 
   // keep form in sync if profile reloads

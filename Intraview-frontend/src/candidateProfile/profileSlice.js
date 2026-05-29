@@ -104,7 +104,7 @@ const initialState = {
   // Profile data
   user: null,
   candidateProfile: null,
-  
+
   // Completion tracking
   completion: {
     percentage: 0,
@@ -159,7 +159,7 @@ const initialState = {
 const profileSlice = createSlice({
   name: 'profile',
   initialState,
-  
+
   reducers: {
     // Set active tab
     setActiveTab: (state, action) => {
@@ -219,6 +219,7 @@ const profileSlice = createSlice({
           firstName: action.payload.user_first_name,
           lastName: action.payload.user_last_name,
           profilePicture: action.payload.user_profile_picture,
+          joinedAt: action.payload.joined_at,
         };
         state.candidateProfile = action.payload;
       })
@@ -239,14 +240,14 @@ const profileSlice = createSlice({
       .addCase(updateProfileAsync.fulfilled, (state, action) => {
         state.loading.update = false;
         state.success.profile = 'Profile updated successfully!';
-        
+
         // Update profile data
         if (action.payload.data) {
           state.candidateProfile = action.payload.data;
         } else {
           state.candidateProfile = action.payload;
         }
-        
+
         state.isEditing = false;
         state.editingField = null;
 

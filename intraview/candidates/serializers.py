@@ -53,41 +53,44 @@ class BasicCandidateProfileSerializer(serializers.ModelSerializer):
 # ============================================
 class DetailedCandidateProfileSerializer(serializers.ModelSerializer):
     """Full profile with all details"""
-    
+
     user_email = serializers.CharField(source='user.email', read_only=True)
     user_first_name = serializers.CharField(source='user.first_name', read_only=True)
     user_last_name = serializers.CharField(source='user.last_name', read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     user_profile_picture = serializers.CharField(
-        source='user.profile_picture_url', 
+        source='user.profile_picture_url',
         read_only=True
     )
-    
+    joined_at = serializers.DateTimeField(source='user.date_joined', read_only=True)
 
     experience_level_display = serializers.CharField(
-        source='get_experience_level_display', 
+        source='get_experience_level_display',
         read_only=True
     )
     preferred_difficulty_display = serializers.CharField(
-        source='get_preferred_difficulty_display', 
+        source='get_preferred_difficulty_display',
         read_only=True
     )
-    
+
     class Meta:
         model = CandidateProfile
         fields = [
-            # Basic
+            # Identity
             'id',
             'user_id',
             'user_email',
             'user_first_name',
             'user_last_name',
             'user_profile_picture',
+            'joined_at',
             'full_name',
+            'headline',
+            'bio',
             'phone',
             'location',
             'timezone',
-            
+
             # Career
             'current_status',
             'current_role',
@@ -96,28 +99,28 @@ class DetailedCandidateProfileSerializer(serializers.ModelSerializer):
             'experience_level_display',
             'years_experience',
             'skills',
-            
+
             # Preferences
             'preferred_interview_types',
             'preferred_difficulty',
             'preferred_difficulty_display',
             'preferred_duration',
             'interviewer_notes',
-            
+
             # Links
             'linkedin_url',
             'github_url',
             'portfolio_url',
-            
+
             # Resume
             'resume_file',
             'resume_url',
-            
+
             # Stats
             'profile_completion',
             'interviews_completed',
             'created_at',
-            'updated_at'
+            'updated_at',
         ]
         read_only_fields = [
             'id',
@@ -126,10 +129,11 @@ class DetailedCandidateProfileSerializer(serializers.ModelSerializer):
             'user_first_name',
             'user_last_name',
             'user_profile_picture',
+            'joined_at',
             'profile_completion',
             'interviews_completed',
             'created_at',
-            'updated_at'
+            'updated_at',
         ]
 
 
@@ -161,8 +165,9 @@ class UpdateCandidateProfileSerializer(serializers.ModelSerializer):
         fields = [
             'user_first_name',
             'user_last_name',
-
             'full_name',
+            'headline',
+            'bio',
             'phone',
             'location',
             'timezone',
@@ -182,8 +187,17 @@ class UpdateCandidateProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = []
     
-    def validate_phone(self, value):
+    def validate_headline(self, value):
+        if value and len(value) > 150:
+            raise ValidationError("Headline cannot exceed 150 characters")
+        return value
 
+    def validate_bio(self, value):
+        if value and len(value) > 1000:
+            raise ValidationError("Bio cannot exceed 1000 characters")
+        return value
+
+    def validate_phone(self, value):
         if value and not value.replace('+', '').replace('-', '').replace(' ', '').isdigit():
             raise ValidationError("Phone number must contain only digits, spaces, +, or -")
         return value

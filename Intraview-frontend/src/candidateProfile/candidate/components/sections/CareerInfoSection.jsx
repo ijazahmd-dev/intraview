@@ -1,5 +1,6 @@
 // src/pages/candidate/components/sections/CareerInfoSection.jsx
 import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
 import { Loader2 } from 'lucide-react';
@@ -35,13 +36,15 @@ const CareerInfoSection = () => {
   } = useProfileData();
 
   const initialData = {
+    headline: candidateProfile?.headline || '',
+    bio: candidateProfile?.bio || '',
     current_status: candidateProfile?.current_status || '',
     current_role: candidateProfile?.current_role || '',
     target_role: candidateProfile?.target_role || '',
     experience_level: candidateProfile?.experience_level || '',
     years_experience:
       candidateProfile?.years_experience !== null &&
-      candidateProfile?.years_experience !== undefined
+        candidateProfile?.years_experience !== undefined
         ? candidateProfile.years_experience
         : '',
     skills: Array.isArray(candidateProfile?.skills)
@@ -83,7 +86,12 @@ const CareerInfoSection = () => {
           ? data.preferred_interview_types
           : [],
     };
-    await handleUpdateProfile(cleaned);
+    const result = await handleUpdateProfile(cleaned);
+    if (result && !result.error) {
+      toast.success('Career profile saved!');
+    } else if (result?.error) {
+      toast.error('Failed to save — please check your inputs.');
+    }
   });
 
   useEffect(() => {
@@ -93,7 +101,6 @@ const CareerInfoSection = () => {
 
   const disabled = isSubmitting || isUpdatingProfile;
 
-  // skill input local state pattern: no separate hook to keep it simple
   const [skillInput, setSkillInput] = React.useState('');
 
   const addSkill = () => {
@@ -142,6 +149,65 @@ const CareerInfoSection = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5 text-sm">
+
+        {/* Headline */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">
+            Headline / Tagline
+          </label>
+          <input
+            type="text"
+            name="headline"
+            value={formData.headline || ''}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            disabled={disabled}
+            maxLength={150}
+            className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            placeholder="e.g. Aspiring ML Engineer | React Developer"
+          />
+          <div className="flex justify-between items-center mt-1">
+            <p className="text-[11px] text-slate-400">
+              Shown on your profile card
+            </p>
+            <p className="text-[11px] text-slate-400">
+              {(formData.headline || '').length}/150
+            </p>
+          </div>
+          {getFieldError('headline') && (
+            <p className="mt-1 text-xs text-rose-600">{getFieldError('headline')}</p>
+          )}
+        </div>
+
+        {/* Bio */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1">
+            About me
+          </label>
+          <textarea
+            name="bio"
+            value={formData.bio || ''}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            disabled={disabled}
+            rows={4}
+            maxLength={1000}
+            className="w-full px-3 py-2 rounded-2xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm resize-none"
+            placeholder="Write a short bio about yourself, your background, and what you're looking for..."
+          />
+          <div className="flex justify-between items-center mt-1">
+            <p className="text-[11px] text-slate-400">
+              Helps interviewers understand you better
+            </p>
+            <p className="text-[11px] text-slate-400">
+              {(formData.bio || '').length}/1000
+            </p>
+          </div>
+          {getFieldError('bio') && (
+            <p className="mt-1 text-xs text-rose-600">{getFieldError('bio')}</p>
+          )}
+        </div>
+
         <div className="grid md:grid-cols-2 gap-4">
           {/* Current status */}
           <div>
@@ -325,11 +391,10 @@ const CareerInfoSection = () => {
                     type="button"
                     onClick={() => togglePreferredType(item.value)}
                     disabled={disabled}
-                    className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${
-                      active
+                    className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${active
                         ? 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -349,11 +414,10 @@ const CareerInfoSection = () => {
                   type="button"
                   onClick={() => setFieldValue('preferred_duration', d)}
                   disabled={disabled}
-                  className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${
-                    Number(formData.preferred_duration) === d
+                  className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${Number(formData.preferred_duration) === d
                       ? 'bg-indigo-600 text-white border-indigo-600'
                       : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                    }`}
                 >
                   {d} min
                 </button>
@@ -376,11 +440,10 @@ const CareerInfoSection = () => {
                   setFieldValue('preferred_difficulty', item.value)
                 }
                 disabled={disabled}
-                className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${
-                  formData.preferred_difficulty === item.value
+                className={`px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all ${formData.preferred_difficulty === item.value
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {item.label}
               </button>

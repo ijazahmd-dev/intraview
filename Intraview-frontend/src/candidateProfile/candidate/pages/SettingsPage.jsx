@@ -71,10 +71,10 @@ const ChangePasswordSection = () => {
     try {
       // TODO: API call to change password
       // await API.post('/auth/change-password/', data);
-      
+
       // Mock success for now
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      
+
       toast.success('Password changed successfully!');
       resetForm();
     } catch (error) {
@@ -254,274 +254,274 @@ const ChangePasswordSection = () => {
   );
 };
 
-// ============================================
-// CONNECTED LOGINS SECTION
-// ============================================
+// // ============================================
+// // CONNECTED LOGINS SECTION
+// // ============================================
 
-const ConnectedLoginsSection = () => {
-  const [connectedLogins, setConnectedLogins] = useState({
-    email: true,
-    google: false,
-    github: false,
-  });
+// const ConnectedLoginsSection = () => {
+//   const [connectedLogins, setConnectedLogins] = useState({
+//     email: true,
+//     google: false,
+//     github: false,
+//   });
 
-  const [isConnecting, setIsConnecting] = useState(null);
+//   const [isConnecting, setIsConnecting] = useState(null);
 
-  const handleConnect = async (provider) => {
-    setIsConnecting(provider);
+//   const handleConnect = async (provider) => {
+//     setIsConnecting(provider);
 
-    try {
-      // TODO: API call to connect OAuth provider
-      // await API.post(`/auth/connect/${provider}/`);
+//     try {
+//       // TODO: API call to connect OAuth provider
+//       // await API.post(`/auth/connect/${provider}/`);
 
-      // Mock success
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+//       // Mock success
+//       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      setConnectedLogins((prev) => ({
-        ...prev,
-        [provider]: true,
-      }));
+//       setConnectedLogins((prev) => ({
+//         ...prev,
+//         [provider]: true,
+//       }));
 
-      toast.success(`${provider} connected successfully!`);
-    } catch (error) {
-      toast.error(`Failed to connect ${provider}`);
-    } finally {
-      setIsConnecting(null);
-    }
-  };
+//       toast.success(`${provider} connected successfully!`);
+//     } catch (error) {
+//       toast.error(`Failed to connect ${provider}`);
+//     } finally {
+//       setIsConnecting(null);
+//     }
+//   };
 
-  const handleDisconnect = async (provider) => {
-    if (provider === 'email') {
-      toast.error('Cannot disconnect your primary email login');
-      return;
-    }
+//   const handleDisconnect = async (provider) => {
+//     if (provider === 'email') {
+//       toast.error('Cannot disconnect your primary email login');
+//       return;
+//     }
 
-    setIsConnecting(provider);
+//     setIsConnecting(provider);
 
-    try {
-      // TODO: API call to disconnect OAuth provider
-      // await API.post(`/auth/disconnect/${provider}/`);
+//     try {
+//       // TODO: API call to disconnect OAuth provider
+//       // await API.post(`/auth/disconnect/${provider}/`);
 
-      // Mock success
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+//       // Mock success
+//       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      setConnectedLogins((prev) => ({
-        ...prev,
-        [provider]: false,
-      }));
+//       setConnectedLogins((prev) => ({
+//         ...prev,
+//         [provider]: false,
+//       }));
 
-      toast.success(`${provider} disconnected successfully!`);
-    } catch (error) {
-      toast.error(`Failed to disconnect ${provider}`);
-    } finally {
-      setIsConnecting(null);
-    }
-  };
+//       toast.success(`${provider} disconnected successfully!`);
+//     } catch (error) {
+//       toast.error(`Failed to disconnect ${provider}`);
+//     } finally {
+//       setIsConnecting(null);
+//     }
+//   };
 
-  const logins = [
-    {
-      id: 'email',
-      name: 'Email & Password',
-      icon: Mail,
-      description: 'Your primary login method',
-      connected: connectedLogins.email,
-      isPrimary: true,
-    },
-    {
-      id: 'google',
-      name: 'Google',
-      icon: Chrome,
-      description: 'Sign in with your Google account',
-      connected: connectedLogins.google,
-      isPrimary: false,
-    },
-    {
-      id: 'github',
-      name: 'GitHub',
-      icon: Chrome,
-      description: 'Sign in with your GitHub account',
-      connected: connectedLogins.github,
-      isPrimary: false,
-    },
-  ];
+//   const logins = [
+//     {
+//       id: 'email',
+//       name: 'Email & Password',
+//       icon: Mail,
+//       description: 'Your primary login method',
+//       connected: connectedLogins.email,
+//       isPrimary: true,
+//     },
+//     {
+//       id: 'google',
+//       name: 'Google',
+//       icon: Chrome,
+//       description: 'Sign in with your Google account',
+//       connected: connectedLogins.google,
+//       isPrimary: false,
+//     },
+//     {
+//       id: 'github',
+//       name: 'GitHub',
+//       icon: Chrome,
+//       description: 'Sign in with your GitHub account',
+//       connected: connectedLogins.github,
+//       isPrimary: false,
+//     },
+//   ];
 
-  return (
-    <div className="bg-white/80 rounded-3xl border border-slate-200 p-6 shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-900">Connected logins</h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Manage your login methods to access Intraview.
-        </p>
-      </div>
+//   return (
+//     <div className="bg-white/80 rounded-3xl border border-slate-200 p-6 shadow-sm">
+//       <div className="mb-4">
+//         <h3 className="text-lg font-bold text-slate-900">Connected logins</h3>
+//         <p className="text-xs text-slate-500 mt-1">
+//           Manage your login methods to access Intraview.
+//         </p>
+//       </div>
 
-      <div className="space-y-3">
-        {logins.map((login) => {
-          const Icon = login.icon;
-          const isLoading = isConnecting === login.id;
+//       <div className="space-y-3">
+//         {logins.map((login) => {
+//           const Icon = login.icon;
+//           const isLoading = isConnecting === login.id;
 
-          return (
-            <div
-              key={login.id}
-              className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-2xl bg-white border border-slate-200">
-                  <Icon className="w-5 h-5 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {login.name}
-                  </p>
-                  <p className="text-xs text-slate-500">{login.description}</p>
-                </div>
-              </div>
+//           return (
+//             <div
+//               key={login.id}
+//               className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all"
+//             >
+//               <div className="flex items-center gap-3">
+//                 <div className="p-2 rounded-2xl bg-white border border-slate-200">
+//                   <Icon className="w-5 h-5 text-slate-600" />
+//                 </div>
+//                 <div>
+//                   <p className="text-sm font-semibold text-slate-900">
+//                     {login.name}
+//                   </p>
+//                   <p className="text-xs text-slate-500">{login.description}</p>
+//                 </div>
+//               </div>
 
-              <div className="flex items-center gap-2">
-                {login.connected ? (
-                  <>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      <span className="text-xs font-semibold text-emerald-700">
-                        Connected
-                      </span>
-                    </span>
-                    {!login.isPrimary && (
-                      <button
-                        onClick={() => handleDisconnect(login.id)}
-                        disabled={isLoading}
-                        className="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-200 rounded-2xl hover:bg-rose-50 disabled:opacity-40"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          'Disconnect'
-                        )}
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    onClick={() => handleConnect(login.id)}
-                    disabled={isLoading}
-                    className="px-3 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 rounded-2xl hover:bg-indigo-50 disabled:opacity-40 inline-flex items-center gap-1.5"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      'Connect'
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+//               <div className="flex items-center gap-2">
+//                 {login.connected ? (
+//                   <>
+//                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+//                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+//                       <span className="text-xs font-semibold text-emerald-700">
+//                         Connected
+//                       </span>
+//                     </span>
+//                     {!login.isPrimary && (
+//                       <button
+//                         onClick={() => handleDisconnect(login.id)}
+//                         disabled={isLoading}
+//                         className="px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-200 rounded-2xl hover:bg-rose-50 disabled:opacity-40"
+//                       >
+//                         {isLoading ? (
+//                           <Loader2 className="w-3 h-3 animate-spin" />
+//                         ) : (
+//                           'Disconnect'
+//                         )}
+//                       </button>
+//                     )}
+//                   </>
+//                 ) : (
+//                   <button
+//                     onClick={() => handleConnect(login.id)}
+//                     disabled={isLoading}
+//                     className="px-3 py-1.5 text-xs font-semibold text-indigo-600 border border-indigo-200 rounded-2xl hover:bg-indigo-50 disabled:opacity-40 inline-flex items-center gap-1.5"
+//                   >
+//                     {isLoading ? (
+//                       <>
+//                         <Loader2 className="w-3 h-3 animate-spin" />
+//                         Connecting...
+//                       </>
+//                     ) : (
+//                       'Connect'
+//                     )}
+//                   </button>
+//                 )}
+//               </div>
+//             </div>
+//           );
+//         })}
+//       </div>
+//     </div>
+//   );
+// };
 
-// ============================================
-// ACCOUNT PREFERENCES SECTION
-// ============================================
+// // ============================================
+// // ACCOUNT PREFERENCES SECTION
+// // ============================================
 
-const AccountPreferencesSection = () => {
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    marketingEmails: false,
-    sessionReminders: true,
-  });
+// const AccountPreferencesSection = () => {
+//   const [preferences, setPreferences] = useState({
+//     emailNotifications: true,
+//     marketingEmails: false,
+//     sessionReminders: true,
+//   });
 
-  const handleToggle = (key) => {
-    setPreferences((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+//   const handleToggle = (key) => {
+//     setPreferences((prev) => ({
+//       ...prev,
+//       [key]: !prev[key],
+//     }));
 
-    toast.success('Preference updated!');
-  };
+//     toast.success('Preference updated!');
+//   };
 
-  return (
-    <div className="bg-white/80 rounded-3xl border border-slate-200 p-6 shadow-sm">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-900">
-          Account preferences
-        </h3>
-        <p className="text-xs text-slate-500 mt-1">
-          Control how you receive communications.
-        </p>
-      </div>
+//   return (
+//     <div className="bg-white/80 rounded-3xl border border-slate-200 p-6 shadow-sm">
+//       <div className="mb-4">
+//         <h3 className="text-lg font-bold text-slate-900">
+//           Account preferences
+//         </h3>
+//         <p className="text-xs text-slate-500 mt-1">
+//           Control how you receive communications.
+//         </p>
+//       </div>
 
-      <div className="space-y-3">
-        {/* Email Notifications */}
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Email notifications
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Receive important updates about your account
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.emailNotifications}
-              onChange={() => handleToggle('emailNotifications')}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-          </label>
-        </div>
+//       <div className="space-y-3">
+//         {/* Email Notifications */}
+//         <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
+//           <div>
+//             <p className="text-sm font-semibold text-slate-900">
+//               Email notifications
+//             </p>
+//             <p className="text-xs text-slate-500 mt-1">
+//               Receive important updates about your account
+//             </p>
+//           </div>
+//           <label className="relative inline-flex items-center cursor-pointer">
+//             <input
+//               type="checkbox"
+//               checked={preferences.emailNotifications}
+//               onChange={() => handleToggle('emailNotifications')}
+//               className="sr-only peer"
+//             />
+//             <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+//           </label>
+//         </div>
 
-        {/* Marketing Emails */}
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Marketing emails
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Tips, updates, and product news from Intraview
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.marketingEmails}
-              onChange={() => handleToggle('marketingEmails')}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-          </label>
-        </div>
+//         {/* Marketing Emails */}
+//         <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
+//           <div>
+//             <p className="text-sm font-semibold text-slate-900">
+//               Marketing emails
+//             </p>
+//             <p className="text-xs text-slate-500 mt-1">
+//               Tips, updates, and product news from Intraview
+//             </p>
+//           </div>
+//           <label className="relative inline-flex items-center cursor-pointer">
+//             <input
+//               type="checkbox"
+//               checked={preferences.marketingEmails}
+//               onChange={() => handleToggle('marketingEmails')}
+//               className="sr-only peer"
+//             />
+//             <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+//           </label>
+//         </div>
 
-        {/* Session Reminders */}
-        <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Session reminders
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Reminders before your interviews
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={preferences.sessionReminders}
-              onChange={() => handleToggle('sessionReminders')}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
-          </label>
-        </div>
-      </div>
-    </div>
-  );
-};
+//         {/* Session Reminders */}
+//         <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200 bg-slate-50">
+//           <div>
+//             <p className="text-sm font-semibold text-slate-900">
+//               Session reminders
+//             </p>
+//             <p className="text-xs text-slate-500 mt-1">
+//               Reminders before your interviews
+//             </p>
+//           </div>
+//           <label className="relative inline-flex items-center cursor-pointer">
+//             <input
+//               type="checkbox"
+//               checked={preferences.sessionReminders}
+//               onChange={() => handleToggle('sessionReminders')}
+//               className="sr-only peer"
+//             />
+//             <div className="w-10 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+//           </label>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 // ============================================
 // DANGER ZONE SECTION
@@ -648,8 +648,8 @@ const SettingsPage = () => {
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               <ChangePasswordSection />
-              <ConnectedLoginsSection />
-              <AccountPreferencesSection />
+              {/* <ConnectedLoginsSection />
+              <AccountPreferencesSection /> */}
             </div>
 
             {/* Sidebar Info */}
