@@ -259,23 +259,42 @@ class InterviewerProfileSerializer(serializers.ModelSerializer):
 
 
 class InterviewerAvailabilityCreateSerializer(serializers.ModelSerializer):
+    VALID_DURATIONS = [30, 45, 60, 90]
+
+    duration_minutes = serializers.ChoiceField(
+        choices=InterviewerAvailability.DURATION_CHOICES,
+        help_text="Session duration: 30, 45, 60, or 90 minutes."
+    )
+
     class Meta:
         model = InterviewerAvailability
         fields = [
             "date",
             "start_time",
-            "end_time",
+            "duration_minutes",
             "timezone",
             "is_recurring",
             "recurrence_type",
             "recurrence_end_date",
         ]
 
-    def validate(self, attrs):
-        if attrs["start_time"] >= attrs["end_time"]:
+    def validate_duration_minutes(self, value):
+        if value not in self.VALID_DURATIONS:
             raise serializers.ValidationError(
-                "Start time must be before end time."
+                f"Duration must be one of {self.VALID_DURATIONS} minutes."
             )
+        return value
+
+    def validate(self, attrs):
+        from datetime import datetime, timedelta
+
+        # Calculate end_time on the backend from start_time + duration_minutes
+        start_time = attrs.get("start_time")
+        duration = attrs.get("duration_minutes")
+        if start_time and duration:
+            start_dt = datetime.combine(datetime.today(), start_time)
+            end_dt = start_dt + timedelta(minutes=duration)
+            attrs["end_time"] = end_dt.time()
 
         if attrs.get("is_recurring"):
             if not attrs.get("recurrence_type"):

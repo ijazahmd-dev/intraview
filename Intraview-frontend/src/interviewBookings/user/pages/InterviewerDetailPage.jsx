@@ -259,8 +259,8 @@ const InterviewerDetailPage = () => {
                 <div className="mb-6">
                   <h2 className="text-xl font-semibold text-slate-900 mb-2">Book a session</h2>
                   <p className="text-sm text-slate-600">
-                    Each session costs <span className="font-semibold">{tokenCost} tokens</span>. Your
-                    tokens are locked at booking and released after completion or cancellation.
+                    Pricing scales with session duration. Base rate: <span className="font-semibold">{tokenCost} tokens</span> / 30 min.
+                    Tokens are locked at booking and released after completion or cancellation.
                   </p>
                 </div>
 
@@ -278,8 +278,8 @@ const InterviewerDetailPage = () => {
                       onClick={() => navigate(`/candidate/interviewers/${id}/calendar`)}
                       disabled={!is_accepting_bookings || bookingLoading}
                       className={`w-full py-5 px-6 rounded-3xl font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-4 text-lg relative overflow-hidden ${is_accepting_bookings
-                          ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]'
-                          : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]'
+                        : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                         }`}
                     >
                       <Calendar className="w-8 h-8" />
@@ -336,25 +336,34 @@ const InterviewerDetailPage = () => {
                           </div>
                         )}
 
-                        {availability.map((slot) => (
-                          <button
-                            key={slot.id}
-                            onClick={() => handleBookClick(slot)}
-                            disabled={!hasEnoughTokens || !is_accepting_bookings || bookingLoading}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-sm font-medium transition-all duration-200 group hover:-translate-y-0.5 ${hasEnoughTokens && is_accepting_bookings
+                        {availability.map((slot) => {
+                          const slotCost = slot.token_cost || tokenCost;
+                          const canAffordSlot = tokenBalance >= slotCost;
+                          return (
+                            <button
+                              key={slot.id}
+                              onClick={() => handleBookClick(slot)}
+                              disabled={!canAffordSlot || !is_accepting_bookings || bookingLoading}
+                              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-sm font-medium transition-all duration-200 group hover:-translate-y-0.5 ${canAffordSlot && is_accepting_bookings
                                 ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 shadow-sm hover:shadow-md'
                                 : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
-                              }`}
-                          >
-                            <span>{slot.start_time} – {slot.end_time}</span>
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-xs font-semibold">Book • {tokenCost}</span>
-                              <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                              </svg>
-                            </span>
-                          </button>
-                        ))}
+                                }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                {slot.start_time} – {slot.end_time}
+                                {slot.duration_minutes && (
+                                  <span className="text-xs px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full">{slot.duration_minutes}min</span>
+                                )}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <span className="text-xs font-semibold">Book • {slotCost} tokens</span>
+                                <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                </svg>
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -386,7 +395,7 @@ const InterviewerDetailPage = () => {
             setSelectedSlot(null);
           }}
           slot={selectedSlot}
-          tokenCost={tokenCost}
+          tokenCost={selectedSlot?.token_cost || tokenCost}
           tokenBalance={tokenBalance}
           onConfirm={handleConfirmBooking}
           loading={bookingLoading}

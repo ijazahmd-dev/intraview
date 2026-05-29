@@ -537,6 +537,7 @@ class InterviewerAvailabilityListView(APIView):
                 "date": slot.date,
                 "start_time": slot.start_time,
                 "end_time": slot.end_time,
+                "duration_minutes": slot.duration_minutes,
                 "timezone": slot.timezone,
                 "is_recurring": slot.is_recurring,
             }

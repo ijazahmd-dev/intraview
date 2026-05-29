@@ -211,10 +211,23 @@ class InterviewerAvailability(models.Model):
     Represents a single availability block for an interviewer.
     """
 
+    DURATION_CHOICES = [
+        (30, "30 minutes"),
+        (45, "45 minutes"),
+        (60, "60 minutes"),
+        (90, "90 minutes"),
+    ]
+    VALID_DURATIONS = {30, 45, 60, 90}
+
     interviewer = models.ForeignKey(User,on_delete=models.CASCADE,related_name="availabilities", )
     date = models.DateField(help_text="Date for which this availability applies")
     start_time = models.TimeField()
-    end_time = models.TimeField()
+    end_time = models.TimeField()  # Derived from start_time + duration_minutes
+    duration_minutes = models.PositiveIntegerField(
+        choices=DURATION_CHOICES,
+        default=30,
+        help_text="Session duration in minutes. Must be 30, 45, 60, or 90.",
+    )
     timezone = models.CharField(max_length=50,default="UTC",help_text="Timezone of the interviewer" )
     is_recurring = models.BooleanField(default=False)
     RECURRENCE_CHOICES = [("DAILY", "Daily"),("WEEKLY", "Weekly"),]
@@ -225,7 +238,7 @@ class InterviewerAvailability(models.Model):
         default=1,
         help_text="Maximum bookings allowed for this availability"
     )
-    # 🔒 NEW — Soft delete
+    # 🔒 Soft delete
     is_active = models.BooleanField(default=True)
     rescheduled_at = models.DateTimeField(null=True, blank=True)
     reschedule_reason = models.TextField(blank=True, max_length=500)
@@ -241,8 +254,18 @@ class InterviewerAvailability(models.Model):
         )
 
     def clean(self):
-        if self.start_time >= self.end_time:
-            raise ValueError("Start time must be before end time")
+        from datetime import datetime, timedelta
+        if self.duration_minutes not in self.VALID_DURATIONS:
+            raise ValueError(
+                f"Invalid duration. Must be one of {sorted(self.VALID_DURATIONS)} minutes."
+            )
+        if self.start_time and self.duration_minutes:
+            start_dt = datetime.combine(datetime.today(), self.start_time)
+            end_dt = start_dt + timedelta(minutes=self.duration_minutes)
+            self.end_time = end_dt.time()
+        if self.start_time and self.end_time:
+            if self.start_time >= self.end_time:
+                raise ValueError("Start time must be before end time")
         
     def remaining_capacity(self):
         """
@@ -260,8 +283,12 @@ class InterviewerAvailability(models.Model):
         ).count()
         return max(0, self.max_bookings - used)
 
+    def token_cost_for(self, base_rate):
+        """Calculate token cost for this slot duration, based on base_rate (30-min rate)."""
+        return int(base_rate * self.duration_minutes / 30)
+
     def __str__(self):
-        return f"{self.interviewer} | {self.date} {self.start_time}-{self.end_time}"
+        return f"{self.interviewer} | {self.date} {self.start_time}-{self.end_time} ({self.duration_minutes}min)"
     
 
 

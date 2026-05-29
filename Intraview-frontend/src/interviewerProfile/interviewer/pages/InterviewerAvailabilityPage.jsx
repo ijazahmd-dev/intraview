@@ -410,11 +410,18 @@ const InterviewerAvailabilityPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  
+
+  const DURATION_OPTIONS = [
+    { value: 30, label: '30 minutes' },
+    { value: 45, label: '45 minutes' },
+    { value: 60, label: '60 minutes' },
+    { value: 90, label: '90 minutes' },
+  ];
+
   const [form, setForm] = useState({
     date: '',
     start_time: '',
-    end_time: '',
+    duration_minutes: 30,
     timezone: 'Asia/Kolkata',
     is_recurring: false,
     recurrence_type: 'WEEKLY',
@@ -452,10 +459,10 @@ const InterviewerAvailabilityPage = () => {
   const getDateStatus = (dateStr) => {
     const slots = availabilities.filter(s => s.date === dateStr);
     if (slots.length === 0) return null;
-    
+
     const isPast = new Date(dateStr) < new Date().setHours(0, 0, 0, 0);
     const hasBookings = slots.some(s => (s.bookings_count || 0) > 0);
-    
+
     return {
       type: isPast ? 'past' : hasBookings ? 'booked' : 'available',
       count: slots.length
@@ -477,12 +484,8 @@ const InterviewerAvailabilityPage = () => {
   };
 
   const handleFormContinue = () => {
-    if (!form.date || !form.start_time || !form.end_time) {
+    if (!form.date || !form.start_time || !form.duration_minutes) {
       toast.error('Please fill all required fields');
-      return;
-    }
-    if (form.start_time >= form.end_time) {
-      toast.error('Start time must be before end time');
       return;
     }
     if (form.is_recurring && !form.recurrence_end_date) {
@@ -499,29 +502,29 @@ const InterviewerAvailabilityPage = () => {
       const payload = {
         date: form.date,
         start_time: form.start_time,
-        end_time: form.end_time,
+        duration_minutes: form.duration_minutes,
         timezone: form.timezone,
         is_recurring: form.is_recurring,
       };
-      
+
       if (form.is_recurring) {
         payload.recurrence_type = form.recurrence_type;
         payload.recurrence_end_date = form.recurrence_end_date;
       }
-      
+
       console.log('📤 Creating availability:', payload);
       const response = await createAvailability(payload);
       console.log('✅ Created:', response.data);
-      
+
       toast.success(response.data.message || 'Availability created successfully!');
       setShowConfirmModal(false);
       await loadAvailabilities();
-      
+
       // Reset form
       setForm({
         date: selectedDate || '',
         start_time: '',
-        end_time: '',
+        duration_minutes: 30,
         timezone: 'Asia/Kolkata',
         is_recurring: false,
         recurrence_type: 'WEEKLY',
@@ -540,9 +543,9 @@ const InterviewerAvailabilityPage = () => {
       toast.error('Cannot delete slots with bookings');
       return;
     }
-    
+
     if (!window.confirm('Are you sure you want to delete this slot?')) return;
-    
+
     try {
       console.log('🗑️ Deleting slot:', slotId);
       await deleteAvailability(slotId);
@@ -568,22 +571,22 @@ const InterviewerAvailabilityPage = () => {
     const month = currentMonth.getMonth();
     const days = [];
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
+
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(<div key={`empty-${i}`} className="h-20" />);
     }
-    
+
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month, day);
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const status = getDateStatus(dateStr);
       const isSelected = dateStr === selectedDate;
       const isToday = dateStr === new Date().toISOString().split('T')[0];
-      
+
       let bgColor = 'bg-white hover:bg-slate-50';
       let borderColor = 'border-slate-200';
       let textColor = 'text-slate-900';
-      
+
       if (status) {
         if (status.type === 'past') {
           bgColor = 'bg-gray-100';
@@ -599,11 +602,11 @@ const InterviewerAvailabilityPage = () => {
           textColor = 'text-emerald-900';
         }
       }
-      
+
       if (isSelected) {
         borderColor = 'border-indigo-500 ring-2 ring-indigo-200';
       }
-      
+
       days.push(
         <button
           key={day}
@@ -614,18 +617,17 @@ const InterviewerAvailabilityPage = () => {
             {day}
           </div>
           {status && (
-            <div className={`text-xs mt-1 font-semibold px-2 py-0.5 rounded-full ${
-              status.type === 'past' ? 'bg-gray-200 text-gray-700' :
+            <div className={`text-xs mt-1 font-semibold px-2 py-0.5 rounded-full ${status.type === 'past' ? 'bg-gray-200 text-gray-700' :
               status.type === 'booked' ? 'bg-orange-200 text-orange-800' :
-              'bg-emerald-200 text-emerald-800'
-            }`}>
+                'bg-emerald-200 text-emerald-800'
+              }`}>
               {status.count} slot{status.count > 1 ? 's' : ''}
             </div>
           )}
         </button>
       );
     }
-    
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-7 gap-2 mb-4">
@@ -689,7 +691,7 @@ const InterviewerAvailabilityPage = () => {
                 <CalendarDays className="w-8 h-8 text-emerald-600" />
                 Select Date
               </h2>
-              
+
               <div className="grid grid-cols-3 gap-3 mb-8 text-sm">
                 <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
                   <div className="w-4 h-4 bg-emerald-500 rounded-full"></div>
@@ -705,7 +707,7 @@ const InterviewerAvailabilityPage = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between mb-8">
               <button onClick={() => changeMonth(-1)} className="p-3 hover:bg-slate-100 rounded-xl transition-all">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -743,39 +745,36 @@ const InterviewerAvailabilityPage = () => {
                 {selectedDateSlots.map(slot => {
                   const isPast = new Date(slot.date) < new Date().setHours(0, 0, 0, 0);
                   const hasBookings = (slot.bookings_count || 0) > 0;
-                  
+
                   return (
                     <div
                       key={slot.id}
-                      className={`p-6 rounded-2xl shadow-lg border-2 transition-all group ${
-                        isPast 
-                          ? 'bg-gray-50 border-gray-300' 
-                          : hasBookings 
-                          ? 'bg-orange-50 border-orange-300 hover:border-orange-400' 
+                      className={`p-6 rounded-2xl shadow-lg border-2 transition-all group ${isPast
+                        ? 'bg-gray-50 border-gray-300'
+                        : hasBookings
+                          ? 'bg-orange-50 border-orange-300 hover:border-orange-400'
                           : 'bg-emerald-50 border-emerald-300 hover:border-emerald-400 hover:shadow-xl'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <Clock className={`w-6 h-6 ${
-                              isPast ? 'text-gray-400' : hasBookings ? 'text-orange-500' : 'text-emerald-600'
-                            }`} />
+                            <Clock className={`w-6 h-6 ${isPast ? 'text-gray-400' : hasBookings ? 'text-orange-500' : 'text-emerald-600'
+                              }`} />
                             <div>
                               <p className="font-bold text-xl text-slate-900">
                                 {slot.start_time} - {slot.end_time}
                               </p>
-                              <p className="text-sm text-slate-500">{slot.timezone}</p>
+                              <p className="text-sm text-slate-500">{slot.timezone} • {slot.duration_minutes || 30} min</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-sm">
-                            <span className={`px-3 py-1 rounded-full font-semibold ${
-                              isPast 
-                                ? 'bg-gray-200 text-gray-700' 
-                                : hasBookings 
-                                ? 'bg-orange-200 text-orange-800' 
+                            <span className={`px-3 py-1 rounded-full font-semibold ${isPast
+                              ? 'bg-gray-200 text-gray-700'
+                              : hasBookings
+                                ? 'bg-orange-200 text-orange-800'
                                 : 'bg-emerald-200 text-emerald-800'
-                            }`}>
+                              }`}>
                               {isPast ? 'Past' : hasBookings ? `${slot.bookings_count} Booked` : 'Available'}
                             </span>
                             {slot.is_recurring && (
@@ -785,7 +784,7 @@ const InterviewerAvailabilityPage = () => {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
                           {!isPast && !hasBookings ? (
                             <button
@@ -804,7 +803,7 @@ const InterviewerAvailabilityPage = () => {
                     </div>
                   );
                 })}
-                
+
                 {selectedDateSlots.length === 0 && (
                   <div className="text-center py-16 border-2 border-dashed border-slate-300 rounded-2xl">
                     <Clock className="w-20 h-20 mx-auto mb-4 text-slate-300" />
@@ -837,7 +836,7 @@ const InterviewerAvailabilityPage = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-8 space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">Date</label>
@@ -860,13 +859,16 @@ const InterviewerAvailabilityPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">End Time</label>
-                  <input
-                    type="time"
-                    value={form.end_time}
-                    onChange={e => setForm({ ...form, end_time: e.target.value })}
+                  <label className="block text-sm font-semibold text-slate-700 mb-3">Duration</label>
+                  <select
+                    value={form.duration_minutes}
+                    onChange={e => setForm({ ...form, duration_minutes: Number(e.target.value) })}
                     className="w-full px-4 py-3 rounded-2xl border-2 border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                  />
+                  >
+                    {DURATION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -952,7 +954,7 @@ const InterviewerAvailabilityPage = () => {
                 <Check className="w-8 h-8 text-emerald-600" />
               </div>
               <h2 className="text-2xl font-bold text-center mb-4">Confirm Availability</h2>
-              
+
               <div className="space-y-4 bg-slate-50 p-6 rounded-2xl mb-6">
                 <div>
                   <p className="text-sm text-slate-600">Date</p>
@@ -964,8 +966,8 @@ const InterviewerAvailabilityPage = () => {
                     <p className="font-bold">{form.start_time}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-slate-600">End Time</p>
-                    <p className="font-bold">{form.end_time}</p>
+                    <p className="text-sm text-slate-600">Duration</p>
+                    <p className="font-bold">{form.duration_minutes} minutes</p>
                   </div>
                 </div>
                 <div>

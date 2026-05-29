@@ -43,21 +43,22 @@ class CandidateAvailabilitySerializer(serializers.ModelSerializer):
     end_datetime = serializers.SerializerMethodField()
     remaining_capacity = serializers.SerializerMethodField()
     title = serializers.SerializerMethodField()
+    token_cost = serializers.SerializerMethodField()
 
     class Meta:
         model = InterviewerAvailability
         fields = [
-            "id", "title", "start_datetime", "end_datetime", 
-            "remaining_capacity", "timezone"
+            "id", "title", "start_datetime", "end_datetime",
+            "remaining_capacity", "timezone", "duration_minutes", "token_cost",
         ]
 
     def get_start_datetime(self, obj):
-        """✅ FIXED: Use django_timezone.make_aware"""
+        """Fixed: Use django_timezone.make_aware"""
         dt = django_timezone.make_aware(datetime.combine(obj.date, obj.start_time))
         return dt.isoformat()
 
     def get_end_datetime(self, obj):
-        """✅ FIXED: Use django_timezone.make_aware"""
+        """Fixed: Use django_timezone.make_aware"""
         dt = django_timezone.make_aware(datetime.combine(obj.date, obj.end_time))
         return dt.isoformat()
 
@@ -65,7 +66,14 @@ class CandidateAvailabilitySerializer(serializers.ModelSerializer):
         return obj.remaining_capacity()
 
     def get_title(self, obj):
-        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')}"
+        return f"{obj.start_time.strftime('%H:%M')} - {obj.end_time.strftime('%H:%M')} ({obj.duration_minutes}min)"
+
+    def get_token_cost(self, obj):
+        try:
+            base_rate = obj.interviewer.interviewer_profile.base_session_rate
+            return obj.token_cost_for(base_rate)
+        except Exception:
+            return None
 
 
 
@@ -94,6 +102,9 @@ class CandidateInterviewerDetailSerializer(serializers.ModelSerializer):
             "years_of_experience",
             "location",
             "timezone",
+
+            # pricing
+            "base_session_rate",
 
             # tags
             "specializations",
@@ -666,6 +677,7 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
             "id", "date", "start_time", "end_time",
             "timezone", "remaining_capacity",
             "start_datetime", "end_datetime",
+            "duration_minutes",
         ]
  
     def get_remaining_capacity(self, obj):

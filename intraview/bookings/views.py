@@ -215,8 +215,9 @@ class CreateInterviewBookingAPIView(APIView):
                 {"detail": "Interviewer does not have an active interviewer subscription."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        # Determine token cost from interviewer profile
-        token_cost = interviewer.interviewer_profile.base_session_rate
+        # Dynamically calculate token cost: base_rate × (duration_minutes / 30)
+        base_rate = interviewer.interviewer_profile.base_session_rate
+        token_cost = availability.token_cost_for(base_rate)
 
         # -------------------------
         # Atomic section
@@ -316,6 +317,7 @@ class CreateInterviewBookingAPIView(APIView):
                 "booking_id": booking.id,
                 "status": booking.status,
                 "tokens_locked": token_cost,
+                "duration_minutes": availability.duration_minutes,
             },
             status=status.HTTP_201_CREATED,
         )
