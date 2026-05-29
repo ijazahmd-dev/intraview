@@ -1,11 +1,11 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Calendar } from "lucide-react";
+import { Calendar } from 'lucide-react';
 
 import { candidateBookingsApi } from '../../candidateBookingsApi';
-
+import SessionConfigModal from '../components/SessionConfigModal';
+import BookingSummaryModal from '../components/BookingSummaryModal';
 
 
 
@@ -17,9 +17,11 @@ const InterviewerDetailPage = () => {
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenLoading, setTokenLoading] = useState(true);
 
-  // Modal state
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  // Modal state — 3-step booking flow
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [sessionConfigOpen, setSessionConfigOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [sessionConfig, setSessionConfig] = useState(null);
 
   // Page state
   const [profile, setProfile] = useState(null);
@@ -89,30 +91,60 @@ const InterviewerDetailPage = () => {
     }
   };
 
-  // Open booking modal
+  // Step 1: slot chosen → open session config
   const handleBookClick = (slot) => {
-    if (!hasEnoughTokens) {
+    const slotCost = slot.token_cost || tokenCost;
+    if (tokenBalance < slotCost) {
       toast.error('Not enough tokens to book this session');
       return;
     }
     setSelectedSlot(slot);
-    setBookingModalOpen(true);
+    setSessionConfig(null);
+    setSessionConfigOpen(true);
   };
 
-  // Confirm booking from modal
+  // Step 2: session config done → move to summary
+  const handleSessionConfigNext = (config) => {
+    setSessionConfig(config);
+    setSessionConfigOpen(false);
+    setSummaryOpen(true);
+  };
+
+  // Step 2 → back to step 1
+  const handleSummaryBack = () => {
+    setSummaryOpen(false);
+    setSessionConfigOpen(true);
+  };
+
+  // Reset the full flow
+  const closeAll = () => {
+    setSessionConfigOpen(false);
+    setSummaryOpen(false);
+    setSelectedSlot(null);
+    setSessionConfig(null);
+  };
+
+  // Step 3: confirm & create booking with session config
   const handleConfirmBooking = async () => {
     if (!selectedSlot) return;
-
     try {
       setBookingLoading(true);
-      // ✅ CORRECT ENDPOINT: POST /api/bookings/ with availability_id
-      const res = await candidateBookingsApi.createBooking(selectedSlot.id);
+      const res = await candidateBookingsApi.createBooking(
+        selectedSlot.id,
+        sessionConfig || {}
+      );
       toast.success(`Booking confirmed! ${res.data.tokens_locked} tokens locked.`);
-      setBookingModalOpen(false);
-      setSelectedSlot(null);
+      closeAll();
       navigate('/candidate/dashboard/upcoming');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create booking');
+      const errors = error.response?.data;
+      if (errors && typeof errors === 'object') {
+        // Show field-level validation errors from backend
+        const firstKey = Object.keys(errors)[0];
+        toast.error(`${firstKey}: ${errors[firstKey]}`);
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to create booking');
+      }
     } finally {
       setBookingLoading(false);
     }
@@ -144,6 +176,8 @@ const InterviewerDetailPage = () => {
     industries,
     is_accepting_bookings,
     verification_status,
+    supported_interview_types,
+    supported_experience_levels,
   } = profile;
 
   return (
@@ -386,21 +420,28 @@ const InterviewerDetailPage = () => {
         </div>
       </div>
 
-      {/* 🔥 CONFIRM BOOKING MODAL */}
-      {selectedSlot && (
-        <ConfirmBookingModal
-          isOpen={bookingModalOpen}
-          onClose={() => {
-            setBookingModalOpen(false);
-            setSelectedSlot(null);
-          }}
-          slot={selectedSlot}
-          tokenCost={selectedSlot?.token_cost || tokenCost}
-          tokenBalance={tokenBalance}
-          onConfirm={handleConfirmBooking}
-          loading={bookingLoading}
-        />
-      )}
+      {/* ── Step 1: Session Configuration ── */}
+      <SessionConfigModal
+        isOpen={sessionConfigOpen}
+        onClose={closeAll}
+        onNext={handleSessionConfigNext}
+        slot={selectedSlot}
+        profile={profile}
+      />
+
+      {/* ── Step 2: Booking Summary + Confirm ── */}
+      <BookingSummaryModal
+        isOpen={summaryOpen}
+        onClose={closeAll}
+        onBack={handleSummaryBack}
+        onConfirm={handleConfirmBooking}
+        loading={bookingLoading}
+        slot={selectedSlot}
+        profile={profile}
+        sessionConfig={sessionConfig}
+        tokenCost={selectedSlot?.token_cost || tokenCost}
+        tokenBalance={tokenBalance}
+      />
     </>
   );
 };
