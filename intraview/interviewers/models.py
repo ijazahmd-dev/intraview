@@ -4,6 +4,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 # Create your models here.
 
@@ -161,6 +162,12 @@ class InterviewerProfile(models.Model):
     years_of_experience = models.PositiveIntegerField()
     location = models.CharField(max_length=100, blank=True)
     timezone = models.CharField(max_length=50, default="UTC")
+
+    base_session_rate = models.PositiveIntegerField(
+        default=10,
+        validators=[MinValueValidator(5), MaxValueValidator(50)],
+        help_text="Token cost for a 30-minute session"
+    )
 
     specializations = models.JSONField(default=list)
     languages = models.JSONField(default=list)

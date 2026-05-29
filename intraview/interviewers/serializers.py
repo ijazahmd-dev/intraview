@@ -232,6 +232,7 @@ class InterviewerProfileSerializer(serializers.ModelSerializer):
             "years_of_experience",
             "location",
             "timezone",
+            "base_session_rate",
             "specializations",
             "languages",
             "education",

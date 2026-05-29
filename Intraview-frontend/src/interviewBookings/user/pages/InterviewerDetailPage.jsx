@@ -6,20 +6,21 @@ import { Calendar } from "lucide-react";
 
 import { candidateBookingsApi } from '../../candidateBookingsApi';
 
-const TOKEN_COST = 10;
+
+
 
 const InterviewerDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   // Token state
   const [tokenBalance, setTokenBalance] = useState(0);
   const [tokenLoading, setTokenLoading] = useState(true);
-  
+
   // Modal state
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  
+
   // Page state
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,8 @@ const InterviewerDetailPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
 
-  const hasEnoughTokens = tokenBalance >= TOKEN_COST;
+  const tokenCost = profile?.base_session_rate || 10;
+  const hasEnoughTokens = tokenBalance >= tokenCost;
 
   // Fetch token balance
   const fetchTokenBalance = useCallback(async () => {
@@ -164,7 +166,7 @@ const InterviewerDetailPage = () => {
 
             <div className="px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-sm font-semibold text-emerald-700">
               Tokens: <span className="font-bold">{tokenLoading ? '...' : tokenBalance}</span> • Cost per
-              session: <span className="font-bold">{TOKEN_COST}</span>
+              session: <span className="font-bold">{tokenCost}</span>
             </div>
           </div>
 
@@ -257,7 +259,7 @@ const InterviewerDetailPage = () => {
                 <div className="mb-6">
                   <h2 className="text-xl font-semibold text-slate-900 mb-2">Book a session</h2>
                   <p className="text-sm text-slate-600">
-                    Each session costs <span className="font-semibold">{TOKEN_COST} tokens</span>. Your
+                    Each session costs <span className="font-semibold">{tokenCost} tokens</span>. Your
                     tokens are locked at booking and released after completion or cancellation.
                   </p>
                 </div>
@@ -268,103 +270,101 @@ const InterviewerDetailPage = () => {
                   </div>
                 )}
 
-   {/* 🔥 NEW: Calendar + List Hybrid */}
-<div className="space-y-6">
-  {/* Primary CTA: Calendar View */}
-  <div className="group">
-    <button
-      onClick={() => navigate(`/candidate/interviewers/${id}/calendar`)}
-      disabled={!is_accepting_bookings || bookingLoading}
-      className={`w-full py-5 px-6 rounded-3xl font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-4 text-lg relative overflow-hidden ${
-        is_accepting_bookings
-          ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]'
-          : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-      }`}
-    >
-      <Calendar className="w-8 h-8" />
-      <span>📅 View Interactive Calendar</span>
-      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-2xl text-sm font-bold ml-4 whitespace-nowrap">
-        {TOKEN_COST} tokens/session
-      </span>
-      <div className="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300 pointer-events-none"></div>
-    </button>
-    <p className="mt-3 text-xs text-slate-500 text-center">
-      See all slots at once • Auto-refreshes • Instant booking
-    </p>
-  </div>
+                {/* 🔥 NEW: Calendar + List Hybrid */}
+                <div className="space-y-6">
+                  {/* Primary CTA: Calendar View */}
+                  <div className="group">
+                    <button
+                      onClick={() => navigate(`/candidate/interviewers/${id}/calendar`)}
+                      disabled={!is_accepting_bookings || bookingLoading}
+                      className={`w-full py-5 px-6 rounded-3xl font-bold shadow-xl transition-all duration-300 flex items-center justify-center gap-4 text-lg relative overflow-hidden ${is_accepting_bookings
+                          ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white hover:shadow-2xl hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.98]'
+                          : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                        }`}
+                    >
+                      <Calendar className="w-8 h-8" />
+                      <span>📅 View Interactive Calendar</span>
+                      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-2xl text-sm font-bold ml-4 whitespace-nowrap">
+                        {tokenCost} tokens/session
+                      </span>
+                      <div className="absolute inset-0 bg-white/10 group-hover:bg-white/20 transition-all duration-300 pointer-events-none"></div>
+                    </button>
+                    <p className="mt-3 text-xs text-slate-500 text-center">
+                      See all slots at once • Auto-refreshes • Instant booking
+                    </p>
+                  </div>
 
-  {/* Secondary: Traditional Date Picker (Keep as backup) */}
-  <div className="pt-6 border-t border-slate-200">
-    <div className="flex items-center gap-3 mb-4">
-      <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-      <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">OR</span>
-      <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
-    </div>
+                  {/* Secondary: Traditional Date Picker (Keep as backup) */}
+                  <div className="pt-6 border-t border-slate-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">OR</span>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                    </div>
 
-    {/* Date picker (unchanged - keep existing) */}
-    <div className="mb-6">
-      <label className="block text-sm font-semibold text-slate-700 mb-2">Pick specific date</label>
-      <input
-        type="date"
-        value={selectedDate}
-        onChange={handleDateChange}
-        className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 text-sm"
-      />
-      {timezone && (
-        <p className="mt-2 text-xs text-slate-500">Times in {timezone}</p>
-      )}
-    </div>
+                    {/* Date picker (unchanged - keep existing) */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Pick specific date</label>
+                      <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={handleDateChange}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 text-sm"
+                      />
+                      {timezone && (
+                        <p className="mt-2 text-xs text-slate-500">Times in {timezone}</p>
+                      )}
+                    </div>
 
-    {/* Existing slots list (unchanged) */}
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-slate-800">Available slots</h3>
-        {loadingSlots && <span className="text-xs text-slate-500">Loading…</span>}
-      </div>
+                    {/* Existing slots list (unchanged) */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-slate-800">Available slots</h3>
+                        {loadingSlots && <span className="text-xs text-slate-500">Loading…</span>}
+                      </div>
 
-      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-        {selectedDate && availability.length === 0 && !loadingSlots && (
-          <div className="text-sm text-slate-500 text-center py-8">
-            No slots for {selectedDate}. Try calendar view ↑
-          </div>
-        )}
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {selectedDate && availability.length === 0 && !loadingSlots && (
+                          <div className="text-sm text-slate-500 text-center py-8">
+                            No slots for {selectedDate}. Try calendar view ↑
+                          </div>
+                        )}
 
-        {!selectedDate && (
-          <div className="text-sm text-slate-500 text-center py-8">
-            Select date or use calendar view above
-          </div>
-        )}
+                        {!selectedDate && (
+                          <div className="text-sm text-slate-500 text-center py-8">
+                            Select date or use calendar view above
+                          </div>
+                        )}
 
-        {availability.map((slot) => (
-          <button
-            key={slot.id}
-            onClick={() => handleBookClick(slot)}
-            disabled={!hasEnoughTokens || !is_accepting_bookings || bookingLoading}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-sm font-medium transition-all duration-200 group hover:-translate-y-0.5 ${
-              hasEnoughTokens && is_accepting_bookings
-                ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 shadow-sm hover:shadow-md'
-                : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            <span>{slot.start_time} – {slot.end_time}</span>
-            <span className="inline-flex items-center gap-1">
-              <span className="text-xs font-semibold">Book • {TOKEN_COST}</span>
-              <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
-</div>
+                        {availability.map((slot) => (
+                          <button
+                            key={slot.id}
+                            onClick={() => handleBookClick(slot)}
+                            disabled={!hasEnoughTokens || !is_accepting_bookings || bookingLoading}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-sm font-medium transition-all duration-200 group hover:-translate-y-0.5 ${hasEnoughTokens && is_accepting_bookings
+                                ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 text-emerald-800 shadow-sm hover:shadow-md'
+                                : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                              }`}
+                          >
+                            <span>{slot.start_time} – {slot.end_time}</span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="text-xs font-semibold">Book • {tokenCost}</span>
+                              <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                              </svg>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
 
                 {/* Token warning */}
                 {!hasEnoughTokens && !tokenLoading && (
                   <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-sm text-rose-800 mb-4">
-                    Not enough tokens to book. Each session costs {TOKEN_COST} tokens, but your balance is {tokenBalance}.
+                    Not enough tokens to book. Each session costs {tokenCost} tokens, but your balance is {tokenBalance}.
                   </div>
                 )}
 
@@ -386,7 +386,7 @@ const InterviewerDetailPage = () => {
             setSelectedSlot(null);
           }}
           slot={selectedSlot}
-          tokenCost={TOKEN_COST}
+          tokenCost={tokenCost}
           tokenBalance={tokenBalance}
           onConfirm={handleConfirmBooking}
           loading={bookingLoading}
@@ -412,14 +412,14 @@ const TagSection = ({ title, items }) => (
   </div>
 );
 
-const ConfirmBookingModal = ({ 
-  isOpen, 
-  onClose, 
-  slot, 
-  tokenCost, 
-  tokenBalance, 
+const ConfirmBookingModal = ({
+  isOpen,
+  onClose,
+  slot,
+  tokenCost,
+  tokenBalance,
   onConfirm,
-  loading 
+  loading
 }) => {
   if (!isOpen || !slot) return null;
 
@@ -448,7 +448,7 @@ const ConfirmBookingModal = ({
               </svg>
             </button>
           </div>
-          
+
           <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
             <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

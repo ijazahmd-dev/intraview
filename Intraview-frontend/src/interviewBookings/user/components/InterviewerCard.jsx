@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 
 const InterviewerCard = ({ interviewer, tokenBalance }) => {
   const [loadingAvailability, setLoadingAvailability] = useState(false);
-  
-  const hasEnoughTokens = tokenBalance >= 10;
-  const TOKEN_COST = 10;
+
+  const tokenCost = interviewer.base_session_rate || 10;
+  const hasEnoughTokens = tokenBalance >= tokenCost;
 
   const formatExperience = (years) => {
     if (!years) return 'Experienced';
@@ -21,7 +21,7 @@ const InterviewerCard = ({ interviewer, tokenBalance }) => {
       <div className="relative mb-6">
         <div className="w-28 h-28 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300 overflow-hidden">
           {interviewer.profile_picture ? (
-            <img 
+            <img
               src={interviewer.profile_picture}
               alt={interviewer.display_name}
               className="w-full h-full object-cover rounded-2xl"
@@ -69,7 +69,7 @@ const InterviewerCard = ({ interviewer, tokenBalance }) => {
             </svg>
           </div>
           <div className="text-center">
-            <div className="text-3xl font-black text-emerald-700">10 tokens</div>
+            <div className="text-3xl font-black text-emerald-700">{tokenCost} tokens</div>
             <div className="text-sm text-emerald-600 font-semibold">per session</div>
           </div>
         </div>
@@ -77,18 +77,17 @@ const InterviewerCard = ({ interviewer, tokenBalance }) => {
         {!hasEnoughTokens && (
           <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl">
             <p className="text-amber-800 text-sm font-semibold text-center">
-              💰 Need 10 tokens to book • You have {tokenBalance}
+              💰 Need {tokenCost} tokens to book • You have {tokenBalance}
             </p>
           </div>
         )}
 
         <Link
           to={`/interviewer/${interviewer.id}`}
-          className={`w-full block text-center py-5 px-8 rounded-2xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${
-            hasEnoughTokens
+          className={`w-full block text-center py-5 px-8 rounded-2xl font-bold text-lg shadow-xl transition-all duration-300 flex items-center justify-center gap-3 ${hasEnoughTokens
               ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white hover:shadow-2xl hover:-translate-y-1'
               : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed'
-          }`}
+            }`}
         >
           {hasEnoughTokens ? (
             <>

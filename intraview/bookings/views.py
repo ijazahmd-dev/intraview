@@ -215,8 +215,8 @@ class CreateInterviewBookingAPIView(APIView):
                 {"detail": "Interviewer does not have an active interviewer subscription."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        TOKEN_COST = 10  # static for now
+        # Determine token cost from interviewer profile
+        token_cost = interviewer.interviewer_profile.base_session_rate
 
         # -------------------------
         # Atomic section
@@ -251,8 +251,7 @@ class CreateInterviewBookingAPIView(APIView):
             # Get & lock wallet (correct pattern)
             wallet = TokenService.get_or_create_wallet(candidate)
             wallet = TokenWallet.objects.select_for_update().get(id=wallet.id)
-
-            if wallet.balance < TOKEN_COST:
+            if wallet.balance < token_cost:
                 return Response(
                     {"detail": "Insufficient token balance."},
                     status=status.HTTP_402_PAYMENT_REQUIRED,
@@ -261,7 +260,7 @@ class CreateInterviewBookingAPIView(APIView):
             # Lock tokens
             TokenService.lock_tokens(
                 wallet=wallet,
-                amount=TOKEN_COST,
+                amount=token_cost,
                 transaction_type=TokenTransactionType.BOOKING_LOCK,
                 reference_id=f"availability_{availability.id}",
                 note="Interview booking lock",
@@ -289,7 +288,7 @@ class CreateInterviewBookingAPIView(APIView):
                 availability=availability,
                 start_datetime=start_aware,
                 end_datetime=end_aware,
-                token_cost=TOKEN_COST,
+                token_cost=token_cost,
                 status=InterviewBooking.Status.CONFIRMED,
             )
 
@@ -316,7 +315,7 @@ class CreateInterviewBookingAPIView(APIView):
             {
                 "booking_id": booking.id,
                 "status": booking.status,
-                "tokens_locked": TOKEN_COST,
+                "tokens_locked": token_cost,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -677,10 +676,7 @@ class CandidateRescheduleInterviewApiView(APIView):
 
 
 
-
-
 RESCHEDULE_LIMIT_HOURS = 3
-TOKEN_COST = 10
 
 
 
@@ -805,7 +801,7 @@ class CandidateRescheduleBookingView(APIView):
                     "end_datetime": end_dt_aware.isoformat(),
                 },
                 "reschedule_count": booking.reschedule_count,
-                "tokens_locked": TOKEN_COST,
+                "tokens_locked": booking.token_cost,
             },
             status=status.HTTP_200_OK,
         )

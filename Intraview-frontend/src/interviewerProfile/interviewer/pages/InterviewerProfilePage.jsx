@@ -1,477 +1,12 @@
 
 
-// import { useEffect, useState, useCallback, useRef } from "react";
-// import toaster from "../../../utils/toaster";
-// import { 
-//   fetchProfile, 
-//   updateProfile, 
-//   uploadProfilePicture, 
-//   deleteProfilePicture,
-//   patchProfile 
-// } from "../../../interviewerDashboard/interviewerDashboardApi";
-
-
-// const normalizeArray = (val) => {
-//   if (Array.isArray(val)) return val;
-//   if (typeof val === "string" && val.trim().startsWith("[")) {
-//     try {
-//       return JSON.parse(val);
-//     } catch {
-//       return [];
-//     }
-//   }
-//   if (val == null || val === "") return [];
-//   return Array.isArray(val) ? val : [val];
-// };
-
-// export default function InterviewerProfilePage() {
-//   const [loading, setLoading] = useState(true);
-//   const [saving, setSaving] = useState(false);
-//   const [error, setError] = useState(null);
-//   const [profile, setProfile] = useState(null);
-//   const [uploadingImage, setUploadingImage] = useState(false);
-//   const [removingImage, setRemovingImage] = useState(false);
-//   const [imagePreview, setImagePreview] = useState(null);
-//   const fileInputRef = useRef(null);
-
-  
-
-//   useEffect(() => {
-//     let mounted = true;
-//     const load = async () => {
-//       try {
-//         const { data } = await fetchProfile();
-//         if (!mounted) return;
-//         setProfile(data);
-//         const isVerified = data.verification_status === 'APPROVED';
-//         console.log("the profile pic is this.......",data.profile_picture);
-//         if (data.profile_picture) {
-//           setImagePreview(data.profile_picture  || null);
-//         }
-//         console.log("the profile image previwe is .......",imagePreview);
-//       } catch (err) {
-//         setError("Failed to load profile.");
-//       } finally {
-//         if (mounted) setLoading(false);
-//       }
-//     };
-//     load();
-//     return () => {
-//       mounted = false;
-//     };
-//   }, []);
-
-
-
-//   const handleChange = useCallback((field, value) => {
-//     setProfile((prev) => ({ ...prev, [field]: value }));
-//   }, []);
-
-//   const handleImageChange = useCallback(async (e) => {
-//     const file = e.target.files?.[0];
-//     if (!file) return;
-
-//     // Client-side validation
-//     if (!file.type.startsWith('image/')) {
-//       setError('Please select a valid image file.');
-//       return;
-//     }
-    
-//     if (file.size > 5 * 1024 * 1024) {
-//       setError('Image size must be less than 5MB.');
-//       return;
-//     }
-
-//     setUploadingImage(true);
-//     setError(null);
-    
-//     try {
-//       const previewUrl = URL.createObjectURL(file);
-//       setImagePreview(previewUrl);
-      
-//       // Upload to backend
-//       await uploadProfilePicture(file);
-      
-//       // Refresh profile to get updated data
-//       const { data } = await fetchProfile();
-//       setProfile(data);
-      
-//     } catch (err) {
-//       setError(err.response?.data?.detail || "Failed to upload image.");
-//       setImagePreview(profile?.profile_picture);
-//     } finally {
-//       setUploadingImage(false);
-//       if (fileInputRef.current) fileInputRef.current.value = "";
-//     }
-//   }, [profile?.profile_picture]);
-
-//   const handleRemoveImage = useCallback(async () => {
-//     if (!confirm('Are you sure you want to remove your profile picture?')) return;
-
-//     setRemovingImage(true);
-//     setError(null);
-    
-//     try {
-//       await deleteProfilePicture();
-      
-//       // Refresh profile
-//       const { data } = await fetchProfile();
-//       setProfile(data);
-//       setImagePreview(null);
-      
-//     } catch (err) {
-//       setError(err.response?.data?.detail || "Failed to remove image.");
-//       setImagePreview(profile?.profile_picture);
-//     } finally {
-//       setRemovingImage(false);
-//     }
-//   }, [profile?.profile_picture]);
-
-//   const toggleSwitch = async (field) => {
-
-//     if (profile.verification_status !== 'APPROVED' && 
-//       (field === 'is_profile_public' || field === 'is_accepting_bookings')) {
-//         toaster.error('You must complete your identity verification first.');
-        
-//     return;
-//   }
-
-//     const newValue = !profile[field];
-//     setProfile((prev) => ({ ...prev, [field]: newValue }));
-    
-//     try {
-//       await patchProfile({ [field]: newValue });
-//     } catch (err) {
-//       setError(`Failed to update ${field}.`);
-//       // Revert on error
-//       setProfile((prev) => ({ ...prev, [field]: !newValue }));
-//     }
-//   };
-
-//   const handleSave = async (e) => {
-//     e.preventDefault();
-//     setSaving(true);
-//     setError(null);
-
-//     try {
-//       const payload = {
-//         ...profile,
-//         specializations: normalizeArray(profile.specializations),
-//         languages: normalizeArray(profile.languages),
-//         education: normalizeArray(profile.education),
-//         certifications: normalizeArray(profile.certifications),
-//         industries: normalizeArray(profile.industries),
-//         years_of_experience: Number(profile.years_of_experience || 0),
-//       };
-
-//       // Don't send profile_picture - handled separately via dedicated endpoint
-//       delete payload.profile_picture;
-
-//       await updateProfile(payload);
-      
-//       // Refresh profile after save
-//       const { data } = await fetchProfile();
-//       setProfile(data);
-      
-//     } catch (err) {
-//       console.error("Update error:", err.response?.data);
-//       setError(err.response?.data?.detail || "Failed to update profile.");
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   if (loading || !profile) {
-//     return (
-//       <div className="flex items-center justify-center h-40">
-//         <p className="text-slate-500 text-sm">Loading profile...</p>
-//       </div>
-//     );
-//   }
-
-//   const initials = profile.display_name
-//     ? profile.display_name
-//         .split(" ")
-//         .map((p) => p[0])
-//         .join("")
-//         .toUpperCase()
-//     : "IN";
-
-//   return (
-//     <div className="space-y-6">
-//       {/* Header card with profile picture */}
-//       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-//         <div className="flex items-center gap-4 flex-1">
-//           <div className="relative">
-//             <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl overflow-hidden shadow-lg border-2 border-slate-100 bg-gradient-to-br from-slate-100 to-slate-200">
-//               {imagePreview ? (
-//                 <img
-//                   src={imagePreview}
-//                   alt={profile.display_name}
-//                   className="w-full h-full object-cover"
-//                 />
-//               ) : (
-//                 <div className="w-full h-full flex items-center justify-center text-lg font-bold text-slate-600">
-//                   {initials}
-//                 </div>
-//               )}
-//             </div>
-
-//             {/* Image controls */}
-//             <div className="absolute -inset-2 bg-black/10 backdrop-blur-sm rounded-2xl opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-1 top-0 left-0">
-//               <label className="flex items-center gap-1 bg-white/90 hover:bg-white rounded-xl px-3 py-1.5 shadow cursor-pointer text-xs transition-all hover:scale-105">
-//                 📁 Change
-//                 <input
-//                   ref={fileInputRef}
-//                   type="file"
-//                   accept="image/*"
-//                   className="hidden"
-//                   onChange={handleImageChange}
-//                   disabled={uploadingImage || removingImage}
-//                 />
-//               </label>
-//               {imagePreview && (
-//                 <button
-//                   type="button"
-//                   onClick={handleRemoveImage}
-//                   disabled={uploadingImage || removingImage}
-//                   className="bg-white/90 hover:bg-white rounded-xl px-3 py-1.5 shadow text-xs transition-all hover:scale-105 disabled:opacity-50"
-//                   title="Remove photo"
-//                 >
-//                   🗑️
-//                 </button>
-//               )}
-//             </div>
-//           </div>
-          
-//           <div className="min-w-0 flex-1">
-//             <input
-//               type="text"
-//               value={profile.display_name || ""}
-//               onChange={(e) => handleChange("display_name", e.target.value)}
-//               className="w-full text-lg font-semibold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1 py-0.5"
-//               placeholder="Your display name"
-//             />
-//             <input
-//               type="text"
-//               value={profile.headline || ""}
-//               onChange={(e) => handleChange("headline", e.target.value)}
-//               className="w-full text-sm text-slate-500 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded px-1 mt-0.5"
-//               placeholder="Add a professional headline"
-//             />
-//           </div>
-//         </div>
-
-
-
-
-//         {/* Toggle switches */}
-//         {/* {profile.verification_status !== 'APPROVED' && (
-//               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl mb-4 text-sm text-amber-800">
-//                 🔐 <strong>Verify your identity</strong> to make profile public and accept bookings.
-//                 <a href="/interviewer/dashboard/verification" className="ml-2 underline">Go to verification →</a>
-//               </div>
-//             )} */}
-//         <div className="flex flex-wrap gap-4 text-xs lg:flex-nowrap">
-//           <div className="flex items-center gap-2">
-//             <span className="text-slate-500 whitespace-nowrap">Public Profile</span>
-//             <button
-//               type="button"
-//               onClick={() => toggleSwitch("is_profile_public")}
-//               disabled={saving}
-//               className={[
-//                 "w-11 h-6 rounded-full flex items-center p-0.5 transition-all relative shadow-sm",
-//                 profile.is_profile_public
-//                   ? "bg-emerald-500 shadow-emerald-200"
-//                   : "bg-slate-200 shadow-slate-200",
-//               ].join(" ")}
-//             >
-//               <span
-//                 className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 flex items-center justify-center text-xs font-bold ${
-//                   profile.is_profile_public ? "translate-x-5 text-emerald-600" : "translate-x-0.5 text-slate-500"
-//                 }`}
-//               >
-//                 {profile.is_profile_public ? "ON" : "OFF"}
-//               </span>
-//             </button>
-//           </div>
-//           <div className="flex items-center gap-2">
-//             <span className="text-slate-500 whitespace-nowrap">Accept Bookings</span>
-//             <button
-//               type="button"
-//               onClick={() => toggleSwitch("is_accepting_bookings")}
-//               disabled={saving}
-//               className={[
-//                 "w-11 h-6 rounded-full flex items-center p-0.5 transition-all relative shadow-sm",
-//                 profile.is_accepting_bookings
-//                   ? "bg-emerald-500 shadow-emerald-200"
-//                   : "bg-slate-200 shadow-slate-200",
-//               ].join(" ")}
-//             >
-//               <span
-//                 className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 flex items-center justify-center text-xs font-bold ${
-//                   profile.is_accepting_bookings ? "translate-x-5 text-emerald-600" : "translate-x-0.5 text-slate-500"
-//                 }`}
-//               >
-//                 {profile.is_accepting_bookings ? "ON" : "OFF"}
-//               </span>
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Main form */}
-//       <form onSubmit={handleSave} className="grid lg:grid-cols-3 gap-6 items-start">
-//         {/* Left: bio and description */}
-//         <div className="lg:col-span-2 space-y-4">
-//           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-//             <p className="text-sm font-semibold text-slate-800 mb-4">Professional Summary</p>
-//             <div className="space-y-4">
-//               <div>
-//                 <label className="block text-slate-600 mb-2 text-sm">Bio</label>
-//                 <textarea
-//                   rows={4}
-//                   value={profile.bio || ""}
-//                   onChange={(e) => handleChange("bio", e.target.value)}
-//                   className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-vertical"
-//                   placeholder="Tell us about your experience as an interviewer..."
-//                 />
-//               </div>
-//               <div className="grid grid-cols-2 gap-4">
-//                 <div>
-//                   <label className="block text-slate-600 mb-2 text-sm">Years of Experience</label>
-//                   <input
-//                     type="number"
-//                     min="0"
-//                     max="50"
-//                     value={profile.years_of_experience || ""}
-//                     onChange={(e) => handleChange("years_of_experience", e.target.value)}
-//                     className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-//                   />
-//                 </div>
-//                 <div>
-//                   <label className="block text-slate-600 mb-2 text-sm">Location</label>
-//                   <input
-//                     type="text"
-//                     value={profile.location || ""}
-//                     onChange={(e) => handleChange("location", e.target.value)}
-//                     className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-//                     placeholder="City, Country"
-//                   />
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-
-//           <TagSection title="Specializations" field="specializations" profile={profile} onChange={handleChange} />
-//           <TagSection title="Industries Served" field="industries" profile={profile} onChange={handleChange} />
-//           <TagSection title="Languages" field="languages" profile={profile} onChange={handleChange} />
-//         </div>
-
-//         {/* Right column */}
-//         <div className="space-y-4">
-//           <TagSection title="Education" field="education" profile={profile} onChange={handleChange} />
-//           <TagSection title="Certifications" field="certifications" profile={profile} onChange={handleChange} />
-//         </div>
-
-//         {/* Save button */}
-//         <div className="lg:col-span-3 flex items-center gap-4 pt-2">
-//           {error && (
-//             <p className="text-sm text-red-600 flex-1 text-left">{error}</p>
-//           )}
-//           <button
-//             type="submit"
-//             disabled={saving || uploadingImage || removingImage}
-//             className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold text-white rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-60 flex items-center gap-2 ml-auto"
-//           >
-//             {saving ? "Saving..." : "Save Changes"}
-//           </button>
-//         </div>
-//       </form>
-
-//       {(uploadingImage || removingImage) && (
-//         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-//           {uploadingImage ? "Uploading profile picture..." : "Removing profile picture..."}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// function TagSection({ title, field, profile, onChange }) {
-//   const values = normalizeArray(profile[field]);
-
-//   const handleKeyDown = (e) => {
-//     if (e.key === "Enter" && !e.shiftKey) {
-//       e.preventDefault();
-//       const value = e.target.value.trim();
-//       if (!value || values.includes(value)) return;
-//       onChange(field, [...values, value]);
-//       e.target.value = "";
-//     }
-//   };
-
-//   const removeTag = (tagToRemove) => {
-//     onChange(field, values.filter((tag) => tag !== tagToRemove));
-//   };
-
-//   return (
-//     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">
-//       <p className="text-sm font-semibold text-slate-800 mb-3">{title}</p>
-//       <div className="flex flex-wrap gap-2 mb-3 max-h-24 overflow-y-auto">
-//         {values.length === 0 ? (
-//           <p className="text-xs text-slate-400">No {title.toLowerCase()} added yet</p>
-//         ) : (
-//           values.map((tag) => (
-//             <span
-//               key={tag}
-//               className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 rounded-full shadow-sm hover:bg-emerald-100 transition-all"
-//             >
-//               {tag}
-//               <button
-//                 type="button"
-//                 onClick={() => removeTag(tag)}
-//                 className="text-emerald-500 hover:text-emerald-700 ml-1 hover:scale-110 transition-all"
-//               >
-//                 ×
-//               </button>
-//             </span>
-//           ))
-//         )}
-//       </div>
-//       <input
-//         type="text"
-//         onKeyDown={handleKeyDown}
-//         placeholder={`Add ${title.toLowerCase()} (press Enter)`}
-//         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-//       />
-//     </div>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { useEffect, useState, useCallback, useRef } from "react";
-import { 
-  fetchProfile, 
-  updateProfile, 
-  uploadProfilePicture, 
+import {
+  fetchProfile,
+  updateProfile,
+  uploadProfilePicture,
   deleteProfilePicture,
-  patchProfile 
+  patchProfile
 } from "../../../interviewerDashboard/interviewerDashboardApi";
 
 const normalizeArray = (val) => {
@@ -533,7 +68,7 @@ export default function InterviewerProfilePage() {
       setError('Please select a valid image file.');
       return;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) {
       setError('Image size must be less than 5MB.');
       return;
@@ -541,16 +76,16 @@ export default function InterviewerProfilePage() {
 
     setUploadingImage(true);
     setError(null);
-    
+
     try {
       const previewUrl = URL.createObjectURL(file);
       setImagePreview(previewUrl);
-      
+
       await uploadProfilePicture(file);
-      
+
       const { data } = await fetchProfile();
       setProfile(data);
-      
+
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to upload image.");
       setImagePreview(profile?.profile_picture);
@@ -565,14 +100,14 @@ export default function InterviewerProfilePage() {
 
     setRemovingImage(true);
     setError(null);
-    
+
     try {
       await deleteProfilePicture();
-      
+
       const { data } = await fetchProfile();
       setProfile(data);
       setImagePreview(null);
-      
+
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to remove image.");
       setImagePreview(profile?.profile_picture);
@@ -584,7 +119,7 @@ export default function InterviewerProfilePage() {
   const toggleSwitch = async (field) => {
     const newValue = !profile[field];
     setProfile((prev) => ({ ...prev, [field]: newValue }));
-    
+
     try {
       await patchProfile({ [field]: newValue });
     } catch (err) {
@@ -607,15 +142,16 @@ export default function InterviewerProfilePage() {
         certifications: normalizeArray(profile.certifications),
         industries: normalizeArray(profile.industries),
         years_of_experience: Number(profile.years_of_experience || 0),
+        base_session_rate: Number(profile.base_session_rate || 10),
       };
 
       delete payload.profile_picture;
 
       await updateProfile(payload);
-      
+
       const { data } = await fetchProfile();
       setProfile(data);
-      
+
     } catch (err) {
       console.error("Update error:", err.response?.data);
       setError(err.response?.data?.detail || "Failed to update profile.");
@@ -646,10 +182,10 @@ export default function InterviewerProfilePage() {
 
   const initials = profile.display_name
     ? profile.display_name
-        .split(" ")
-        .map((p) => p[0])
-        .join("")
-        .toUpperCase()
+      .split(" ")
+      .map((p) => p[0])
+      .join("")
+      .toUpperCase()
     : "IN";
 
   return (
@@ -717,7 +253,7 @@ export default function InterviewerProfilePage() {
                   </div>
                 )}
               </div>
-              
+
               {/* Name and Headline */}
               <div className="flex-1 pt-2">
                 <input
@@ -734,7 +270,7 @@ export default function InterviewerProfilePage() {
                   className="w-full text-base text-slate-600 font-light bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-slate-400 focus:outline-none transition-all px-2 py-1"
                   placeholder="Professional headline"
                 />
-                
+
                 {/* Location and Experience */}
                 <div className="flex items-center gap-4 mt-4 text-sm text-slate-500 px-2">
                   {profile.location && (
@@ -757,7 +293,7 @@ export default function InterviewerProfilePage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Toggle Switches */}
             <div className="flex flex-col gap-3 lg:min-w-[280px]">
               <div className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
@@ -782,7 +318,7 @@ export default function InterviewerProfilePage() {
                   <span className="w-5 h-5 rounded-full bg-white shadow-sm" />
                 </button>
               </div>
-              
+
               <div className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -835,7 +371,7 @@ export default function InterviewerProfilePage() {
                 </div>
                 <h3 className="text-base font-medium text-slate-800">Professional Summary</h3>
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Professional Bio</label>
@@ -847,8 +383,8 @@ export default function InterviewerProfilePage() {
                     placeholder="Tell us about your experience as an interviewer..."
                   />
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Years of Experience</label>
                     <input
@@ -868,6 +404,17 @@ export default function InterviewerProfilePage() {
                       onChange={(e) => handleChange("location", e.target.value)}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50 focus:bg-white transition-all"
                       placeholder="City, Country"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Session Token Rate</label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="50"
+                      value={profile.base_session_rate || ""}
+                      onChange={(e) => handleChange("base_session_rate", e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50 focus:bg-white transition-all"
                     />
                   </div>
                 </div>
@@ -947,7 +494,7 @@ function ListSection({ title, field, profile, onChange, icon }) {
         </div>
         <h3 className="text-base font-medium text-slate-800">{title}</h3>
       </div>
-      
+
       {values.length > 0 ? (
         <div className="mb-4 bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100">
           {values.map((item, idx) => (
@@ -977,7 +524,7 @@ function ListSection({ title, field, profile, onChange, icon }) {
           <p className="text-xs text-slate-400 font-light">No {title.toLowerCase()} added yet</p>
         </div>
       )}
-      
+
       <div className="relative">
         <input
           type="text"

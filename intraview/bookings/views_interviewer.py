@@ -28,7 +28,6 @@ from django.db.models import Case, When, IntegerField
 logger = logging.getLogger(__name__)
 
 RESCHEDULE_LIMIT_HOURS = 3
-TOKEN_COST = 10
 MAX_RESCHEDULES = 3
 
 
@@ -351,7 +350,7 @@ class InterviewerRescheduleBookingView(APIView):
                 "end_datetime": end_dt_aware.isoformat(),
             },
             "reschedule_count": booking.reschedule_count,
-            "tokens_locked": TOKEN_COST,
+            "tokens_locked": booking.token_cost,
             "max_reschedules": MAX_RESCHEDULES
         }, status=status.HTTP_200_OK)
 
