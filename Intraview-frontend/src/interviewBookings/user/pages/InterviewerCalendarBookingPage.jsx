@@ -268,10 +268,10 @@ const CalendarBookingPage = () => {
           onClick={() => handleDateClick(dateStr)}
           disabled={!isAvailable}
           className={`h-20 p-2 border-2 rounded-xl flex flex-col items-center justify-center transition-all duration-200 group hover:shadow-lg ${isSelected
-              ? 'bg-emerald-500 text-white border-emerald-500 shadow-xl scale-105 ring-4 ring-emerald-200/50'
-              : isAvailable
-                ? 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300 text-emerald-800 cursor-pointer hover:scale-105 hover:shadow-emerald-200/50 group-hover:ring-2 group-hover:ring-emerald-300'
-                : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed hover:bg-gray-50'
+            ? 'bg-emerald-500 text-white border-emerald-500 shadow-xl scale-105 ring-4 ring-emerald-200/50'
+            : isAvailable
+              ? 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300 text-emerald-800 cursor-pointer hover:scale-105 hover:shadow-emerald-200/50 group-hover:ring-2 group-hover:ring-emerald-300'
+              : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed hover:bg-gray-50'
             }`}
           title={isAvailable ? `${capacity} slots available` : 'No slots'}
         >
@@ -318,9 +318,9 @@ const CalendarBookingPage = () => {
               </div>
             </div>
             <div className="ml-auto">
-              <div className={`px-5 py-3 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 ${hasEnoughTokens
-                  ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-200'
-                  : 'bg-rose-100 text-rose-800 border-2 border-rose-200'
+              <div className={`px-5 py-3 rounded-xl font-bold text-sm shadow-lg flex items-center gap-2 ${tokenBalance > 0
+                ? 'bg-emerald-100 text-emerald-800 border-2 border-emerald-200'
+                : 'bg-rose-100 text-rose-800 border-2 border-rose-200'
                 }`}>
                 <Coins className="w-5 h-5" />
                 {tokenBalance} tokens
@@ -427,8 +427,8 @@ const CalendarBookingPage = () => {
                       onClick={() => handleBookClick(slot)}
                       disabled={!canBook || bookingLoading}
                       className={`w-full p-6 rounded-3xl shadow-lg transition-all duration-300 flex items-center justify-between relative overflow-hidden group hover:shadow-2xl ${canBook
-                          ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-2 border-slate-700 hover:from-slate-800 hover:to-slate-800 hover:scale-[1.02] hover:-translate-y-1'
-                          : 'bg-slate-100 border-2 border-slate-200 text-slate-500 cursor-not-allowed opacity-70'
+                        ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-2 border-slate-700 hover:from-slate-800 hover:to-slate-800 hover:scale-[1.02] hover:-translate-y-1'
+                        : 'bg-slate-100 border-2 border-slate-200 text-slate-500 cursor-not-allowed opacity-70'
                         }`}
                     >
                       <div className="flex items-center gap-4 z-10">
@@ -444,8 +444,8 @@ const CalendarBookingPage = () => {
 
                       <div className="flex items-center gap-3 z-10">
                         <div className={`px-4 py-2 rounded-2xl text-xs font-black shadow-lg ${canBook
-                            ? 'bg-white/20 backdrop-blur-sm text-white border border-white/30'
-                            : 'bg-slate-200 text-slate-600'
+                          ? 'bg-white/20 backdrop-blur-sm text-white border border-white/30'
+                          : 'bg-slate-200 text-slate-600'
                           }`}>
                           {slotCost} tokens
                         </div>
