@@ -258,6 +258,12 @@ class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
             "start_time",
             "end_time",
             "token_cost",
+            # session config
+            "interview_type",
+            "difficulty_level",
+            "candidate_goal",
+            "candidate_notes",
+            "selected_specialties",
         ]
 
 
@@ -280,6 +286,12 @@ class CandidatePastInterviewSerializer(serializers.ModelSerializer):
             "end_time",
             "status",
             "token_cost",
+            # session config
+            "interview_type",
+            "difficulty_level",
+            "candidate_goal",
+            "candidate_notes",
+            "selected_specialties",
         ]
 
 
@@ -501,6 +513,12 @@ class InterviewerBookingDetailSerializer(serializers.ModelSerializer):
             "cancellation_reason",
             "cancelled_at",
             "created_at",
+            # session config
+            "interview_type",
+            "difficulty_level",
+            "candidate_goal",
+            "candidate_notes",
+            "selected_specialties",
         ]
 
 
@@ -947,6 +965,12 @@ class InterviewerUpcomingSerializer(serializers.ModelSerializer):
             "proposed_slot",
             "reschedule_note",
             "reschedule_requested_by",
+            # session config
+            "interview_type",
+            "difficulty_level",
+            "candidate_goal",
+            "candidate_notes",
+            "selected_specialties",
         ]
  
     def get_candidate_name(self, obj):

@@ -15,7 +15,7 @@
 
 // const CandidateBookingsDashboard = () => {
 //   const navigate = useNavigate();
-  
+
 //   const [activeTab, setActiveTab] = useState('upcoming');
 //   const [bookings, setBookings] = useState([]);
 //   const [loading, setLoading] = useState(false);
@@ -26,17 +26,17 @@
 //     try {
 //       console.log('🔥 fetchBookings STARTED - tab:', activeTab);
 //       setLoading(true);
-      
+
 //       let res;
 //       if (activeTab === 'upcoming') {
 //         res = await candidateBookingsApi.getUpcomingBookings();
 //       } else {
 //         res = await candidateBookingsApi.getPastBookings();
 //       }
-      
+
 //       console.log('✅ RAW API DATA:', res.data);
 //       setBookings(res.data || []);
-      
+
 //     } catch (error) {
 //       console.error('💥 ERROR:', error);
 //       toast.error('Failed to load bookings');
@@ -54,7 +54,7 @@
 //   const filteredBookings = bookings.filter(booking => {
 //     const interviewerName = booking.interviewer_name || booking.interviewer__interviewer_profile__display_name || '';
 //     const startDateTime = booking.start_datetime || '';
-    
+
 //     const matchesSearch = interviewerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
 //                          startDateTime.toLowerCase().includes(searchTerm.toLowerCase());
 //     const matchesFilter = filterType === 'all' || booking.type === filterType;
@@ -68,7 +68,7 @@
 //   // 🔥 BookingStatusBadge Component
 //   const BookingStatusBadge = ({ status }) => {
 //     console.log('🔥 Status from API:', status, typeof status);
-    
+
 //     const statusConfig = {
 //       'confirmed': { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
 //       'CONFIRMED': { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
@@ -87,7 +87,7 @@
 //       text: 'text-gray-800', 
 //       label: 'Unknown' 
 //     };
-    
+
 //     return (
 //       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
 //         {config.label}
@@ -261,7 +261,7 @@
 //           >
 //             {isLive ? '🎥 JOIN NOW' : '📱 Join Session'}
 //           </button>
-          
+
 //           {canReschedule && (
 //             <button 
 //               className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 text-sm flex items-center justify-center gap-2"
@@ -416,10 +416,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { candidateBookingsApi } from '../../candidateBookingsApi';
+import { INTERVIEW_TYPE_LABELS } from '../components/SessionConfigModal';
 
 const CandidateBookingsDashboard = () => {
   const navigate = useNavigate();
-  
+
   const [activeTab, setActiveTab] = useState('upcoming');
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -430,17 +431,17 @@ const CandidateBookingsDashboard = () => {
     try {
       console.log('🔥 fetchBookings STARTED - tab:', activeTab);
       setLoading(true);
-      
+
       let res;
       if (activeTab === 'upcoming') {
         res = await candidateBookingsApi.getUpcomingBookings();
       } else {
         res = await candidateBookingsApi.getPastBookings();
       }
-      
+
       console.log('✅ RAW API DATA:', res.data);
       setBookings(res.data || []);
-      
+
     } catch (error) {
       console.error('💥 ERROR:', error);
       toast.error('Failed to load bookings');
@@ -458,10 +459,10 @@ const CandidateBookingsDashboard = () => {
   const filteredBookings = bookings.filter(booking => {
     const interviewerName = booking.interviewer_name || booking.interviewer__interviewer_profile__display_name || '';
     const startDateTime = booking.start_datetime || '';
-    
+
     const matchesSearch = interviewerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         startDateTime.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterType === 'all' || booking.type === filterType;
+      startDateTime.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterType === 'all' || booking.interview_type === filterType;
     return matchesSearch && matchesFilter;
   });
 
@@ -472,7 +473,7 @@ const CandidateBookingsDashboard = () => {
   // 🔥 BookingStatusBadge Component
   const BookingStatusBadge = ({ status }) => {
     console.log('🔥 Status from API:', status, typeof status);
-    
+
     const statusConfig = {
       'confirmed': { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
       'CONFIRMED': { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Confirmed' },
@@ -487,11 +488,11 @@ const CandidateBookingsDashboard = () => {
     };
 
     const config = statusConfig[status?.toLowerCase()] || {
-      bg: 'bg-gray-100', 
-      text: 'text-gray-800', 
-      label: 'Unknown' 
+      bg: 'bg-gray-100',
+      text: 'text-gray-800',
+      label: 'Unknown'
     };
-    
+
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
         {config.label}
@@ -513,8 +514,8 @@ const CandidateBookingsDashboard = () => {
     useEffect(() => {
       const now = new Date();
       const startTime = new Date(booking.start_datetime);
-      const endTime = booking.end_datetime ? 
-        new Date(booking.end_datetime) : 
+      const endTime = booking.end_datetime ?
+        new Date(booking.end_datetime) :
         new Date(startTime.getTime() + 30 * 60 * 1000); // Default 30min
 
       const updateTimer = () => {
@@ -550,8 +551,8 @@ const CandidateBookingsDashboard = () => {
         const [hours, minutes] = timeString.split(':');
         const date = new Date();
         date.setHours(parseInt(hours), parseInt(minutes), 0);
-        return date.toLocaleTimeString('en-US', { 
-          hour: 'numeric', minute: '2-digit', hour12: true 
+        return date.toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true
         });
       } catch {
         return timeString;
@@ -562,11 +563,11 @@ const CandidateBookingsDashboard = () => {
       if (!dateString) return 'Date unavailable';
       try {
         const date = new Date(dateString + 'T00:00:00');
-        return date.toLocaleDateString('en-US', { 
-          weekday: 'short', 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
+        return date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         });
       } catch {
         return dateString;
@@ -603,11 +604,11 @@ const CandidateBookingsDashboard = () => {
     const interviewDate = booking.date;
     const startTime = booking.start_time;
     const endTime = booking.end_time;
-    const bookingType = booking.type || 'Technical Interview';
+    const bookingType = INTERVIEW_TYPE_LABELS[booking.interview_type] || booking.interview_type || 'Technical Interview';
     const status = booking.status || 'CONFIRMED';
 
     return (
-      <div 
+      <div
         className="group bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-slate-200 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 hover:border-slate-300 cursor-pointer"
         onClick={() => handleBookingClick(booking.id)}
       >
@@ -677,13 +678,12 @@ const CandidateBookingsDashboard = () => {
           <div className="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-blue-50 rounded-2xl border-2 border-emerald-200">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-700">Starts in:</span>
-              <span className={`font-mono font-bold text-lg px-3 py-1 rounded-lg ${
-                isLive 
-                  ? 'bg-emerald-500 text-white animate-pulse shadow-lg' 
-                  : parseInt(timeLeft.split(' ')[0]) < 1 
-                    ? 'bg-amber-500 text-white shadow-lg' 
+              <span className={`font-mono font-bold text-lg px-3 py-1 rounded-lg ${isLive
+                  ? 'bg-emerald-500 text-white animate-pulse shadow-lg'
+                  : parseInt(timeLeft.split(' ')[0]) < 1
+                    ? 'bg-amber-500 text-white shadow-lg'
                     : 'bg-blue-500 text-white shadow-lg'
-              }`}>
+                }`}>
                 {timeLeft}
               </span>
             </div>
@@ -692,19 +692,18 @@ const CandidateBookingsDashboard = () => {
 
         {/* 🔥 ACTION BUTTONS */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <button 
-            className={`flex-1 font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 text-sm ${
-              isLive
+          <button
+            className={`flex-1 font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 text-sm ${isLive
                 ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
                 : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white'
-            }`}
+              }`}
             onClick={handleJoinClick}
           >
             {isLive ? '🎥 JOIN NOW' : '📱 Join Session'}
           </button>
-          
+
           {canReschedule && (
-            <button 
+            <button
               className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 text-sm flex items-center justify-center gap-2"
               onClick={handleRescheduleClick}
             >
@@ -757,9 +756,10 @@ const CandidateBookingsDashboard = () => {
                 className="w-full lg:w-48 px-6 py-4 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 bg-white/80 backdrop-blur-sm text-sm shadow-lg appearance-none"
               >
                 <option value="all">All Types</option>
-                <option value="technical">Technical</option>
-                <option value="behavioral">Behavioral</option>
-                <option value="system-design">System Design</option>
+                <option value="TECHNICAL">Technical Interview</option>
+                <option value="BEHAVIORAL">Behavioral Interview</option>
+                <option value="SYSTEM_DESIGN">System Design</option>
+                <option value="CODING">Coding Interview</option>
               </select>
             </div>
           </div>
@@ -768,21 +768,19 @@ const CandidateBookingsDashboard = () => {
           <div className="flex bg-slate-100/50 backdrop-blur-sm rounded-3xl p-1 max-w-md mx-auto">
             <button
               onClick={() => setActiveTab('upcoming')}
-              className={`flex-1 py-4 px-6 rounded-2xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'upcoming'
+              className={`flex-1 py-4 px-6 rounded-2xl font-semibold text-sm transition-all duration-200 ${activeTab === 'upcoming'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
                   : 'text-slate-700 hover:text-slate-900'
-              }`}
+                }`}
             >
               Upcoming Sessions
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`flex-1 py-4 px-6 rounded-2xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'past'
+              className={`flex-1 py-4 px-6 rounded-2xl font-semibold text-sm transition-all duration-200 ${activeTab === 'past'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
                   : 'text-slate-700 hover:text-slate-900'
-              }`}
+                }`}
             >
               Past Sessions
             </button>

@@ -1,9 +1,10 @@
-// src/interviewBookings/interviewer/pages/InterviewerBookingDetailPage.jsx
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Target, Layers, BookOpen, MessageSquare, Briefcase } from 'lucide-react';
 import { interviewerBookingsApi } from '../../interviewerBookingsApi';
 import ReportIssueModal from '../../../features/issues/components/RaiseIssueModal';
+import { INTERVIEW_TYPE_LABELS, DIFFICULTY_LABELS, CANDIDATE_GOALS } from '../components/SessionConfigModal';
 
 const InterviewerBookingDetailPage = () => {
   const { bookingId } = useParams();
@@ -94,7 +95,7 @@ const InterviewerBookingDetailPage = () => {
       CANCELLED_BY_INTERVIEWER: 'bg-rose-100 text-rose-800',
     };
     const badgeClass = config[status] || config.CANCELLED;
-    
+
     return (
       <span className={`px-4 py-2 rounded-full text-sm font-semibold ${badgeClass}`}>
         {status.replace('_', ' ')}
@@ -138,7 +139,7 @@ const InterviewerBookingDetailPage = () => {
                 {/* Session Details */}
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 mb-8">Session Details</h2>
-                  
+
                   <div className="space-y-6">
                     {/* Date & Time */}
                     <div className="flex items-start gap-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-3xl border-2 border-blue-100">
@@ -176,6 +177,63 @@ const InterviewerBookingDetailPage = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Session Configuration (if present) */}
+                    {(booking.interview_type || booking.difficulty_level || booking.candidate_goal || booking.candidate_notes) && (
+                      <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl border-2 border-indigo-100/50">
+                        <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                          <Target className="w-5 h-5 text-indigo-500" />
+                          Session Requirements
+                        </h3>
+                        <div className="space-y-4">
+                          {booking.interview_type && (
+                            <div className="flex items-start justify-between">
+                              <span className="text-sm font-medium text-slate-500">Interview Type</span>
+                              <span className="text-sm font-bold text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                                {INTERVIEW_TYPE_LABELS[booking.interview_type] || booking.interview_type}
+                              </span>
+                            </div>
+                          )}
+                          {booking.difficulty_level && (
+                            <div className="flex items-start justify-between">
+                              <span className="text-sm font-medium text-slate-500">Difficulty Level</span>
+                              <span className="text-sm font-bold text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                                {DIFFICULTY_LABELS[booking.difficulty_level] || booking.difficulty_level}
+                              </span>
+                            </div>
+                          )}
+                          {booking.candidate_goal && (
+                            <div className="flex items-start justify-between">
+                              <span className="text-sm font-medium text-slate-500">Candidate's Goal</span>
+                              <span className="text-sm font-bold text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200">
+                                {CANDIDATE_GOALS.find(g => g.value === booking.candidate_goal)?.label || booking.candidate_goal}
+                              </span>
+                            </div>
+                          )}
+                          {/* Selected Specialties / Focus Areas */}
+                          {booking.selected_specialties && Array.isArray(booking.selected_specialties) && booking.selected_specialties.length > 0 && (
+                            <div>
+                              <span className="text-sm font-medium text-slate-500 block mb-2">Focus Areas</span>
+                              <div className="flex flex-wrap gap-2">
+                                {booking.selected_specialties.map((spec, i) => (
+                                  <span key={i} className="px-3 py-1 bg-white border border-slate-200 text-sm font-semibold text-slate-700 rounded-lg">
+                                    {spec}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {booking.candidate_notes && (
+                            <div>
+                              <span className="text-sm font-medium text-slate-500 block mb-2">Preparation Notes</span>
+                              <div className="p-4 bg-white/60 rounded-xl border border-slate-200 text-sm text-slate-700 whitespace-pre-wrap">
+                                {booking.candidate_notes}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -202,42 +260,42 @@ const InterviewerBookingDetailPage = () => {
                     )}
 
                     <div className="space-y-4">
-                    {canCancel && (
-                      <button
-                        onClick={() => setCancelModalOpen(true)}
-                        className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl h-16 text-lg transition-all duration-200"
-                        disabled={cancelLoading}
-                      >
-                        Cancel Session
-                      </button>
-                    )}
+                      {canCancel && (
+                        <button
+                          onClick={() => setCancelModalOpen(true)}
+                          className="w-full bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl h-16 text-lg transition-all duration-200"
+                          disabled={cancelLoading}
+                        >
+                          Cancel Session
+                        </button>
+                      )}
 
-                    {isCompleted && (
-                      <div className="p-6 bg-emerald-50 rounded-3xl border-2 border-emerald-200 text-center">
-                        <div className="w-16 h-16 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                      {isCompleted && (
+                        <div className="p-6 bg-emerald-50 rounded-3xl border-2 border-emerald-200 text-center">
+                          <div className="w-16 h-16 bg-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h3 className="text-2xl font-bold text-emerald-800 mb-2">Tokens Earned!</h3>
+                          <p className="text-emerald-700 text-lg">+{booking.token_cost} tokens transferred</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-emerald-800 mb-2">Tokens Earned!</h3>
-                        <p className="text-emerald-700 text-lg">+{booking.token_cost} tokens transferred</p>
-                      </div>
-                    )}
+                      )}
 
-                    {/* ── Report Issue ── */}
-                    {(isCompleted || isCancelled) && (
-                      <button
-                        onClick={() => setReportIssueOpen(true)}
-                        className="w-full border-2 border-orange-200 text-orange-700 hover:bg-orange-50 font-semibold py-4 px-6 rounded-2xl h-16 text-base transition-all duration-200 flex items-center justify-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        Report Issue
-                      </button>
-                    )}
-                  </div>
+                      {/* ── Report Issue ── */}
+                      {(isCompleted || isCancelled) && (
+                        <button
+                          onClick={() => setReportIssueOpen(true)}
+                          className="w-full border-2 border-orange-200 text-orange-700 hover:bg-orange-50 font-semibold py-4 px-6 rounded-2xl h-16 text-base transition-all duration-200 flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          Report Issue
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -264,7 +322,7 @@ const InterviewerBookingDetailPage = () => {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="p-6 bg-rose-50 rounded-3xl border border-rose-200">
                 <p className="text-rose-800 font-semibold text-lg">
                   ⚠️ Candidate will be fully refunded ({booking.token_cost} tokens)

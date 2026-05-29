@@ -13,7 +13,7 @@
 //   const { bookingId } = useParams();
 //   const navigate = useNavigate();
 //   const [searchParams] = useSearchParams();
-  
+
 //   const [booking, setBooking] = useState(null);
 //   const [loading, setLoading] = useState(true);
 //   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -678,25 +678,25 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Clock, Calendar, User, AlertTriangle,
   RefreshCw, XCircle, MessageSquare, CheckCircle2,
-  ChevronRight, X,
+  ChevronRight, X, Target
 } from 'lucide-react';
 import { candidateBookingsApi } from '../../candidateBookingsApi';
 import RescheduleRequestModal from '../components/RescheduleRequestModal';
-
 import ReportIssueModal from '../../../features/issues/components/RaiseIssueModal';
+import { INTERVIEW_TYPE_LABELS, DIFFICULTY_LABELS, CANDIDATE_GOALS } from '../components/SessionConfigModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  CONFIRMED:               { label: 'Confirmed',                color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  PENDING:                 { label: 'Pending',                  color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  COMPLETED:               { label: 'Completed',                color: 'bg-slate-100 text-slate-700 border-slate-200' },
-  LIVE:                    { label: 'Live Now',                 color: 'bg-green-100 text-green-800 border-green-200 animate-pulse' },
-  CANCELLED:               { label: 'Cancelled',                color: 'bg-rose-100 text-rose-700 border-rose-200' },
-  CANCELLED_BY_CANDIDATE:  { label: 'Cancelled by You',         color: 'bg-rose-100 text-rose-700 border-rose-200' },
-  CANCELLED_BY_INTERVIEWER:{ label: 'Cancelled by Interviewer', color: 'bg-rose-100 text-rose-700 border-rose-200' },
-  CANDIDATE_NO_SHOW:       { label: 'No Show',                  color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  INTERVIEWER_NO_SHOW:     { label: 'Interviewer No Show',      color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  CONFIRMED: { label: 'Confirmed', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  COMPLETED: { label: 'Completed', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  LIVE: { label: 'Live Now', color: 'bg-green-100 text-green-800 border-green-200 animate-pulse' },
+  CANCELLED: { label: 'Cancelled', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  CANCELLED_BY_CANDIDATE: { label: 'Cancelled by You', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  CANCELLED_BY_INTERVIEWER: { label: 'Cancelled by Interviewer', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  CANDIDATE_NO_SHOW: { label: 'No Show', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  INTERVIEWER_NO_SHOW: { label: 'Interviewer No Show', color: 'bg-orange-100 text-orange-700 border-orange-200' },
 };
 
 
@@ -842,12 +842,11 @@ const BookingDetailPage = () => {
             {/* Hero card */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               {/* Colored top stripe based on status */}
-              <div className={`h-1.5 w-full ${
-                isLive ? 'bg-green-500' :
-                isCompleted ? 'bg-teal-600' :
-                isCancelled ? 'bg-rose-400' :
-                'bg-teal-600'
-              }`} />
+              <div className={`h-1.5 w-full ${isLive ? 'bg-green-500' :
+                  isCompleted ? 'bg-teal-600' :
+                    isCancelled ? 'bg-rose-400' :
+                      'bg-teal-600'
+                }`} />
               <div className="p-6">
                 <div className="flex items-start justify-between mb-5">
                   <div>
@@ -900,11 +899,10 @@ const BookingDetailPage = () => {
 
             {/* Live countdown / timer */}
             {(canJoin || isLive) && booking.status !== 'COMPLETED' && (
-              <div className={`rounded-2xl border p-5 flex items-center justify-between ${
-                isLive
+              <div className={`rounded-2xl border p-5 flex items-center justify-between ${isLive
                   ? 'bg-green-50 border-green-200'
                   : 'bg-teal-50 border-teal-200'
-              }`}>
+                }`}>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-teal-700 mb-1">
                     {isLive ? 'Session is happening now' : 'Time until session'}
@@ -919,11 +917,10 @@ const BookingDetailPage = () => {
                       ? window.open(booking.meeting_url, '_blank')
                       : toast.info('Meeting link will be available closer to the session time')
                   }
-                  className={`px-5 py-2.5 rounded-xl font-semibold text-sm text-white transition-all ${
-                    isLive
+                  className={`px-5 py-2.5 rounded-xl font-semibold text-sm text-white transition-all ${isLive
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-teal-600 hover:bg-teal-700'
-                  }`}
+                    }`}
                 >
                   {isLive ? 'Join Now →' : 'Join Session'}
                 </button>
@@ -974,16 +971,14 @@ const BookingDetailPage = () => {
 
             {/* Feedback card (completed sessions) */}
             {isCompleted && (
-              <div className={`rounded-2xl border p-5 ${
-                hasFeedback
+              <div className={`rounded-2xl border p-5 ${hasFeedback
                   ? 'bg-white border-teal-200'
                   : 'bg-gray-50 border-gray-200'
-              }`}>
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      hasFeedback ? 'bg-teal-100' : 'bg-gray-100'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hasFeedback ? 'bg-teal-100' : 'bg-gray-100'
+                      }`}>
                       <MessageSquare className={`w-5 h-5 ${hasFeedback ? 'text-teal-600' : 'text-gray-400'}`} />
                     </div>
                     <div>
@@ -1012,10 +1007,66 @@ const BookingDetailPage = () => {
               </div>
             )}
 
+            {/* Session Configuration */}
+            {(booking.interview_type || booking.difficulty_level || booking.candidate_goal || booking.candidate_notes) && (
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <Target className="w-5 h-5 text-indigo-500" />
+                  <p className="text-sm font-bold text-gray-900">Session Requirements</p>
+                </div>
+                <div className="space-y-4">
+                  {booking.interview_type && (
+                    <div className="flex items-start justify-between border-b border-indigo-100 pb-3 last:border-0 last:pb-0">
+                      <span className="text-sm font-medium text-gray-500">Interview Type</span>
+                      <span className="text-sm font-bold text-gray-900 bg-white px-3 py-1 rounded-lg border border-indigo-100">
+                        {INTERVIEW_TYPE_LABELS[booking.interview_type] || booking.interview_type}
+                      </span>
+                    </div>
+                  )}
+                  {booking.difficulty_level && (
+                    <div className="flex items-start justify-between border-b border-indigo-100 pb-3 last:border-0 last:pb-0">
+                      <span className="text-sm font-medium text-gray-500">Experience Level</span>
+                      <span className="text-sm font-bold text-gray-900 bg-white px-3 py-1 rounded-lg border border-indigo-100">
+                        {DIFFICULTY_LABELS[booking.difficulty_level] || booking.difficulty_level}
+                      </span>
+                    </div>
+                  )}
+                  {booking.candidate_goal && (
+                    <div className="flex items-start justify-between border-b border-indigo-100 pb-3 last:border-0 last:pb-0">
+                      <span className="text-sm font-medium text-gray-500">Your Goal</span>
+                      <span className="text-sm font-bold text-gray-900 bg-white px-3 py-1 rounded-lg border border-indigo-100">
+                        {CANDIDATE_GOALS.find(g => g.value === booking.candidate_goal)?.label || booking.candidate_goal}
+                      </span>
+                    </div>
+                  )}
+                  {booking.selected_specialties && Array.isArray(booking.selected_specialties) && booking.selected_specialties.length > 0 && (
+                    <div className="border-b border-indigo-100 pb-3 last:border-0 last:pb-0">
+                      <span className="text-sm font-medium text-gray-500 block mb-2">Focus Areas</span>
+                      <div className="flex flex-wrap gap-2">
+                        {booking.selected_specialties.map((spec, i) => (
+                          <span key={i} className="px-3 py-1 bg-white border border-indigo-100 text-sm font-semibold text-gray-700 rounded-lg">
+                            {spec}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {booking.candidate_notes && (
+                    <div className="last:border-0 last:pb-0">
+                      <span className="text-sm font-medium text-gray-500 block mb-2">Preparation Notes</span>
+                      <div className="p-4 bg-white rounded-xl border border-indigo-100 text-sm text-gray-700 whitespace-pre-wrap">
+                        {booking.candidate_notes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Session notes */}
             {booking.notes && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <p className="text-sm font-semibold text-gray-700 mb-2">Session Notes</p>
+                <p className="text-sm font-semibold text-gray-700 mb-2">Internal Notes</p>
                 <p className="text-sm text-gray-600 whitespace-pre-line">{booking.notes}</p>
               </div>
             )}

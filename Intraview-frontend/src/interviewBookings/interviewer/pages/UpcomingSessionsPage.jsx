@@ -73,16 +73,16 @@
 
 //   const formatTimeUntil = (dateTime) => {
 //     if (!dateTime || isNaN(dateTime)) return 'Loading...';
-    
+
 //     const now = new Date();
 //     const start = dateTime;
 //     const diffMs = start - now;
-    
+
 //     if (diffMs < 0) return 'Started';
-    
+
 //     const hours = Math.floor(diffMs / (1000 * 60 * 60));
 //     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
 //     if (hours > 0) return `Starts in ${hours}h ${minutes}m`;
 //     return `Starts in ${minutes}m`;
 //   };
@@ -123,7 +123,7 @@
 //               // ✅ FIXED: Create dateTime for this booking
 //               const dateTime = formatDateTime(booking.date, booking.start_time);
 //               const endTime = formatDateTime(booking.date, booking.end_time);
-              
+
 //               return (
 //                 <div
 //                   key={booking.id}
@@ -195,7 +195,7 @@
 //                       </svg>
 //                       Cancel Session
 //                     </button>
-                    
+
 //                     <button
 //                       onClick={(e) => {
 //                         e.stopPropagation();
@@ -230,7 +230,7 @@
 //                   </svg>
 //                 </button>
 //               </div>
-              
+
 //               <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-200">
 //                 <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center">
 //                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -327,6 +327,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { interviewerBookingsApi } from '../../interviewerBookingsApi';
+import { INTERVIEW_TYPE_LABELS } from '../../user/components/SessionConfigModal';
 
 const UpcomingSessionsPage = () => {
   const navigate = useNavigate();
@@ -347,9 +348,9 @@ const UpcomingSessionsPage = () => {
   const [rescheduleRejectReason, setRescheduleRejectReason] = useState('');
   const [rescheduleActionLoadingId, setRescheduleActionLoadingId] =
     useState(null); // booking id currently being accepted/rejected
-  
+
   const isRescheduleActionLoading =
-  rescheduleActionLoadingId === rescheduleRejectBookingId;  
+    rescheduleActionLoadingId === rescheduleRejectBookingId;
 
   useEffect(() => {
     fetchUpcomingSessions();
@@ -554,8 +555,16 @@ const UpcomingSessionsPage = () => {
                   }
                 >
                   {/* Top: Candidate + Status */}
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex-1 min-w-0">
+                  <div className="flex flex-col gap-2 mb-6">
+                    <div className="flex items-center justify-between">
+                      <span className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-semibold">
+                        {INTERVIEW_TYPE_LABELS[booking.interview_type] || booking.interview_type || 'Interview Session'}
+                      </span>
+                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+                        CONFIRMED
+                      </span>
+                    </div>
+                    <div>
                       <h3 className="text-xl font-bold text-slate-900 truncate group-hover:text-indigo-600">
                         {booking.candidate_name ||
                           booking.candidate_email ||
@@ -565,9 +574,6 @@ const UpcomingSessionsPage = () => {
                         {booking.candidate_email || 'Email not available'}
                       </p>
                     </div>
-                    <span className="ml-3 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-sm font-semibold">
-                      CONFIRMED
-                    </span>
                   </div>
 
                   {/* NEW: Reschedule request banner */}
@@ -616,10 +622,10 @@ const UpcomingSessionsPage = () => {
                       <span>
                         {dateTime
                           ? dateTime.toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })
                           : 'N/A'}
                       </span>
                     </div>
@@ -640,12 +646,12 @@ const UpcomingSessionsPage = () => {
                       <span>
                         {dateTime && endTime
                           ? `${dateTime.toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })} - ${endTime.toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}`
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })} - ${endTime.toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`
                           : 'N/A'}
                       </span>
                     </div>
