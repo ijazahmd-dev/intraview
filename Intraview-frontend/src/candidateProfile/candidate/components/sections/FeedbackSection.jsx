@@ -253,7 +253,9 @@ const FeedbackSection = () => {
   });
 
   // Aggregate stats
-  const ratings = evaluations.map((e) => e.overall_score ?? e.overall_rating).filter((r) => r != null);
+  const ratings = evaluations
+    .map((e) => parseFloat(e.overall_score ?? e.overall_rating))
+    .filter((r) => r != null && !isNaN(r));
   const avgRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : null;
   const highestRating = ratings.length ? Math.max(...ratings) : null;
 
@@ -341,8 +343,8 @@ const FeedbackSection = () => {
               key={type}
               onClick={() => setFilterType(type)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${filterType === type
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
             >
               {type === 'all' ? 'All' : type}
