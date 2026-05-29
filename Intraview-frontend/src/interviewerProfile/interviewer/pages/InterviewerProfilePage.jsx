@@ -8,6 +8,10 @@ import {
   deleteProfilePicture,
   patchProfile
 } from "../../../interviewerDashboard/interviewerDashboardApi";
+import {
+  INTERVIEW_TYPE_LABELS,
+  DIFFICULTY_LABELS
+} from "../../../interviewBookings/user/components/SessionConfigModal";
 
 const normalizeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -141,6 +145,8 @@ export default function InterviewerProfilePage() {
         education: normalizeArray(profile.education),
         certifications: normalizeArray(profile.certifications),
         industries: normalizeArray(profile.industries),
+        supported_interview_types: normalizeArray(profile.supported_interview_types),
+        supported_experience_levels: normalizeArray(profile.supported_experience_levels),
         years_of_experience: Number(profile.years_of_experience || 0),
         base_session_rate: Number(profile.base_session_rate || 10),
       };
@@ -428,6 +434,22 @@ export default function InterviewerProfilePage() {
 
           {/* Right Column */}
           <div className="space-y-6">
+            <MultiSelectPillSection
+              title="Supported Interview Types"
+              field="supported_interview_types"
+              profile={profile}
+              onChange={handleChange}
+              options={INTERVIEW_TYPE_LABELS}
+              icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
+            />
+            <MultiSelectPillSection
+              title="Supported Experience Levels"
+              field="supported_experience_levels"
+              profile={profile}
+              onChange={handleChange}
+              options={DIFFICULTY_LABELS}
+              icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+            />
             <ListSection title="Education" field="education" profile={profile} onChange={handleChange} icon={<svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z" /><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>} />
             <ListSection title="Certifications" field="certifications" profile={profile} onChange={handleChange} icon={<svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>} />
           </div>
@@ -539,6 +561,51 @@ function ListSection({ title, field, profile, onChange, icon }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MultiSelectPillSection({ title, field, profile, onChange, icon, options }) {
+  const values = normalizeArray(profile[field]);
+
+  const toggle = (key) => {
+    if (values.includes(key)) {
+      onChange(field, values.filter(v => v !== key));
+    } else {
+      onChange(field, [...values, key]);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+          {icon}
+        </div>
+        <div className="flex-1">
+          <h3 className="text-base font-medium text-slate-800">{title}</h3>
+          <p className="text-xs text-slate-500">Select all that apply</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(options).map(([key, label]) => {
+          const isSelected = values.includes(key);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggle(key)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${isSelected
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md scale-[1.02]'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
