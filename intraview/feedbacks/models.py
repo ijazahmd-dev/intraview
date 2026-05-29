@@ -94,6 +94,10 @@ class CandidateEvaluation(models.Model):
 
     is_visible_to_candidate = models.BooleanField(default=True)
 
+    is_edited = models.BooleanField(default=False)
+    edit_count = models.PositiveIntegerField(default=0)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

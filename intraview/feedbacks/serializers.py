@@ -41,19 +41,103 @@ class CandidateEvaluationCreateSerializer(serializers.ModelSerializer):
         return value
 
 
-class CandidateEvaluationDetailSerializer(serializers.ModelSerializer):
 
-    candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
-    interviewer_email = serializers.EmailField(source="interviewer.email", read_only=True)
+
+
+
+class CandidateEvaluationUpdateSerializer(CandidateEvaluationCreateSerializer):
+    """
+    Same fields/validators as create, but used for PATCH updates.
+    """
+    class Meta(CandidateEvaluationCreateSerializer.Meta):
+        # Same fields, model, validation; we allow partial via `partial=True` in the view.
+        pass
+
+
+
+
+
+
+
+
+
+
+# class CandidateEvaluationDetailSerializer(serializers.ModelSerializer):
+
+#     candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+#     interviewer_email = serializers.EmailField(source="interviewer.email", read_only=True)
+
+#     class Meta:
+#         model = CandidateEvaluation
+#         fields = "__all__"
+#         read_only_fields = "__all__"
+
+
+
+
+
+
+
+
+class CandidateEvaluationDetailSerializer(serializers.ModelSerializer):
+    """
+    Full evaluation payload used by BOTH:
+      - Interviewer list/detail
+      - Candidate list/detail
+
+    Adds denormalized fields used in the React UI:
+      - candidate_name
+      - candidate_email
+      - interviewer_email
+      - booking_title
+    """
+
+    candidate_name = serializers.SerializerMethodField()
+    candidate_email = serializers.EmailField(
+        source="candidate.email", read_only=True
+    )
+    interviewer_email = serializers.EmailField(
+        source="interviewer.email", read_only=True
+    )
+    booking_title = serializers.SerializerMethodField()
 
     class Meta:
         model = CandidateEvaluation
-        fields = "__all__"
-        read_only_fields = "__all__"
+        fields = [
+            "id",
+            "booking",
+            "feedback_type",
+            "technical_score",
+            "communication_score",
+            "problem_solving_score",
+            "confidence_score",
+            "overall_score",
+            "hire_recommendation",
+            "strengths",
+            "areas_for_improvement",
+            "actionable_suggestions",
+            "additional_notes",
+            "interview_difficulty",
+            "topics_covered",
+            "is_visible_to_candidate",
+            "candidate",
+            "interviewer",
+            "candidate_name",
+            "candidate_email",
+            "interviewer_email",
+            "booking_title",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
 
+    def get_candidate_name(self, obj):
+        full = f"{obj.candidate.first_name} {obj.candidate.last_name}".strip()
+        return full or obj.candidate.email
 
-
-
+    def get_booking_title(self, obj):
+        # You can customize this later if booking has its own title field.
+        return f"Mock Interview #{obj.booking_id}"
 
 
 
@@ -175,49 +259,27 @@ class InterviewerReviewDetailSerializer(serializers.ModelSerializer):
 
 
 # ============================================
-# CANDIDATE EVALUATION DETAIL
-# ============================================
-
-class CandidateEvaluationDetailSerializer(serializers.ModelSerializer):
-
-    interviewer_email = serializers.EmailField(
-        source="interviewer.email",
-        read_only=True
-    )
-
-    class Meta:
-
-        model = CandidateEvaluation
-
-        fields = "__all__"
-
-
-
-# ============================================
 # CANDIDATE EVALUATION LIST
 # ============================================
 
+
 class CandidateEvaluationListSerializer(serializers.ModelSerializer):
+    """
+    Compact list view for candidate evaluations.
+    Used on candidate side where we only show high‑level info.
+    """
 
     interviewer_email = serializers.EmailField(
         source="interviewer.email",
-        read_only=True
+        read_only=True,
     )
 
     class Meta:
-
         model = CandidateEvaluation
-
         fields = [
-
             "id",
-
             "overall_score",
-
             "hire_recommendation",
-
             "created_at",
-
             "interviewer_email",
-
         ]

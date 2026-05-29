@@ -22,6 +22,15 @@ const feedbackApi = {
     const response = await API.get(`/api/feedback/interviewer/evaluations/${evaluationId}/`);
     return response.data;
   },
+
+    // Update an existing evaluation (edit)
+  updateEvaluation: async (evaluationId, data) => {
+    const response = await API.patch(
+      `/api/feedback/interviewer/evaluations/${evaluationId}/`,
+      data
+    );
+    return response.data;
+  },
   
   // Check if evaluation can be submitted for booking
   checkEvaluationStatus: async (bookingId) => {

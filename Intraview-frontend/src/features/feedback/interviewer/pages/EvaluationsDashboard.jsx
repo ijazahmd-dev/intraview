@@ -1,4 +1,4 @@
-// src/pages/interviewer/EvaluationsDashboard.jsx (COMPLETE & PRODUCTION READY)
+// src/pages/interviewer/EvaluationsDashboard.jsx
 
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -6,41 +6,41 @@ import { Link, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 import { Star, Calendar, Eye, Download, Users, Award, X } from 'lucide-react'; // ✅ Added X
 import { toast } from 'sonner';
 
-import { 
-  fetchMyEvaluations, 
-  setSelectedEvaluation, 
-  clearSelectedEvaluation 
+import {
+  fetchMyEvaluations,
+  setSelectedEvaluation,
+  clearSelectedEvaluation
 } from '../interviewerFeedbackSlice'; // ✅ Fix your path
 
 const EvaluationsDashboard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); // ✅ NEW: For route navigation
-  const { 
-    evaluations, 
-    loading, 
-    selectedEvaluation, 
-    error 
+  const {
+    evaluations,
+    loading,
+    selectedEvaluation,
+    error
   } = useSelector(state => state.feedback);
-  
+
   useEffect(() => {
     dispatch(fetchMyEvaluations());
   }, [dispatch]);
-  
+
   useEffect(() => {
     if (error) {
       toast.error('Failed to load evaluations');
     }
   }, [error]);
-  
+
   // NEW: Navigate to detail page (FULL PAGE)
   const handleViewFullReport = (evaluation) => {
     // Option 1: Full page navigation (RECOMMENDED)
     navigate(`/interviewer/evaluations/${evaluation.id}`);
-    
+
     // Option 2: Redux modal (keep existing)
     // dispatch(setSelectedEvaluation(evaluation));
   };
-  
+
   const getHireBadgeStyle = (recommendation) => {
     const styles = {
       'STRONG_YES': 'bg-emerald-100 border-emerald-200 text-emerald-800',
@@ -51,14 +51,14 @@ const EvaluationsDashboard = () => {
     };
     return styles[recommendation] || 'bg-slate-100 border-slate-200 text-slate-800';
   };
-  
+
   const getScoreColor = (score) => {
     if (score >= 4) return 'text-emerald-600 bg-emerald-100';
     if (score >= 3) return 'text-blue-600 bg-blue-100';
     if (score >= 2) return 'text-amber-600 bg-amber-100';
     return 'text-red-600 bg-red-100';
   };
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-20">
@@ -72,11 +72,11 @@ const EvaluationsDashboard = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="max-w-7xl mx-auto px-6 py-12">
-        
+
         {/* Header */}
         <div className="mb-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
@@ -93,7 +93,7 @@ const EvaluationsDashboard = () => {
                 </p>
               </div>
             </div>
-            
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4 max-w-md">
               <div className="bg-white/70 backdrop-blur-xl p-6 rounded-3xl border border-white/50 shadow-lg hover:shadow-xl transition-all">
@@ -114,7 +114,7 @@ const EvaluationsDashboard = () => {
                 <div className="flex items-center space-x-3 mb-1">
                   <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
                   <span className="text-2xl font-bold text-slate-900">
-                    {evaluations.length > 0 
+                    {evaluations.length > 0
                       ? (evaluations.reduce((sum, e) => sum + parseFloat(e.overall_score), 0) / evaluations.length).toFixed(1)
                       : '0.0'
                     }
@@ -124,7 +124,7 @@ const EvaluationsDashboard = () => {
               </div>
             </div>
           </div>
-          
+
           {evaluations.length === 0 ? (
             <div className="text-center py-32">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-3xl mb-8 shadow-xl">
@@ -145,9 +145,9 @@ const EvaluationsDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
               {evaluations.map((evaluation) => {
                 const score = parseFloat(evaluation.overall_score || 0);
-                
+
                 return (
-                  <div 
+                  <div
                     key={evaluation.id}
                     className="group bg-white/80 backdrop-blur-xl rounded-3xl border border-white/50 shadow-lg hover:shadow-2xl hover:-translate-y-2 hover:border-slate-200/50 transition-all duration-300 overflow-hidden h-full cursor-pointer"
                     onClick={() => handleViewFullReport(evaluation)} // ✅ ROUTE NAVIGATION
@@ -168,21 +168,20 @@ const EvaluationsDashboard = () => {
                             </p>
                           </div>
                         </div>
-                        
+
                         {/* Hire Badge */}
-                        <div className={`px-4 py-2 rounded-2xl text-xs font-bold shadow-md whitespace-nowrap capitalize ${
-                          getHireBadgeStyle(evaluation.hire_recommendation)
-                        }`}>
+                        <div className={`px-4 py-2 rounded-2xl text-xs font-bold shadow-md whitespace-nowrap capitalize ${getHireBadgeStyle(evaluation.hire_recommendation)
+                          }`}>
                           {evaluation.hire_recommendation?.replace(/_/g, ' ') || 'Pending'}
                         </div>
                       </div>
-                      
+
                       {/* Score Card */}
                       <div className={`p-6 rounded-2xl mb-6 shadow-inner ${getScoreColor(score)}`}>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Overall Score</span>
                           <div className="flex items-center space-x-2">
-                            {[1,2,3,4,5].map(i => (
+                            {[1, 2, 3, 4, 5].map(i => (
                               <Star key={i} className={`w-5 h-5 ${i <= score ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}`} />
                             ))}
                             <span className="text-2xl font-black text-slate-900 ml-2">
@@ -191,7 +190,7 @@ const EvaluationsDashboard = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Quick Stats */}
                       <div className="grid grid-cols-2 gap-4 mb-8 text-sm">
                         <div className="flex items-center space-x-3 p-4 bg-slate-50/50 rounded-xl group-hover:bg-slate-100/60">
@@ -215,7 +214,7 @@ const EvaluationsDashboard = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Action Buttons - NOW PRIMARY NAVIGATION */}
                       <div className="flex space-x-3 pt-2">
                         <button
@@ -228,7 +227,7 @@ const EvaluationsDashboard = () => {
                           <Eye className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                           <span>View Full Report</span>
                         </button>
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             // PDF download logic here
@@ -247,38 +246,8 @@ const EvaluationsDashboard = () => {
             </div>
           )}
         </div>
-        
-        {/* KEEP MODAL AS BONUS FEATURE (Optional) */}
-        {selectedEvaluation && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
-            onClick={() => dispatch(clearSelectedEvaluation())}
-          >
-            <div 
-              className="bg-white/95 backdrop-blur-xl rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl border border-white/30"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-bold text-slate-900">Evaluation Report</h2>
-                  <button 
-                    onClick={() => dispatch(clearSelectedEvaluation())}
-                    className="p-3 hover:bg-slate-100 rounded-2xl transition-all shadow-sm"
-                  >
-                    <X className="w-6 h-6 text-slate-500 hover:text-slate-900" />
-                  </button>
-                </div>
-                
-                {/* Modal content - SAME AS BEFORE (truncated for brevity) */}
-                <div className="space-y-6 text-sm">
-                  <div><strong>Candidate:</strong> {selectedEvaluation.candidate_name}</div>
-                  <div><strong>Score:</strong> {selectedEvaluation.overall_score}</div>
-                  <div><strong>Strengths:</strong> {selectedEvaluation.strengths?.substring(0, 100)}...</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
+
       </div>
     </div>
   );

@@ -16,7 +16,8 @@ from authentication.authentication import InterviewerCookieJWTAuthentication
 from bookings.models import InterviewBooking
 from feedbacks.serializers import (
     CandidateEvaluationCreateSerializer,
-    CandidateEvaluationDetailSerializer
+    CandidateEvaluationDetailSerializer,
+    CandidateEvaluationUpdateSerializer, 
 )
 from feedbacks.services.evaluation_service import EvaluationService
 
@@ -127,6 +128,41 @@ class InterviewerEvaluationDetailAPIView(APIView):
         serializer = CandidateEvaluationDetailSerializer(evaluation)
 
         return Response(serializer.data)
+    
+
+    def patch(self, request, evaluation_id):
+        """
+        PATCH /api/feedback/interviewer/evaluations/{evaluation_id}/
+        Allow interviewer to update their own evaluation within the edit window.
+        """
+        evaluation = get_object_or_404(
+            request.user.evaluations_given,
+            id=evaluation_id,
+        )
+
+        serializer = CandidateEvaluationUpdateSerializer(
+            data=request.data,
+            partial=True,  # allow partial updates
+        )
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            updated = EvaluationService.update_evaluation(
+                evaluation=evaluation,
+                interviewer=request.user,
+                validated_data=serializer.validated_data,
+            )
+        except ValueError as e:
+            # Business rule violation (ownership / time window)
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Return fresh detail payload for frontend
+        return Response(
+            CandidateEvaluationDetailSerializer(updated).data,
+            status=status.HTTP_200_OK,
+        )
     
 
 

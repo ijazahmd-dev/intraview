@@ -105,14 +105,19 @@
 
 
 
-# feedback/services/evaluation_service.py
+# feedbacks/services/evaluation_service.py
 
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 
 from feedbacks.models import CandidateEvaluation, FeedbackType
 from bookings.models import InterviewBooking
 from feedbacks.signals import evaluation_created
+
+
+EVALUATION_EDIT_WINDOW_HOURS = 24  # you can change this to 48 or 168 later
+
 
 
 class EvaluationService:
@@ -244,3 +249,84 @@ class EvaluationService:
             return False, "This interview ended as a no-show."
 
         return False, f"Evaluation not allowed (booking status: {booking.status})."
+    
+
+
+
+
+    @staticmethod
+    def can_edit_evaluation(evaluation: CandidateEvaluation, interviewer) -> tuple[bool, str]:
+        """
+        Rules:
+        - Only the same interviewer who created it.
+        - Only for HUMAN feedback.
+        - Only within EVALUATION_EDIT_WINDOW_HOURS from created_at.
+        """
+        # Must be the owner
+        if evaluation.interviewer != interviewer:
+            return False, "You can only edit evaluations that you created."
+
+        # (Optional) Only human feedback is editable
+        if evaluation.feedback_type != FeedbackType.HUMAN:
+            return False, "AI-generated evaluations cannot be edited."
+
+        # Time window
+        if not evaluation.created_at:
+            return False, "Editing is not allowed for this evaluation."
+
+        deadline = evaluation.created_at + timedelta(hours=EVALUATION_EDIT_WINDOW_HOURS)
+        now = timezone.now()
+
+        if now > deadline:
+            return False, "The editing window for this evaluation has expired."
+
+        return True, "You can edit this evaluation."
+    
+
+
+
+
+    @staticmethod
+    @transaction.atomic
+    def update_evaluation(*, evaluation: CandidateEvaluation, interviewer, validated_data: dict) -> CandidateEvaluation:
+        """
+        Update an existing evaluation with new scores/text.
+
+        - Enforces can_edit_evaluation rules.
+        - Updates only allowed fields.
+        - Bumps edit metadata.
+        """
+        # Ownership & window checks
+        can_edit, reason = EvaluationService.can_edit_evaluation(evaluation, interviewer)
+        if not can_edit:
+            # Keep same style as create: raise ValueError with user-facing message
+            raise ValueError(reason)
+
+        # Whitelist fields that can be edited
+        editable_fields = [
+            "technical_score",
+            "communication_score",
+            "problem_solving_score",
+            "confidence_score",
+            "hire_recommendation",
+            "strengths",
+            "areas_for_improvement",
+            "actionable_suggestions",
+            "additional_notes",
+            "interview_difficulty",
+            "topics_covered",
+        ]
+
+        for field in editable_fields:
+            if field in validated_data:
+                setattr(evaluation, field, validated_data[field])
+
+        # Update metadata
+        evaluation.is_edited = True
+        evaluation.edit_count = (evaluation.edit_count or 0) + 1
+        evaluation.edited_at = timezone.now()
+
+        # save() will recompute overall_score and run full_clean()
+        evaluation.save()
+
+        return evaluation

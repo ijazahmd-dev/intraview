@@ -35,6 +35,25 @@ export const submitEvaluation = createAsyncThunk(
   }
 );
 
+export const updateEvaluation = createAsyncThunk(
+  'feedback/updateEvaluation',
+  async ({ evaluationId, data }, { rejectWithValue }) => {
+    try {
+      const response = await feedbackApi.updateEvaluation(evaluationId, data);
+      toast.success('Evaluation updated successfully!');
+      return response; // full detail payload
+    } catch (error) {
+      const message =
+        error.response?.data?.detail ||
+        error.response?.data?.non_field_errors?.[0] ||
+        error.response?.data?.error ||
+        'Failed to update evaluation';
+      toast.error(message);
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 const feedbackSlice = createSlice({
   name: 'feedback',
   initialState: {
@@ -67,7 +86,18 @@ const feedbackSlice = createSlice({
       })
       .addCase(fetchMyEvaluations.fulfilled, (state, action) => {
         state.loading = false;
-        state.evaluations = action.payload.results || [];
+
+        // Handle both: plain list OR paginated `{ results: [...] }`
+        if (Array.isArray(action.payload)) {
+          // Backend returns a simple list
+          state.evaluations = action.payload;
+        } else if (Array.isArray(action.payload?.results)) {
+          // Backend returns `{ results: [...] }`
+          state.evaluations = action.payload.results;
+        } else {
+          // Fallback
+          state.evaluations = [];
+        }
       })
       .addCase(fetchMyEvaluations.rejected, (state, action) => {
         state.loading = false;
@@ -90,6 +120,29 @@ const feedbackSlice = createSlice({
         }
       })
       .addCase(submitEvaluation.rejected, (state, action) => {
+        state.submitting = false;
+        state.error = action.payload;
+      })
+
+      // Update evaluation
+      .addCase(updateEvaluation.pending, (state) => {
+        state.submitting = true;
+        state.error = null;
+      })
+      .addCase(updateEvaluation.fulfilled, (state, action) => {
+        state.submitting = false;
+        const updated = action.payload;
+
+        // Replace in list by id, if present
+        const idx = state.evaluations.findIndex(e => e.id === updated.id);
+        if (idx >= 0) {
+          state.evaluations[idx] = updated;
+        }
+
+        // Keep detail view in sync
+        state.selectedEvaluation = updated;
+      })
+      .addCase(updateEvaluation.rejected, (state, action) => {
         state.submitting = false;
         state.error = action.payload;
       });
