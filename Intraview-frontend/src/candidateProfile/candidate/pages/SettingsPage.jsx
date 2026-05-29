@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import ProfileSidebar from '../components/ProfileSidebar';
 import { useProfileData } from '../hooks/useProfileData';
 import useProfileForm from '../hooks/useProfileForm';
+import { changePassword } from '../../../api/authApi';
 
 // ============================================
 // CHANGE PASSWORD SECTION
@@ -69,17 +70,16 @@ const ChangePasswordSection = () => {
     setIsChanging(true);
 
     try {
-      // TODO: API call to change password
-      // await API.post('/auth/change-password/', data);
-
-      // Mock success for now
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await changePassword({
+        current_password: data.current_password,
+        new_password: data.new_password,
+      });
 
       toast.success('Password changed successfully!');
       resetForm();
     } catch (error) {
       toast.error(
-        error?.response?.data?.message || 'Failed to change password'
+        error?.response?.data?.error || error?.response?.data?.message || 'Failed to change password'
       );
     } finally {
       setIsChanging(false);

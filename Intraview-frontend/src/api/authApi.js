@@ -4,17 +4,17 @@ import API from "../utils/axiosClient";
 
 // Signup API
 export const signup = async (data) => {
-    return await API.post("/auth/signup/", data);
+  return await API.post("/auth/signup/", data);
 };
 
 // Verify OTP API
 export const verifyOtp = async (data) => {
-    return await API.post("/auth/verify-otp/", data);
+  return await API.post("/auth/verify-otp/", data);
 };
 
 // Resend OTP
 export const resendSignupOtp = async (data) => {
-    return await API.post("/auth/resend-otp/", data);
+  return await API.post("/auth/resend-otp/", data);
 };
 
 
@@ -33,6 +33,9 @@ export const logout = async () => {
   return await API.post("/auth/logout/");
 };
 
+export const changePassword = async (data) => {
+  return await API.post("/auth/change-password/", data);
+};
 
 export const requestPasswordReset = (data) =>
   API.post("/auth/forgot-password/", data);
@@ -53,7 +56,6 @@ export const googleLogin = async (idToken) => {
 
 
 export const resendForgotOtp = async (data) => {
-    return await API.post("/auth/forgot-password/resend-otp/", data);
+  return await API.post("/auth/forgot-password/resend-otp/", data);
 };
 
- 

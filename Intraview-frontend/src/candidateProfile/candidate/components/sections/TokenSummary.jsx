@@ -82,10 +82,9 @@ const TokenSummary = () => {
   };
 
   // Normalise wallet fields
-  const available = walletSummary?.balance ?? walletSummary?.available_tokens ?? 0;
-  const locked = walletSummary?.locked_balance ?? walletSummary?.locked_tokens ?? 0;
-  const total = walletSummary?.total_tokens ?? walletSummary?.monthly_limit ?? (available + locked);
-  const used = walletSummary?.used_tokens ?? Math.max(0, total - available - locked);
+  const available = walletSummary?.available_balance ?? walletSummary?.balance ?? 0;
+  const locked = walletSummary?.locked_balance ?? 0;
+  const total = walletSummary?.total_balance ?? (available + locked);
 
   // Normalise subscription fields
   const planName = currentSub?.plan_name ?? currentSub?.plan?.name ?? currentSub?.name ?? 'Free';
@@ -98,10 +97,9 @@ const TokenSummary = () => {
   const displayPlans = (apiPlans && apiPlans.length > 0) ? apiPlans.map((p) => ({
     id: p.slug ?? p.id,
     name: p.name,
-    price: p.price != null ? `₹${p.price}` : 'Custom',
+    price: p.price_inr != null ? (p.price_inr === 0 ? 'Free' : `₹${p.price_inr}`) : 'Custom',
     period: '/month',
-    tokens: p.token_limit ?? p.tokens ?? '—',
-    interviews: p.interview_limit ?? p.interviews ?? '—',
+    description: p.description,
     badge: p.is_recommended ? 'MOST POPULAR' : null,
     recommended: p.is_recommended ?? false,
   })) : plans;
@@ -155,7 +153,7 @@ const TokenSummary = () => {
               <div className="h-6 w-20 bg-white/20 rounded animate-pulse" />
             ) : (
               <span className="text-xl font-black">
-                {available}/{total}
+                {total}
               </span>
             )}
           </div>
@@ -172,21 +170,13 @@ const TokenSummary = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
               <p className="text-indigo-100">Available</p>
               {isLoading ? (
                 <div className="h-4 w-8 bg-white/20 rounded animate-pulse mt-0.5" />
               ) : (
                 <p className="font-bold">{available}</p>
-              )}
-            </div>
-            <div>
-              <p className="text-indigo-100">Used</p>
-              {isLoading ? (
-                <div className="h-4 w-8 bg-white/20 rounded animate-pulse mt-0.5" />
-              ) : (
-                <p className="font-bold">{used}</p>
               )}
             </div>
             <div className="flex items-center gap-1">
@@ -260,19 +250,8 @@ const TokenSummary = () => {
                   <p className="text-xs text-slate-600 mt-0.5">
                     {plan.price} <span className="text-[10px]">{plan.period}</span>
                   </p>
-                  <div className="mt-3 space-y-1">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Zap className="w-3 h-3 text-amber-600" />
-                      <span className="text-slate-700 font-medium">{plan.tokens} tokens/month</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <TrendingUp className="w-3 h-3 text-blue-600" />
-                      <span className="text-slate-700 font-medium">
-                        {plan.interviews === 'Unlimited'
-                          ? 'Unlimited interviews'
-                          : `${plan.interviews} interviews/month`}
-                      </span>
-                    </div>
+                  <div className="mt-3 text-xs text-slate-700 font-medium whitespace-pre-wrap leading-relaxed">
+                    {plan.description || "No description available"}
                   </div>
                 </div>
 

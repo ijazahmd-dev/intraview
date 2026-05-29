@@ -27,6 +27,8 @@ urlpatterns = [
     path("forgot-password/reset/", views.ResetPasswordView.as_view(), name="reset-password"),
     path("forgot-password/resend-otp/", views.ResendResetOTPView.as_view()),
 
+    path("change-password/", views.ChangePasswordView.as_view(), name="change-password"),
+
     path("google-login/", views.GoogleLoginView.as_view(), name="google-login"),
 
     path("admin/login/", views_admin.AdminLoginView.as_view(), name="admin-login"),
