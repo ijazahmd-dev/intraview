@@ -46,6 +46,33 @@ class InterviewBooking(models.Model):
         CANDIDATE_NO_SHOW = "CANDIDATE_NO_SHOW", "Candidate No Show"
         INTERVIEWER_NO_SHOW = "INTERVIEWER_NO_SHOW", "Interviewer No Show"
 
+    # ─── Interview Type Choices ────────────────────────────────────────────────
+    class InterviewType(models.TextChoices):
+        TECHNICAL    = "TECHNICAL",    "Technical Interview"
+        BEHAVIORAL   = "BEHAVIORAL",   "Behavioral Interview"
+        HR_ROUND     = "HR_ROUND",     "HR Round"
+        CODING       = "CODING",       "Coding Interview"
+        MOCK_FULL    = "MOCK_FULL",    "Mock Full Interview"
+        RESUME_REVIEW = "RESUME_REVIEW", "Resume Review"
+        WARMUP       = "WARMUP",       "Warm-up Session"
+        SYSTEM_DESIGN = "SYSTEM_DESIGN", "System Design"
+
+    # ─── Experience Level Choices ──────────────────────────────────────────────
+    class DifficultyLevel(models.TextChoices):
+        BEGINNER     = "BEGINNER",     "Beginner"
+        INTERMEDIATE = "INTERMEDIATE", "Intermediate"
+        ADVANCED     = "ADVANCED",     "Advanced"
+
+    # ─── Candidate Goal Choices ────────────────────────────────────────────────
+    class CandidateGoal(models.TextChoices):
+        FIRST_MOCK          = "FIRST_MOCK",          "First Mock Interview"
+        PLACEMENT_PREP      = "PLACEMENT_PREP",      "Placement Preparation"
+        IMPROVE_CONFIDENCE  = "IMPROVE_CONFIDENCE",  "Improve Confidence"
+        COMPANY_PREP        = "COMPANY_PREP",        "Company Preparation"
+        PRACTICE_DSA        = "PRACTICE_DSA",        "Practice DSA"
+        IMPROVE_COMM        = "IMPROVE_COMM",        "Improve Communication"
+        GENERAL_PRACTICE    = "GENERAL_PRACTICE",    "General Practice"
+
 
     candidate = models.ForeignKey(
         User,
@@ -74,6 +101,42 @@ class InterviewBooking(models.Model):
         max_length=200,
         choices=Status.choices,
         default=Status.PENDING,
+    )
+
+    # ─── Session Configuration (set at booking time, never change) ─────────────
+    interview_type = models.CharField(
+        max_length=30,
+        choices=InterviewType.choices,
+        blank=True,
+        default="",
+        help_text="The type of interview the candidate wants.",
+    )
+    difficulty_level = models.CharField(
+        max_length=20,
+        choices=DifficultyLevel.choices,
+        blank=True,
+        default="",
+        help_text="Target experience level (must be supported by interviewer).",
+    )
+    candidate_goal = models.CharField(
+        max_length=30,
+        choices=CandidateGoal.choices,
+        blank=True,
+        default="",
+        help_text="What the candidate wants to achieve in this session.",
+    )
+    candidate_notes = models.TextField(
+        blank=True,
+        max_length=1000,
+        help_text="Optional preparation notes from the candidate to the interviewer.",
+    )
+    selected_specialties = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Subset of interviewer's specializations the candidate wants to focus on. "
+            "Stored as a list of strings matching the interviewer's specializations field."
+        ),
     )
 
     payment_status = models.CharField(

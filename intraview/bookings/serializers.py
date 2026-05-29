@@ -113,6 +113,10 @@ class CandidateInterviewerDetailSerializer(serializers.ModelSerializer):
             "certifications",
             "industries",
 
+            # session configuration options (for booking UI)
+            "supported_interview_types",
+            "supported_experience_levels",
+
             # public flags
             "is_profile_public",
             "is_accepting_bookings",
@@ -138,18 +142,102 @@ class CreateInterviewBookingSerializer(serializers.Serializer):
 
     availability_id = serializers.IntegerField()
 
+    # ─── Session Configuration Fields ────────────────────────────────────────────
+    interview_type = serializers.ChoiceField(
+        choices=InterviewBooking.InterviewType.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Must be one of the interviewer's supported_interview_types.",
+    )
+    difficulty_level = serializers.ChoiceField(
+        choices=InterviewBooking.DifficultyLevel.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Must be one of the interviewer's supported_experience_levels.",
+    )
+    candidate_goal = serializers.ChoiceField(
+        choices=InterviewBooking.CandidateGoal.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    candidate_notes = serializers.CharField(
+        max_length=1000,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Optional preparation notes from candidate.",
+    )
+    selected_specialties = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="Must be a subset of the interviewer's specializations.",
+    )
+
     def validate_availability_id(self, value):
         try:
-            availability = InterviewerAvailability.objects.get(
-                id=value,
-                is_active=True
-            )
-        except InterviewerAvailability.DoesNotExist :
+            availability = InterviewerAvailability.objects.select_related(
+                "interviewer__interviewer_profile"
+            ).get(id=value, is_active=True)
+        except InterviewerAvailability.DoesNotExist:
             raise serializers.ValidationError("Availability not found.")
+        return availability
 
-        return availability 
+    def validate(self, attrs):
+        availability = attrs.get("availability_id")  # already the object
+        if not availability:
+            return attrs
+
+        try:
+            profile = availability.interviewer.interviewer_profile
+        except Exception:
+            return attrs  # profile may not exist yet (edge case)
+
+        interview_type     = attrs.get("interview_type", "")
+        difficulty_level   = attrs.get("difficulty_level", "")
+        selected_specialties = attrs.get("selected_specialties", [])
+
+        # ─── Interview Type ──────────────────────────────────────────────────
+        if interview_type and profile.supported_interview_types:
+            if interview_type not in profile.supported_interview_types:
+                raise serializers.ValidationError({
+                    "interview_type": (
+                        f"This interviewer does not support '{interview_type}'. "
+                        f"Supported types: {profile.supported_interview_types}"
+                    )
+                })
+
+        # ─── Difficulty Level ────────────────────────────────────────────────
+        if difficulty_level and profile.supported_experience_levels:
+            if difficulty_level not in profile.supported_experience_levels:
+                raise serializers.ValidationError({
+                    "difficulty_level": (
+                        f"This interviewer does not support level '{difficulty_level}'. "
+                        f"Supported levels: {profile.supported_experience_levels}"
+                    )
+                })
+
+        # ─── Selected Specialties ──────────────────────────────────────────────
+        if selected_specialties and profile.specializations:
+            # Normalize both sides to lowercase for case-insensitive comparison
+            interviewer_specs_lower = {s.lower() for s in profile.specializations}
+            invalid = [
+                s for s in selected_specialties
+                if s.lower() not in interviewer_specs_lower
+            ]
+            if invalid:
+                raise serializers.ValidationError({
+                    "selected_specialties": (
+                        f"The following specialties are not supported by this interviewer: {invalid}. "
+                        f"Available: {profile.specializations}"
+                    )
+                })
+
+        return attrs
     
-
 
 
 class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
@@ -248,6 +336,13 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
             # feedback
             "feedback_evaluation_id",
+
+            # session configuration
+            "interview_type",
+            "difficulty_level",
+            "candidate_goal",
+            "candidate_notes",
+            "selected_specialties",
 
             "created_at",
             "updated_at",

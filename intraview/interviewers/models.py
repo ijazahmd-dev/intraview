@@ -136,6 +136,45 @@ class InterviewerApplication(models.Model):
 
 class InterviewerProfile(models.Model):
 
+    # ─── Interview Type Options ────────────────────────────────────────────────
+    INTERVIEW_TYPE_TECHNICAL    = "TECHNICAL"
+    INTERVIEW_TYPE_BEHAVIORAL   = "BEHAVIORAL"
+    INTERVIEW_TYPE_HR           = "HR_ROUND"
+    INTERVIEW_TYPE_CODING       = "CODING"
+    INTERVIEW_TYPE_MOCK_FULL    = "MOCK_FULL"
+    INTERVIEW_TYPE_RESUME       = "RESUME_REVIEW"
+    INTERVIEW_TYPE_WARMUP       = "WARMUP"
+    INTERVIEW_TYPE_SYSTEM       = "SYSTEM_DESIGN"
+
+    INTERVIEW_TYPE_CHOICES = [
+        (INTERVIEW_TYPE_TECHNICAL,  "Technical Interview"),
+        (INTERVIEW_TYPE_BEHAVIORAL, "Behavioral Interview"),
+        (INTERVIEW_TYPE_HR,         "HR Round"),
+        (INTERVIEW_TYPE_CODING,     "Coding Interview"),
+        (INTERVIEW_TYPE_MOCK_FULL,  "Mock Full Interview"),
+        (INTERVIEW_TYPE_RESUME,     "Resume Review"),
+        (INTERVIEW_TYPE_WARMUP,     "Warm-up Session"),
+        (INTERVIEW_TYPE_SYSTEM,     "System Design"),
+    ]
+    VALID_INTERVIEW_TYPES = {
+        INTERVIEW_TYPE_TECHNICAL, INTERVIEW_TYPE_BEHAVIORAL,
+        INTERVIEW_TYPE_HR,        INTERVIEW_TYPE_CODING,
+        INTERVIEW_TYPE_MOCK_FULL, INTERVIEW_TYPE_RESUME,
+        INTERVIEW_TYPE_WARMUP,    INTERVIEW_TYPE_SYSTEM,
+    }
+
+    # ─── Experience Level Options ──────────────────────────────────────────────
+    LEVEL_BEGINNER     = "BEGINNER"
+    LEVEL_INTERMEDIATE = "INTERMEDIATE"
+    LEVEL_ADVANCED     = "ADVANCED"
+
+    EXPERIENCE_LEVEL_CHOICES = [
+        (LEVEL_BEGINNER,     "Beginner"),
+        (LEVEL_INTERMEDIATE, "Intermediate"),
+        (LEVEL_ADVANCED,     "Advanced"),
+    ]
+    VALID_EXPERIENCE_LEVELS = {LEVEL_BEGINNER, LEVEL_INTERMEDIATE, LEVEL_ADVANCED}
+
     class OnboardingStep(models.TextChoices):
         PROFILE = "PROFILE", "Profile"
         AVAILABILITY = "AVAILABILITY", "Availability"
@@ -172,14 +211,33 @@ class InterviewerProfile(models.Model):
     specializations = models.JSONField(default=list)
     languages = models.JSONField(default=list)
     education = models.JSONField(default=list)
-    certifications = models.JSONField(default=list,blank=True)
+    certifications = models.JSONField(default=list, blank=True)
     industries = models.JSONField(default=list, blank=True)
+
+    # ─── Session Configuration ─────────────────────────────────────────────────
+    supported_interview_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "List of interview type keys this interviewer supports. "
+            "Valid values: TECHNICAL, BEHAVIORAL, HR_ROUND, CODING, "
+            "MOCK_FULL, RESUME_REVIEW, WARMUP, SYSTEM_DESIGN"
+        ),
+    )
+    supported_experience_levels = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Experience levels this interviewer is comfortable conducting. "
+            "Valid values: BEGINNER, INTERMEDIATE, ADVANCED"
+        ),
+    )
 
     is_profile_public = models.BooleanField(default=False)
     is_accepting_bookings = models.BooleanField(default=False)
 
     is_completed = models.BooleanField(default=False)
-    completed_at = models.DateTimeField(blank=True,null=True,)
+    completed_at = models.DateTimeField(blank=True, null=True,)
 
     onboarding_step = models.CharField(
         max_length=20,
@@ -189,7 +247,6 @@ class InterviewerProfile(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
 
     def mark_completed(self):
         self.is_completed = True

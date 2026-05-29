@@ -238,6 +238,8 @@ class InterviewerProfileSerializer(serializers.ModelSerializer):
             "education",
             "certifications",
             "industries",
+            "supported_interview_types",
+            "supported_experience_levels",
             "is_profile_public",
             "is_accepting_bookings",
             "is_completed",
@@ -253,8 +255,28 @@ class InterviewerProfileSerializer(serializers.ModelSerializer):
         if not isinstance(value, list):
             raise serializers.ValidationError("Languages must be a list.")
         return value
-        
 
+    def validate_supported_interview_types(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Must be a list.")
+        invalid = set(value) - InterviewerProfile.VALID_INTERVIEW_TYPES
+        if invalid:
+            raise serializers.ValidationError(
+                f"Invalid interview types: {sorted(invalid)}. "
+                f"Valid values: {sorted(InterviewerProfile.VALID_INTERVIEW_TYPES)}"
+            )
+        return value
+
+    def validate_supported_experience_levels(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Must be a list.")
+        invalid = set(value) - InterviewerProfile.VALID_EXPERIENCE_LEVELS
+        if invalid:
+            raise serializers.ValidationError(
+                f"Invalid experience levels: {sorted(invalid)}. "
+                f"Valid values: {sorted(InterviewerProfile.VALID_EXPERIENCE_LEVELS)}"
+            )
+        return value
 
 
 

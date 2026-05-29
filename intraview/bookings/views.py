@@ -291,6 +291,12 @@ class CreateInterviewBookingAPIView(APIView):
                 end_datetime=end_aware,
                 token_cost=token_cost,
                 status=InterviewBooking.Status.CONFIRMED,
+                # Session configuration snapshot
+                interview_type=serializer.validated_data.get("interview_type", ""),
+                difficulty_level=serializer.validated_data.get("difficulty_level", ""),
+                candidate_goal=serializer.validated_data.get("candidate_goal", ""),
+                candidate_notes=serializer.validated_data.get("candidate_notes", ""),
+                selected_specialties=serializer.validated_data.get("selected_specialties", []),
             )
 
             def emit_booking_event():
