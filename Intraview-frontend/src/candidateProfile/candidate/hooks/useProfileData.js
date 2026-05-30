@@ -8,6 +8,7 @@ import {
   uploadResumeAsync,
   deleteResumeAsync,
   uploadProfilePictureAsync,
+  deleteProfilePictureAsync,
 } from '../../profileSlice';
 
 /**
@@ -16,7 +17,7 @@ import {
  */
 export const useProfileData = () => {
   const dispatch = useDispatch();
-  
+
   const profile = useSelector((state) => state.profile);
   const {
     user,
@@ -80,6 +81,11 @@ export const useProfileData = () => {
     },
     [dispatch]
   );
+
+  const handleDeletePicture = useCallback(async () => {
+    const result = await dispatch(deleteProfilePictureAsync());
+    return result.payload;
+  }, [dispatch]);
 
   // ============================================
   // UTILITY METHODS
@@ -156,6 +162,7 @@ export const useProfileData = () => {
     handleUploadResume,
     handleDeleteResume,
     handleUploadPicture,
+    handleDeletePicture,
 
     // Utilities
     getCompletionPercentage,

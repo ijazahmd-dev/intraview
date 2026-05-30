@@ -61,7 +61,7 @@ class TokenService:
 
     @staticmethod
     def get_available_balance(wallet):
-        return wallet.balance - wallet.locked_balance
+        return wallet.balance
 
 
 

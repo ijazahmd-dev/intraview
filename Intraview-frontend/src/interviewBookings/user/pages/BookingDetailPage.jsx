@@ -265,11 +265,15 @@ const BookingDetailPage = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      isLive
-                        ? navigate(`/interview/room/${booking.id}`)
-                        : toast.info('Meeting link will be available closer to the session time')
-                    }
+                    onClick={() => {
+                      if (isLive) {
+                        navigate(`/interview/room/${booking.id}`);
+                      } else if (timeLeft === 'COMPLETED') {
+                        toast.info('This session has already ended');
+                      } else {
+                        toast.info(`Session starts in ${timeLeft}`);
+                      }
+                    }}
                     className={`px-5 py-2.5 rounded-xl font-semibold text-sm text-white transition-all ${isLive
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-teal-600 hover:bg-teal-700'

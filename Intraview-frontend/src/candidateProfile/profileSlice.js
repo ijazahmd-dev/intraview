@@ -96,6 +96,21 @@ export const uploadProfilePictureAsync = createAsyncThunk(
   }
 );
 
+/**
+ * Delete profile picture
+ */
+export const deleteProfilePictureAsync = createAsyncThunk(
+  'profile/deleteProfilePicture',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await candidateProfileApi.deleteProfilePicture();
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Failed to delete picture');
+    }
+  }
+);
+
 // ============================================
 // INITIAL STATE
 // ============================================
@@ -362,6 +377,31 @@ const profileSlice = createSlice({
         }, 3000);
       })
       .addCase(uploadProfilePictureAsync.rejected, (state, action) => {
+        state.loading.pictureUpload = false;
+        state.errors.picture = action.payload;
+      });
+
+    // ============================================
+    // DELETE PROFILE PICTURE
+    // ============================================
+    builder
+      .addCase(deleteProfilePictureAsync.pending, (state) => {
+        state.loading.pictureUpload = true;
+        state.errors.picture = null;
+        state.success.picture = null;
+      })
+      .addCase(deleteProfilePictureAsync.fulfilled, (state) => {
+        state.loading.pictureUpload = false;
+        if (state.user) {
+          state.user.profilePicture = null;
+        }
+        state.success.picture = 'Profile picture removed successfully!';
+
+        setTimeout(() => {
+          state.success.picture = null;
+        }, 3000);
+      })
+      .addCase(deleteProfilePictureAsync.rejected, (state, action) => {
         state.loading.pictureUpload = false;
         state.errors.picture = action.payload;
       });

@@ -177,6 +177,8 @@ const CandidateBookingsDashboard = () => {
       e.stopPropagation();
       if (isLive) {
         navigate(`/interview/room/${booking.id}`);
+      } else if (timeLeft === 'ENDED') {
+        toast.info('This session has already ended');
       } else {
         toast.info(`Session starts in ${timeLeft}`);
       }

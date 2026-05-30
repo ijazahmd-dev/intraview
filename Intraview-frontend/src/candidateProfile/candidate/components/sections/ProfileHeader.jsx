@@ -1,6 +1,5 @@
-// src/pages/candidate/components/sections/ProfileHeader.jsx
-import React from 'react';
-import { ShieldCheck, Edit3 } from 'lucide-react';
+import React, { useRef } from 'react';
+import { ShieldCheck, Edit3, Camera, Trash2, Loader2 } from 'lucide-react';
 import useProfileData from '../../hooks/useProfileData';
 
 const ProfileHeader = ({ onEditClick }) => {
@@ -10,7 +9,22 @@ const ProfileHeader = ({ onEditClick }) => {
     getProfilePicture,
     getFullName,
     getCompletionPercentage,
+    handleUploadPicture,
+    handleDeletePicture,
+    isUploadingPicture
   } = useProfileData();
+
+  const fileInputRef = useRef(null);
+
+  const onFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handleUploadPicture(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const fullName = getFullName();
   const completion = getCompletionPercentage();
@@ -25,12 +39,44 @@ const ProfileHeader = ({ onEditClick }) => {
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
         {/* Left: Avatar + Basic Info */}
         <div className="flex items-center gap-4 sm:gap-6">
-          <div className="relative">
-            <img
-              src={getProfilePicture()}
-              alt={fullName || user?.email}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/60 shadow-lg object-cover bg-slate-100"
+          <div className="relative group">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/60 shadow-lg bg-slate-100 overflow-hidden relative">
+              <img
+                src={getProfilePicture()}
+                alt={fullName || user?.email}
+                className="w-full h-full object-cover"
+              />
+              {/* Overlay for upload */}
+              <div
+                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploadingPicture ? (
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-5 h-5 text-white" />
+                )}
+              </div>
+            </div>
+
+            {user?.profilePicture && (
+              <button
+                onClick={handleDeletePicture}
+                className="absolute -top-2 -right-2 p-1.5 bg-white text-red-500 rounded-full shadow-md hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                title="Remove picture"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={onFileChange}
+              className="hidden"
+              accept="image/jpeg,image/png,image/gif"
             />
+
             <span className="absolute -bottom-2 -right-2 px-2 py-1 rounded-full bg-emerald-400 text-xs font-semibold text-emerald-900 shadow-md flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" />
               Candidate

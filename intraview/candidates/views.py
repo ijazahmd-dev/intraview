@@ -473,3 +473,45 @@ class CandidateProfileViewSet(viewsets.ModelViewSet):
                 {"error": "Failed to upload picture. Please try again."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+            
+    @action(
+        detail=False,
+        methods=['delete'],
+        permission_classes=[IsAuthenticated],
+        url_path='picture/delete'
+    )
+    def delete_picture(self, request):
+        """
+        DELETE /api/candidate/profile/picture/delete/
+        Delete profile picture
+        """
+        try:
+            user = request.user
+            if not user.profile_picture_url:
+                return Response(
+                    {"error": "No profile picture to delete"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Note: We optionally skip Cloudinary destruction here if we don't store public_id,
+            # but since we upload with public_id=f"user_{user.id}", we could delete it if we import cloudinary.uploader
+            try:
+                import cloudinary.uploader
+                cloudinary.uploader.destroy(f"profile_pictures/user_{user.id}")
+            except Exception as e:
+                logger.warning(f"Could not delete picture from Cloudinary: {str(e)}")
+            
+            user.profile_picture_url = None
+            user.save(update_fields=["profile_picture_url"])
+            
+            logger.info(f"Profile picture deleted: user_id={user.id}")
+            
+            return Response({
+                "message": "Profile picture deleted successfully"
+            })
+        except Exception as e:
+            logger.error(f"Picture delete error: user_id={request.user.id}, error={str(e)}")
+            return Response(
+                {"error": "Failed to delete picture"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

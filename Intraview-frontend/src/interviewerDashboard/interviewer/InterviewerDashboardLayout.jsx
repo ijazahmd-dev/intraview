@@ -1,134 +1,3 @@
-// import { NavLink, Outlet, useNavigate } from "react-router-dom";
-// import { useEffect, useState } from "react";
-// import { fetchDashboardSummary } from "../interviewerDashboardApi";
-
-// const navItems = [
-//   { to: "/interviewer/dashboard", label: "Dashboard" },
-//   { to: "/interviewer/dashboard/profile", label: "Interviewer Profile" },
-//   { to: "/interviewer/dashboard/availability", label: "Availability" },
-// ];
-
-// export default function InterviewerDashboardLayout() {
-//   const [summary, setSummary] = useState(null);
-//   const [loading, setLoading] = useState(true);
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     let mounted = true;
-//     const load = async () => {
-//       try {
-//         const { data } = await fetchDashboardSummary();
-//         if (!mounted) return;
-//         setSummary(data);
-//       } catch {
-//         // If not active interviewer, send away
-//         navigate("/home", { replace: true });
-//       } finally {
-//         if (mounted) setLoading(false);
-//       }
-//     };
-//     load();
-//     return () => {
-//       mounted = false;
-//     };
-//   }, [navigate]);
-
-//   if (loading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-//         <p className="text-slate-500 text-sm">Loading dashboard...</p>
-//       </div>
-//     );
-//   }
-
-//   const name = summary?.header?.name || "Interviewer";
-
-//   return (
-//     <div className="min-h-screen bg-slate-50 flex">
-//       {/* Sidebar */}
-//       <aside className="w-64 bg-white border-r border-slate-100 flex flex-col">
-//         <div className="px-5 py-4 border-b border-slate-100">
-//           <div className="flex items-center gap-2">
-//             <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-sm font-semibold text-white">
-//               {name[0]?.toUpperCase() || "IN"}
-//             </div>
-//             <div>
-//               <p className="text-xs text-slate-400">IntraView</p>
-//               <p className="text-sm font-semibold text-slate-800">Interviewer</p>
-//             </div>
-//           </div>
-//         </div>
-
-//         <nav className="flex-1 px-3 py-4 space-y-1">
-//           {navItems.map((item) => (
-//             <NavLink
-//               key={item.to}
-//               to={item.to}
-//               end={item.to === "/interviewer/dashboard"}
-//               className={({ isActive }) =>
-//                 [
-//                   "flex items-center px-3 py-2 rounded-lg text-sm transition",
-//                   isActive
-//                     ? "bg-slate-900 text-white"
-//                     : "text-slate-600 hover:bg-slate-100",
-//                 ].join(" ")
-//               }
-//             >
-//               {item.label}
-//             </NavLink>
-//           ))}
-//         </nav>
-
-//         <div className="px-4 py-4 border-t border-slate-100 text-xs text-slate-500">
-//           <p>{name}</p>
-//           <button
-//             onClick={() => navigate("/interviewer/login")}
-//             className="mt-2 text-slate-400 hover:text-slate-700"
-//           >
-//             Logout
-//           </button>
-//         </div>
-//       </aside>
-
-//       {/* Main area */}
-//       <div className="flex-1 flex flex-col">
-//         {/* Topbar */}
-//         <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6">
-//           <div>
-//             <p className="text-xs text-slate-400">Welcome back</p>
-//             <p className="text-sm font-semibold text-slate-800">
-//               {name}, let’s make a difference today.
-//             </p>
-//           </div>
-//           <button className="px-4 py-2 rounded-full bg-slate-900 text-xs font-semibold text-white hover:bg-slate-800">
-//             Schedule New Session
-//           </button>
-//         </header>
-
-//         {/* Page content */}
-//         <main className="flex-1 p-6 overflow-y-auto">
-//           <Outlet context={{ summary }} />
-//         </main>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -141,8 +10,8 @@ import { useDispatch } from "react-redux";
 import NotificationBell from "../../features/notification/user/components/NotificationBell";
 
 const navItems = [
-  { 
-    to: "/interviewer/dashboard", 
+  {
+    to: "/interviewer/dashboard",
     label: "Dashboard",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,9 +19,9 @@ const navItems = [
       </svg>
     )
   },
-  { 
+  {
     // ✅ ADD VERIFICATION HERE (top priority for new interviewers)
-    to: "/interviewer/dashboard/verification", 
+    to: "/interviewer/dashboard/verification",
     label: "Verification",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,8 +29,8 @@ const navItems = [
       </svg>
     )
   },
-  { 
-    to: "/interviewer/dashboard/profile", 
+  {
+    to: "/interviewer/dashboard/profile",
     label: "Interviewer Profile",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,8 +38,8 @@ const navItems = [
       </svg>
     )
   },
-  { 
-    to: "/interviewer/dashboard/availability", 
+  {
+    to: "/interviewer/dashboard/availability",
     label: "Availability",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,8 +47,8 @@ const navItems = [
       </svg>
     )
   },
-  { 
-    to: "/interviewer/dashboard/upcoming", 
+  {
+    to: "/interviewer/dashboard/upcoming",
     label: "Upcoming Sessions",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,9 +56,9 @@ const navItems = [
       </svg>
     )
   },
-  { 
-    to: "/interviewer/dashboard/completed", 
-    label: "Session History", 
+  {
+    to: "/interviewer/dashboard/completed",
+    label: "Session History",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -197,32 +66,32 @@ const navItems = [
     )
   },
   {
-  to: "/interviewer/dashboard/wallet",
-  label: "Wallet",
-  icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m2-6h-4a2 2 0 100 4h4m0-4v4" />
-    </svg>
-  ),
-},
-{
-  to: "/interviewer/dashboard/subscriptions",
-  label: "Subscriptions",
-  icon: (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M8 7h8m-8 4h8m-8 4h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
-      />
-    </svg>
-  ),
-},
+    to: "/interviewer/dashboard/wallet",
+    label: "Wallet",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m2-6h-4a2 2 0 100 4h4m0-4v4" />
+      </svg>
+    ),
+  },
+  {
+    to: "/interviewer/dashboard/subscriptions",
+    label: "Subscriptions",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M8 7h8m-8 4h8m-8 4h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
+        />
+      </svg>
+    ),
+  },
 
 
 
-  
+
 
 ];
 
@@ -234,13 +103,13 @@ export default function InterviewerDashboardLayout() {
   const dispatch = useDispatch();
 
   const handleLogout = async () => {
-  try {
-    await dispatch(logoutInterviewer()).unwrap();
-    navigate("/interviewer/login", { replace: true });
-  } catch {
-    navigate("/interviewer/login", { replace: true });
-  }
-};
+    try {
+      await dispatch(logoutInterviewer()).unwrap();
+      navigate("/interviewer/login", { replace: true });
+    } catch {
+      navigate("/interviewer/login", { replace: true });
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -297,7 +166,7 @@ export default function InterviewerDashboardLayout() {
               <p className="text-xs text-slate-500 font-light">Interviewer Portal</p>
             </div>
           </div>
-          
+
           {/* User Profile Card */}
           {/* <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
             <div className="flex items-center gap-3">
@@ -429,7 +298,7 @@ export default function InterviewerDashboardLayout() {
         <header className="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-6 shadow-sm">
           <div className="flex items-center gap-4">
             {/* Mobile menu button */}
-            <button 
+            <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
             >
@@ -437,7 +306,7 @@ export default function InterviewerDashboardLayout() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            
+
             <div>
               <p className="text-xs text-slate-400 font-light mb-0.5">Welcome back</p>
               <p className="text-base font-medium text-slate-800">
@@ -446,16 +315,13 @@ export default function InterviewerDashboardLayout() {
             </div>
           </div>
 
-          <NotificationBell />
-
           <div className="flex items-center gap-3">
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all shadow-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              Notifications
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-sm font-medium text-white hover:bg-slate-900 transition-all shadow-lg shadow-slate-300/50">
+            <NotificationBell variant="pill" />
+
+            <button
+              onClick={() => navigate('/interviewer/dashboard/availability')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 text-sm font-medium text-white hover:bg-slate-900 transition-all shadow-lg shadow-slate-300/50"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>

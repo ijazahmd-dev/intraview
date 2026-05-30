@@ -939,360 +939,379 @@ import { useSelector, useDispatch } from "react-redux";
 import { logoutUser } from "../api/authSlice";
 
 import {
-    Bell, Coins, ChevronDown, User, Settings, LogOut, Briefcase,
-    Menu, X, Home, Search, Bot, CalendarCheck, TrendingUp,
-    Wallet, Tag, ArrowUpRight,
+  Bell, Coins, ChevronDown, User, Settings, LogOut, Briefcase,
+  Menu, X, Home, Search, Bot, CalendarCheck, TrendingUp,
+  Wallet, Tag, ArrowUpRight,
 } from "lucide-react";
+import { loadUnreadCount } from "../features/notification/notificationsSlice";
+import { fetchWalletSummary } from "../wallets/candidateWalletSlice";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const LOGO_URL =
-    "https://res.cloudinary.com/dpn42vumz/image/upload/v1780132429/Intraview_logo_ysnzdc.jpg";
+  "https://res.cloudinary.com/dpn42vumz/image/upload/v1780132429/Intraview_logo_ysnzdc.jpg";
 
 const AUTH_NAV = [
-    { label: "Home", path: "/home", icon: Home },
-    { label: "Find Interviewers", path: "/candidate/interviewers", icon: Search },
-    { label: "AI Interview", path: "/ai-interview/roles", icon: Bot },
-    { label: "My Sessions", path: "/candidate/dashboard/upcoming", icon: CalendarCheck },
-    { label: "Progress", path: "/candidate/progress", icon: TrendingUp },
-    { label: "Wallet", path: "/candidate/wallet", icon: Wallet },
-    { label: "Subscriptions", path: "/subscriptions", icon: Tag },
+  { label: "Home", path: "/home", icon: Home },
+  { label: "Find Interviewers", path: "/candidate/interviewers", icon: Search },
+  { label: "AI Interview", path: "/ai-interview/roles", icon: Bot },
+  { label: "My Sessions", path: "/candidate/dashboard/upcoming", icon: CalendarCheck },
+  { label: "Progress", path: "/candidate/progress", icon: TrendingUp },
+  { label: "Wallet", path: "/candidate/wallet", icon: Wallet },
+  { label: "Subscriptions", path: "/subscriptions", icon: Tag },
 ];
 
 const GUEST_NAV = [
-    { label: "About", path: "/about" },
-    { label: "Interviewers", path: "/candidate/interviewers" },
-    { label: "Pricing", path: "/subscriptions" },
+  { label: "About", path: "/about" },
+  { label: "Interviewers", path: "/candidate/interviewers" },
+  { label: "Pricing", path: "/subscriptions" },
 ];
 
 const PROFILE_ITEMS = [
-    { label: "My Profile", path: "/candidate/profile", icon: User },
-    { label: "Settings", path: "/candidate/settings", icon: Settings },
-    { label: "Become Interviewer", path: "/interviewer/request", icon: Briefcase, divider: true },
-    { label: "Logout", action: "logout", icon: LogOut, danger: true },
+  { label: "My Profile", path: "/candidate/profile", icon: User },
+  { label: "Settings", path: "/candidate/settings", icon: Settings },
+  { label: "Become Interviewer", path: "/interviewer/request", icon: Briefcase, divider: true },
+  { label: "Logout", action: "logout", icon: LogOut, danger: true },
 ];
 
 function initials(a, b) {
-    return ((a || "").charAt(0) + (b || "").charAt(0)).toUpperCase() || "?";
+  return ((a || "").charAt(0) + (b || "").charAt(0)).toUpperCase() || "?";
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function CandidateNavbar() {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const dispatch = useDispatch();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-    const user = useSelector((s) => s.auth?.user ?? null);
-    const tokenBalance = useSelector((s) => s.wallet?.overview?.data?.tokens_balance ?? null);
-    const unreadCount = useSelector((s) => s.notifications?.unread_count ?? 0);
+  const user = useSelector((s) => s.auth?.user ?? null);
 
-    const isAuth = !!user;
+  // Tokens config: Candidate uses s.candidateWallet?.summary?.tokens_balance. (If it's token_balance from API, let's try token_balance first, then fallback to s.wallet)
+  const tokenBalance = useSelector((s) =>
+    s.candidateWallet?.summary?.tokens_balance ??
+    s.candidateWallet?.summary?.token_balance ??
+    s.wallet?.overview?.data?.tokens_balance ?? null
+  );
+  // Notifications config: the slice stores it as unreadCount, not unread_count
+  const unreadCount = useSelector((s) => s.notifications?.unreadCount ?? 0);
 
-    const [scrolled, setScrolled] = useState(false);
-    const [profileOpen, setProfileOpen] = useState(false);
-    const [notifOpen, setNotifOpen] = useState(false);
-    const [mobileOpen, setMobileOpen] = useState(false);
+  const isAuth = !!user;
 
-    const profileRef = useRef(null);
-    const notifRef = useRef(null);
+  // Load necessary user data on mount
+  useEffect(() => {
+    if (isAuth) {
+      dispatch(loadUnreadCount());
+      dispatch(fetchWalletSummary());
+    }
+  }, [isAuth, dispatch]);
 
-    // Scroll detection
-    useEffect(() => {
-        const fn = () => setScrolled(window.scrollY > 10);
-        window.addEventListener("scroll", fn, { passive: true });
-        return () => window.removeEventListener("scroll", fn);
-    }, []);
+  const [scrolled, setScrolled] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-    // Outside click — close dropdowns
-    useEffect(() => {
-        const fn = (e) => {
-            if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
-            if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
-        };
-        document.addEventListener("mousedown", fn);
-        return () => document.removeEventListener("mousedown", fn);
-    }, []);
+  const profileRef = useRef(null);
+  const notifRef = useRef(null);
 
-    // Close mobile on route change
-    useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+  // Scroll detection
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
+  }, []);
 
-    const isActive = (path) =>
-        location.pathname === path ||
-        (path !== "/home" && path !== "/" && location.pathname.startsWith(path));
-
-    const handleLogout = async () => {
-        setProfileOpen(false);
-        try {
-            await dispatch(logoutUser()).unwrap();
-        } catch (e) {
-            console.error('Logout failed', e);
-        }
-        navigate("/login");
+  // Outside click — close dropdowns
+  useEffect(() => {
+    const fn = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
 
-    const doProfileAction = (item) => {
-        setProfileOpen(false);
-        if (item.action === "logout") { handleLogout(); return; }
-        navigate(item.path);
-    };
+  // Close mobile on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-    const firstName = user?.first_name || "";
-    const lastName = user?.last_name || "";
-    const fullName = `${firstName} ${lastName}`.trim() || "Candidate";
-    const userInitials = initials(firstName, lastName);
-    const avatarSrc = user?.profile_picture || null;
+  const isActive = (path) =>
+    location.pathname === path ||
+    (path !== "/home" && path !== "/" && location.pathname.startsWith(path));
 
-    // ── Render ───────────────────────────────────────────────────────────────
-    return (
-        <>
-            <div className={`iv-nav-wrap ${scrolled ? "iv-scrolled" : ""}`}>
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    try {
+      await dispatch(logoutUser()).unwrap();
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+    navigate("/login");
+  };
 
-                {/* ───── Main pill ───── */}
-                <nav className="iv-pill" role="navigation" aria-label="Main navigation">
+  const doProfileAction = (item) => {
+    setProfileOpen(false);
+    if (item.action === "logout") { handleLogout(); return; }
+    navigate(item.path);
+  };
 
-                    {/* Logo */}
-                    <Link to={isAuth ? "/home" : "/"} className="iv-logo" aria-label="IntraView home">
-                        <img src={LOGO_URL} alt="IntraView" className="iv-logo-img" />
-                    </Link>
+  const firstName = user?.first_name || user?.firstName || "";
+  const lastName = user?.last_name || user?.lastName || "";
+  const fullName = `${firstName} ${lastName}`.trim() || "Candidate";
+  const userInitials = initials(firstName, lastName);
 
-                    {/* Divider */}
-                    <div className="iv-sep" aria-hidden="true" />
+  // Support profilePicture (ProfileSlice mapping) or profile_picture / profile_picture_url (Auth Payload mapping)
+  const avatarSrc = user?.profilePicture || user?.profile_picture_url || user?.profile_picture || null;
 
-                    {/* Nav links */}
-                    <div className="iv-links" role="list">
-                        {(isAuth ? AUTH_NAV : GUEST_NAV).map(({ label, path }) => (
-                            <Link
-                                key={path}
-                                to={path}
-                                role="listitem"
-                                className={`iv-link ${isActive(path) ? "iv-link--on" : ""}`}
-                            >
-                                {label}
-                                {isActive(path) && <span className="iv-link-bar" aria-hidden="true" />}
-                            </Link>
-                        ))}
-                    </div>
+  // ── Render ───────────────────────────────────────────────────────────────
+  return (
+    <>
+      <div className={`iv-nav-wrap ${scrolled ? "iv-scrolled" : ""}`}>
 
-                    <div className="iv-flex-gap" />
+        {/* ───── Main pill ───── */}
+        <nav className="iv-pill" role="navigation" aria-label="Main navigation">
 
-                    {/* Right controls */}
-                    <div className="iv-right">
-                        {isAuth ? (
-                            <>
-                                {/* Token chip */}
-                                <button
-                                    className="iv-token"
-                                    onClick={() => navigate("/candidate/wallet")}
-                                    aria-label={`${tokenBalance} tokens — open wallet`}
-                                >
-                                    <Coins size={13} strokeWidth={2} aria-hidden="true" />
-                                    <span className="iv-token-num">
-                                        {tokenBalance !== null ? tokenBalance.toLocaleString() : "—"}
-                                    </span>
-                                    <span className="iv-token-lbl">tokens</span>
-                                </button>
+          {/* Logo */}
+          <Link to={isAuth ? "/home" : "/"} className="iv-logo" aria-label="IntraView home">
+            <img src={LOGO_URL} alt="IntraView" className="iv-logo-img" />
+          </Link>
 
-                                {/* Bell */}
-                                <div className="iv-icon-wrap" ref={notifRef}>
-                                    <button
-                                        className={`iv-icon-btn ${notifOpen ? "iv-icon-btn--on" : ""}`}
-                                        onClick={() => { setNotifOpen((p) => !p); setProfileOpen(false); }}
-                                        aria-label="Notifications"
-                                        aria-expanded={notifOpen}
-                                    >
-                                        <Bell size={17} strokeWidth={1.8} aria-hidden="true" />
-                                        {unreadCount > 0 && (
-                                            <span className="iv-badge" aria-label={`${unreadCount} unread`}>
-                                                {unreadCount > 9 ? "9+" : unreadCount}
-                                            </span>
-                                        )}
-                                    </button>
+          {/* Divider */}
+          <div className="iv-sep" aria-hidden="true" />
 
-                                    {notifOpen && (
-                                        <div className="iv-drop" role="dialog" aria-label="Notifications">
-                                            <div className="iv-drop-head">
-                                                <span>Notifications</span>
-                                                {unreadCount > 0 && (
-                                                    <span className="iv-count-pill">{unreadCount} new</span>
-                                                )}
-                                            </div>
-                                            {unreadCount === 0 ? (
-                                                <div className="iv-drop-empty">
-                                                    <Bell size={24} strokeWidth={1.2} aria-hidden="true" />
-                                                    <p>All caught up</p>
-                                                    <span>No new notifications</span>
-                                                </div>
-                                            ) : (
-                                                <div className="iv-drop-body">
-                                                    <Link
-                                                        className="iv-view-all"
-                                                        to="/candidate/notifications"
-                                                        onClick={() => setNotifOpen(false)}
-                                                    >
-                                                        View all notifications →
-                                                    </Link>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+          {/* Nav links */}
+          <div className="iv-links" role="list">
+            {(isAuth ? AUTH_NAV : GUEST_NAV).map(({ label, path }) => (
+              <Link
+                key={path}
+                to={path}
+                role="listitem"
+                className={`iv-link ${isActive(path) ? "iv-link--on" : ""}`}
+              >
+                {label}
+                {isActive(path) && <span className="iv-link-bar" aria-hidden="true" />}
+              </Link>
+            ))}
+          </div>
 
-                                {/* Avatar */}
-                                <div className="iv-icon-wrap" ref={profileRef}>
-                                    <button
-                                        className={`iv-avatar-btn ${profileOpen ? "iv-avatar-btn--on" : ""}`}
-                                        onClick={() => { setProfileOpen((p) => !p); setNotifOpen(false); }}
-                                        aria-label="Profile menu"
-                                        aria-expanded={profileOpen}
-                                    >
-                                        {avatarSrc
-                                            ? <img src={avatarSrc} alt={fullName} className="iv-avatar-img" />
-                                            : <span className="iv-avatar-init" aria-hidden="true">{userInitials}</span>
-                                        }
-                                        <ChevronDown
-                                            size={11}
-                                            strokeWidth={2.5}
-                                            className={`iv-chevron ${profileOpen ? "iv-chevron--up" : ""}`}
-                                            aria-hidden="true"
-                                        />
-                                    </button>
+          <div className="iv-flex-gap" />
 
-                                    {profileOpen && (
-                                        <div className="iv-profile-drop" role="menu">
-                                            <div className="iv-pd-head">
-                                                <div className="iv-pd-avatar">
-                                                    {avatarSrc
-                                                        ? <img src={avatarSrc} alt={fullName} />
-                                                        : <span aria-hidden="true">{userInitials}</span>
-                                                    }
-                                                </div>
-                                                <div className="iv-pd-info">
-                                                    <p className="iv-pd-name">{fullName}</p>
-                                                    <p className="iv-pd-email">{user?.email || ""}</p>
-                                                </div>
-                                            </div>
-                                            <div className="iv-pd-rule" />
-                                            {PROFILE_ITEMS.map((item) => (
-                                                <div key={item.label}>
-                                                    {item.divider && <div className="iv-pd-rule" />}
-                                                    <button
-                                                        className={`iv-pd-item ${item.danger ? "iv-pd-item--red" : ""}`}
-                                                        onClick={() => doProfileAction(item)}
-                                                        role="menuitem"
-                                                    >
-                                                        <item.icon size={14} strokeWidth={1.8} aria-hidden="true" />
-                                                        {item.label}
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        ) : (
-                            /* ── Guest controls ── */
-                            <>
-                                <Link to="/login" className="iv-login-link">Log In</Link>
-                                <Link to="/signup" className="iv-signup-btn">
-                                    Sign Up
-                                    <ArrowUpRight size={13} strokeWidth={2.5} aria-hidden="true" />
-                                </Link>
-                            </>
-                        )}
-
-                        {/* Hamburger — always visible on mobile */}
-                        <button
-                            className="iv-hamburger"
-                            onClick={() => setMobileOpen((p) => !p)}
-                            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-                            aria-expanded={mobileOpen}
-                        >
-                            {mobileOpen
-                                ? <X size={18} strokeWidth={2} aria-hidden="true" />
-                                : <Menu size={18} strokeWidth={2} aria-hidden="true" />
-                            }
-                        </button>
-                    </div>
-                </nav>
-
-                {/* ───── Mobile panel ───── */}
-                <div
-                    className={`iv-mobile ${mobileOpen ? "iv-mobile--open" : ""}`}
-                    aria-hidden={!mobileOpen}
+          {/* Right controls */}
+          <div className="iv-right">
+            {isAuth ? (
+              <>
+                {/* Token chip */}
+                <button
+                  className="iv-token"
+                  onClick={() => navigate("/candidate/wallet")}
+                  aria-label={`${tokenBalance} tokens — open wallet`}
                 >
-                    <div className="iv-mobile-inner">
-                        {isAuth ? (
-                            <>
-                                {/* User row */}
-                                <div className="iv-m-user">
-                                    {avatarSrc
-                                        ? <img src={avatarSrc} alt={fullName} className="iv-m-avatar" />
-                                        : <span className="iv-m-init" aria-hidden="true">{userInitials}</span>
-                                    }
-                                    <div className="iv-m-info">
-                                        <p className="iv-m-name">{fullName}</p>
-                                        <p className="iv-m-email">{user?.email || "Candidate"}</p>
-                                    </div>
-                                    {tokenBalance !== null && (
-                                        <div className="iv-m-token">
-                                            <Coins size={11} aria-hidden="true" />
-                                            <span>{tokenBalance.toLocaleString()}</span>
-                                        </div>
-                                    )}
-                                </div>
+                  <Coins size={13} strokeWidth={2} aria-hidden="true" />
+                  <span className="iv-token-num">
+                    {tokenBalance !== null ? tokenBalance.toLocaleString() : "—"}
+                  </span>
+                  <span className="iv-token-lbl">tokens</span>
+                </button>
 
-                                <div className="iv-m-rule" />
+                {/* Bell */}
+                <div className="iv-icon-wrap" ref={notifRef}>
+                  <button
+                    className={`iv-icon-btn ${notifOpen ? "iv-icon-btn--on" : ""}`}
+                    onClick={() => { setNotifOpen((p) => !p); setProfileOpen(false); }}
+                    aria-label="Notifications"
+                    aria-expanded={notifOpen}
+                  >
+                    <Bell size={17} strokeWidth={1.8} aria-hidden="true" />
+                    {unreadCount > 0 && (
+                      <span className="iv-badge" aria-label={`${unreadCount} unread`}>
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
 
-                                {AUTH_NAV.map(({ label, path, icon: Icon }) => (
-                                    <Link
-                                        key={path}
-                                        to={path}
-                                        className={`iv-m-link ${isActive(path) ? "iv-m-link--on" : ""}`}
-                                    >
-                                        <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
-                                        {label}
-                                    </Link>
-                                ))}
-
-                                <div className="iv-m-rule" />
-
-                                {PROFILE_ITEMS.map((item) =>
-                                    item.action === "logout" ? (
-                                        <button key="logout" className="iv-m-link iv-m-link--logout" onClick={handleLogout}>
-                                            <item.icon size={15} strokeWidth={1.8} aria-hidden="true" />
-                                            {item.label}
-                                        </button>
-                                    ) : (
-                                        <Link key={item.label} to={item.path} className="iv-m-link">
-                                            <item.icon size={15} strokeWidth={1.8} aria-hidden="true" />
-                                            {item.label}
-                                        </Link>
-                                    )
-                                )}
-                            </>
-                        ) : (
-                            /* Guest mobile */
-                            <>
-                                {GUEST_NAV.map(({ label, path }) => (
-                                    <Link key={path} to={path} className="iv-m-link">{label}</Link>
-                                ))}
-                                <div className="iv-m-rule" />
-                                <Link to="/login" className="iv-m-link">Log In</Link>
-                                <Link to="/signup" className="iv-m-link iv-m-link--signup">
-                                    Sign Up <ArrowUpRight size={13} aria-hidden="true" />
-                                </Link>
-                            </>
+                  {notifOpen && (
+                    <div className="iv-drop" role="dialog" aria-label="Notifications">
+                      <div className="iv-drop-head">
+                        <span>Notifications</span>
+                        {unreadCount > 0 && (
+                          <span className="iv-count-pill">{unreadCount} new</span>
                         )}
+                      </div>
+                      {unreadCount === 0 ? (
+                        <div className="iv-drop-empty">
+                          <Bell size={24} strokeWidth={1.2} aria-hidden="true" />
+                          <p>All caught up</p>
+                          <span>No new notifications</span>
+                        </div>
+                      ) : (
+                        <div className="iv-drop-body">
+                          <Link
+                            className="iv-view-all"
+                            to="/notifications"
+                            onClick={() => setNotifOpen(false)}
+                          >
+                            View all notifications →
+                          </Link>
+                        </div>
+                      )}
                     </div>
+                  )}
                 </div>
-            </div>
 
-            {/* Page spacer — clears the fixed floating pill */}
-            <div className="iv-spacer" aria-hidden="true" />
+                {/* Avatar */}
+                <div className="iv-icon-wrap" ref={profileRef}>
+                  <button
+                    className={`iv-avatar-btn ${profileOpen ? "iv-avatar-btn--on" : ""}`}
+                    onClick={() => { setProfileOpen((p) => !p); setNotifOpen(false); }}
+                    aria-label="Profile menu"
+                    aria-expanded={profileOpen}
+                  >
+                    {avatarSrc
+                      ? <img src={avatarSrc} alt={fullName} className="iv-avatar-img" />
+                      : <span className="iv-avatar-init" aria-hidden="true">{userInitials}</span>
+                    }
+                    <ChevronDown
+                      size={11}
+                      strokeWidth={2.5}
+                      className={`iv-chevron ${profileOpen ? "iv-chevron--up" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </button>
 
-            {/* ─────────────────── STYLES ─────────────────── */}
-            <style>{`
+                  {profileOpen && (
+                    <div className="iv-profile-drop" role="menu">
+                      <div className="iv-pd-head">
+                        <div className="iv-pd-avatar">
+                          {avatarSrc
+                            ? <img src={avatarSrc} alt={fullName} />
+                            : <span aria-hidden="true">{userInitials}</span>
+                          }
+                        </div>
+                        <div className="iv-pd-info">
+                          <p className="iv-pd-name">{fullName}</p>
+                          <p className="iv-pd-email">{user?.email || ""}</p>
+                        </div>
+                      </div>
+                      <div className="iv-pd-rule" />
+                      {PROFILE_ITEMS.map((item) => (
+                        <div key={item.label}>
+                          {item.divider && <div className="iv-pd-rule" />}
+                          <button
+                            className={`iv-pd-item ${item.danger ? "iv-pd-item--red" : ""}`}
+                            onClick={() => doProfileAction(item)}
+                            role="menuitem"
+                          >
+                            <item.icon size={14} strokeWidth={1.8} aria-hidden="true" />
+                            {item.label}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ── Guest controls ── */
+              <>
+                <Link to="/login" className="iv-login-link">Log In</Link>
+                <Link to="/signup" className="iv-signup-btn">
+                  Sign Up
+                  <ArrowUpRight size={13} strokeWidth={2.5} aria-hidden="true" />
+                </Link>
+              </>
+            )}
+
+            {/* Hamburger — always visible on mobile */}
+            <button
+              className="iv-hamburger"
+              onClick={() => setMobileOpen((p) => !p)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen
+                ? <X size={18} strokeWidth={2} aria-hidden="true" />
+                : <Menu size={18} strokeWidth={2} aria-hidden="true" />
+              }
+            </button>
+          </div>
+        </nav>
+
+        {/* ───── Mobile panel ───── */}
+        <div
+          className={`iv-mobile ${mobileOpen ? "iv-mobile--open" : ""}`}
+          aria-hidden={!mobileOpen}
+        >
+          <div className="iv-mobile-inner">
+            {isAuth ? (
+              <>
+                {/* User row */}
+                <div className="iv-m-user">
+                  {avatarSrc
+                    ? <img src={avatarSrc} alt={fullName} className="iv-m-avatar" />
+                    : <span className="iv-m-init" aria-hidden="true">{userInitials}</span>
+                  }
+                  <div className="iv-m-info">
+                    <p className="iv-m-name">{fullName}</p>
+                    <p className="iv-m-email">{user?.email || "Candidate"}</p>
+                  </div>
+                  {tokenBalance !== null && (
+                    <div className="iv-m-token">
+                      <Coins size={11} aria-hidden="true" />
+                      <span>{tokenBalance.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="iv-m-rule" />
+
+                {AUTH_NAV.map(({ label, path, icon: Icon }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    className={`iv-m-link ${isActive(path) ? "iv-m-link--on" : ""}`}
+                  >
+                    <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+                    {label}
+                  </Link>
+                ))}
+
+                <div className="iv-m-rule" />
+
+                {PROFILE_ITEMS.map((item) =>
+                  item.action === "logout" ? (
+                    <button key="logout" className="iv-m-link iv-m-link--logout" onClick={handleLogout}>
+                      <item.icon size={15} strokeWidth={1.8} aria-hidden="true" />
+                      {item.label}
+                    </button>
+                  ) : (
+                    <Link key={item.label} to={item.path} className="iv-m-link">
+                      <item.icon size={15} strokeWidth={1.8} aria-hidden="true" />
+                      {item.label}
+                    </Link>
+                  )
+                )}
+              </>
+            ) : (
+              /* Guest mobile */
+              <>
+                {GUEST_NAV.map(({ label, path }) => (
+                  <Link key={path} to={path} className="iv-m-link">{label}</Link>
+                ))}
+                <div className="iv-m-rule" />
+                <Link to="/login" className="iv-m-link">Log In</Link>
+                <Link to="/signup" className="iv-m-link iv-m-link--signup">
+                  Sign Up <ArrowUpRight size={13} aria-hidden="true" />
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Page spacer — clears the fixed floating pill */}
+      <div className="iv-spacer" aria-hidden="true" />
+
+      {/* ─────────────────── STYLES ─────────────────── */}
+      <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
         /* ── Floating wrapper ───────────────────── */
@@ -1726,6 +1745,6 @@ export default function CandidateNavbar() {
           .iv-spacer   { height: 76px; }
         }
       `}</style>
-        </>
-    );
+    </>
+  );
 }

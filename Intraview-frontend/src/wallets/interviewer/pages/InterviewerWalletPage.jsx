@@ -14,27 +14,27 @@ import {
 const InterviewerWalletPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+
   const { summary, transactions, earnings, stats, loading, error, filters } = useSelector(
     (state) => state.interviewerWallet
   );
 
   useEffect(() => {
-  if (error) {
-    toast.error(error);
-  }
-}, [error]);
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   useEffect(() => {
     console.log('🔥 DISPATCHING - About to call transactions...');
-    
+
     dispatch(fetchWalletSummary()).then(console.log).catch(console.error);
     dispatch(fetchEarnings()).then(console.log).catch(console.error);
     dispatch(fetchWalletStats()).then(console.log).catch(console.error);
-    
+
     const txPromise = dispatch(fetchTransactions({ page: 1, pageSize: 20 }));
     console.log('🚀 Transactions dispatched, promise:', txPromise);
-    
+
     txPromise.then((result) => {
       console.log('✅ Transactions SUCCESS:', result);
     }).catch((err) => {
@@ -44,18 +44,18 @@ const InterviewerWalletPage = () => {
 
   const handleFilterChange = (type) => {
     dispatch(setFilter(type));
-    dispatch(fetchTransactions({ 
-      page: 1, 
-      pageSize: 20, 
-      type: type || null 
+    dispatch(fetchTransactions({
+      page: 1,
+      pageSize: 20,
+      type: type || null
     }));
   };
 
   const handlePageChange = (page) => {
-    dispatch(fetchTransactions({ 
-      page, 
-      pageSize: transactions.pageSize, 
-      type: filters.type 
+    dispatch(fetchTransactions({
+      page,
+      pageSize: transactions.pageSize,
+      type: filters.type
     }));
   };
 
@@ -187,17 +187,16 @@ const InterviewerWalletPage = () => {
             </div>
           </div>
           <button
-            disabled
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-6 px-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3 opacity-75 cursor-not-allowed"
-            title="Coming Soon"
+            onClick={() => navigate('/interviewer/payout/request')}
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-6 px-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3"
           >
-            <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-            Coming Soon
+            Request Payout
           </button>
           <p className="text-xs text-slate-500 mt-3 text-center">
-            Bank transfer & PayPal integration in progress
+            Process bank transfers directly to your account
           </p>
         </div>
       </div>
@@ -211,7 +210,7 @@ const InterviewerWalletPage = () => {
               {transactions.count || 0} total transactions
             </p>
           </div>
-          
+
           {/* Filter Dropdown */}
           <select
             value={filters.type || 'ALL'}
@@ -269,11 +268,10 @@ const InterviewerWalletPage = () => {
                     {/* Type & Note */}
                     <div className="col-span-4">
                       <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          tx.amount > 0 
-                            ? 'bg-emerald-100 text-emerald-800' 
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${tx.amount > 0
+                            ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-rose-100 text-rose-800'
-                        }`}>
+                          }`}>
                           {tx.amount > 0 ? '+' : ''}{tx.amount}
                         </span>
                         <div>
@@ -308,11 +306,10 @@ const InterviewerWalletPage = () => {
 
                     {/* Status Indicator */}
                     <div className="col-span-2 text-right">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        tx.amount > 0 
-                          ? 'bg-emerald-100 text-emerald-800' 
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${tx.amount > 0
+                          ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-rose-100 text-rose-800'
-                      }`}>
+                        }`}>
                         {tx.amount > 0 ? 'EARNED' : 'DEDUCTED'}
                       </span>
                     </div>

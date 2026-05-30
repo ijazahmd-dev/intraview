@@ -73,7 +73,7 @@ export const getProfileCompletion = () => {
 export const uploadResume = (file) => {
   const formData = new FormData();
   formData.append('resume_file', file);
-  
+
   return API.post('api/candidate/profile/resume/upload/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -110,12 +110,20 @@ export const deleteResume = () => {
 export const uploadProfilePicture = (file) => {
   const formData = new FormData();
   formData.append('profile_picture', file);
-  
+
   return API.post('api/candidate/profile/picture/upload/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
+};
+
+/**
+ * DELETE /api/candidate/profile/picture/delete/
+ * Delete profile picture
+ */
+export const deleteProfilePicture = () => {
+  return API.delete('api/candidate/profile/picture/delete/');
 };
 
 // ============================================

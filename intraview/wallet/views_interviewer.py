@@ -75,7 +75,7 @@ class InterviewerWalletSummaryAPIView(APIView):
         data = {
             "total_balance": wallet.balance + wallet.locked_balance,
             "locked_balance": wallet.locked_balance,
-            "available_balance": wallet.balance - wallet.locked_balance,
+            "available_balance": wallet.balance,
         }
 
         serializer = InterviewerWalletSummarySerializer(data=data)
