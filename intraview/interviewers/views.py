@@ -1,4 +1,5 @@
 # interviewers views.py
+from decimal import Decimal
 
 from django.utils import timezone
 from rest_framework import status
@@ -32,6 +33,8 @@ from interviewer_subscriptions.services.entitlement_service import (
     InterviewerEntitlementService,
 )
 from bookings.models import InterviewBooking
+from feedbacks.models import InterviewerReview
+from wallet._services.payout_service import PayoutService
 
 
 # ------------------------------------------ User-facing APIs --------------------------------------------------
@@ -815,23 +818,21 @@ class InterviewerDashboardSummaryView(APIView):
             interviews_change = "No interviews yet"
 
         # ============================================
-        # 2. AVERAGE RATING (from completed bookings)
+        # 2. AVERAGE RATING (from InterviewerReview)
         # ============================================
-        # Assuming you have a rating field in InterviewBooking
-        
-        avg_rating = 0.0
-        avg_rating = round(avg_rating, 1)
+        reviews_for_user = InterviewerReview.objects.filter(interviewer=user)
+        avg_rating_aggregate = reviews_for_user.aggregate(Avg('overall_rating'))['overall_rating__avg']
+        avg_rating = round(avg_rating_aggregate, 1) if avg_rating_aggregate else 0.0
         
         # Last month average for comparison
         last_month_start = month_start - timedelta(days=30)
-        last_month_bookings = InterviewBooking.objects.filter(
-            interviewer=user,
-            status=InterviewBooking.Status.COMPLETED,
+        last_month_reviews = reviews_for_user.filter(
             created_at__gte=last_month_start,
             created_at__lt=month_start
         )
+        last_month_avg_aggregate = last_month_reviews.aggregate(Avg('overall_rating'))['overall_rating__avg']
+        last_month_avg = round(last_month_avg_aggregate, 1) if last_month_avg_aggregate else 0.0
         
-        last_month_avg = 0.0
         rating_change = f"+{round(avg_rating - last_month_avg, 1)} from last month" if avg_rating >= last_month_avg else f"{round(avg_rating - last_month_avg, 1)} from last month"
 
         # ============================================
@@ -874,12 +875,11 @@ class InterviewerDashboardSummaryView(APIView):
         # ============================================
         # 4. TOTAL EARNINGS (from completed sessions)
         # ============================================
-        # Sum of token_cost from completed bookings
         total_tokens_earned = all_bookings.aggregate(Sum('token_cost'))['token_cost__sum'] or 0
         
-        # If you have a token rate, multiply to get INR
-        # For now, assuming 1 token = ₹1 for display (adjust based on your rate)
-        total_earnings = total_tokens_earned
+        # Convert tokens to Fiat
+        rate = PayoutService.get_current_rate()
+        total_earnings = int(Decimal(total_tokens_earned) * rate)
         
         # This month earnings
         earnings_this_month = InterviewBooking.objects.filter(
@@ -980,16 +980,26 @@ class InterviewerDashboardSummaryView(APIView):
         # ============================================
         # 8. SESSION BREAKDOWN
         # ============================================
-        # This depends on how you categorize interviews
         total_completed = InterviewBooking.objects.filter(
             interviewer=user,
             status=InterviewBooking.Status.COMPLETED
         ).count()
         
-        # Placeholder: you'll need to add interview_type to BookingModel
-        human_interviews = total_completed  # Adjust based on actual type
-        peer_reviews = 0  # Add if you have this data
-        ai_assisted = 0   # Add if you have this data
+        technical = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED,
+            interview_type=InterviewBooking.InterviewType.TECHNICAL
+        ).count()
+
+        behavioral = InterviewBooking.objects.filter(
+            interviewer=user,
+            status=InterviewBooking.Status.COMPLETED,
+            interview_type=InterviewBooking.InterviewType.BEHAVIORAL
+        ).count()
+
+        human_interviews = total_completed  # Since Intraview currently only supports Human interviews
+        peer_reviews = 0  
+        ai_assisted = 0   
 
         # ============================================
         # 9. AVAILABILITY THIS WEEK
@@ -1035,20 +1045,29 @@ class InterviewerDashboardSummaryView(APIView):
             status=InterviewBooking.Status.COMPLETED
         )
         
-        # Calculate duration from start and end times
-        total_duration_seconds = 0
+        total_duration = 0
+        tech_duration = 0
+        behav_duration = 0
         count = 0
+        tech_count = 0
+        behav_count = 0
+
         for booking in completed_bookings:
             if hasattr(booking, 'start_datetime') and hasattr(booking, 'end_datetime'):
                 duration = (booking.end_datetime - booking.start_datetime).total_seconds() / 60
-                total_duration_seconds += duration
+                total_duration += duration
                 count += 1
+                
+                if booking.interview_type == InterviewBooking.InterviewType.TECHNICAL:
+                    tech_duration += duration
+                    tech_count += 1
+                elif booking.interview_type == InterviewBooking.InterviewType.BEHAVIORAL:
+                    behav_duration += duration
+                    behav_count += 1
         
-        overall_avg = int(total_duration_seconds / max(count, 1))
-        
-        # You can categorize by type if you have that info
-        technical_avg = overall_avg  # Placeholder
-        behavioral_avg = overall_avg  # Placeholder
+        overall_avg = int(total_duration / max(count, 1))
+        technical_avg = int(tech_duration / max(tech_count, 1))
+        behavioral_avg = int(behav_duration / max(behav_count, 1))
 
         # ============================================
         # FINAL RESPONSE

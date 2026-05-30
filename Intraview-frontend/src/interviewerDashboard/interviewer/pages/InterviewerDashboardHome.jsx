@@ -75,7 +75,7 @@ export default function InterviewerDashboardHome() {
           />
           <StatCard
             label="Total Earnings"
-            value={`$${stats.total_earnings ?? 0}`}
+            value={`₹${stats.total_earnings ?? 0}`}
             caption={stats.total_earnings_change}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,8 +146,8 @@ export default function InterviewerDashboardHome() {
                           item.status === "Confirmed"
                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : item.status === "Pending"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-slate-100 text-slate-600 border border-slate-200",
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : "bg-slate-100 text-slate-600 border border-slate-200",
                         ].join(" ")}
                       >
                         {item.status}

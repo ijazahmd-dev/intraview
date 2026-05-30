@@ -66,7 +66,11 @@ class CustomUser(AbstractUser):
     def current_subscription(self):
         return UserSubscription.objects.active_for_user(self)
 
-
+    def get_full_name(self):
+        first = self.first_name or ""
+        last = self.last_name or ""
+        name = f"{first} {last}".strip()
+        return name
 
     def __str__(self):
         return self.username
