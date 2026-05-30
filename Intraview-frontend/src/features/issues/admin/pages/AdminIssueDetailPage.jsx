@@ -59,12 +59,12 @@ const extractError = (error) => {
 const formatDate = (iso) =>
   iso
     ? new Date(iso).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
     : "—";
 
 // ─── Section Card ─────────────────────────────────────────────────────────────
@@ -94,12 +94,12 @@ const InfoRow = ({ label, value }) => (
 
 const UpdateStatusPanel = ({ issueId, currentStatus }) => {
   const dispatch = useDispatch();
-  const loading  = useSelector(selectAdminStatusUpdateLoading);
-  const error    = useSelector(selectAdminStatusUpdateError);
+  const loading = useSelector(selectAdminStatusUpdateLoading);
+  const error = useSelector(selectAdminStatusUpdateError);
 
-  const [status, setStatus]         = useState(currentStatus ?? "");
+  const [status, setStatus] = useState(currentStatus ?? "");
   const [adminNotes, setAdminNotes] = useState("");
-  const [saved, setSaved]           = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Sync if parent issue reloads
   useEffect(() => {
@@ -199,12 +199,12 @@ const UpdateStatusPanel = ({ issueId, currentStatus }) => {
 
 const ResolvePanel = ({ issueId, alreadyResolved }) => {
   const dispatch = useDispatch();
-  const loading  = useSelector(selectAdminResolveLoading);
-  const error    = useSelector(selectAdminResolveError);
+  const loading = useSelector(selectAdminResolveLoading);
+  const error = useSelector(selectAdminResolveError);
 
-  const [resolution, setResolution]   = useState("");
+  const [resolution, setResolution] = useState("");
   const [actionTaken, setActionTaken] = useState("");
-  const [saved, setSaved]             = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     return () => dispatch(clearAdminResolveState());
@@ -300,12 +300,12 @@ const ResolvePanel = ({ issueId, alreadyResolved }) => {
 
 const AdminIssueDetailPage = () => {
   const { issueId } = useParams();
-  const dispatch    = useDispatch();
-  const navigate    = useNavigate();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const issue          = useSelector(selectAdminSelectedIssue);
-  const detailLoading  = useSelector(selectAdminDetailLoading);
-  const detailError    = useSelector(selectAdminDetailError);
+  const issue = useSelector(selectAdminSelectedIssue);
+  const detailLoading = useSelector(selectAdminDetailLoading);
+  const detailError = useSelector(selectAdminDetailError);
 
   // ── Fetch on mount ──
   useEffect(() => {
@@ -353,10 +353,10 @@ const AdminIssueDetailPage = () => {
     );
   }
 
-  const typeLabel     = ISSUE_TYPE_LABELS[issue.issue_type] ?? issue.issue_type;
-  const isResolved    = issue.status === ISSUE_STATUS.RESOLVED;
-  const isRejected    = issue.status === ISSUE_STATUS.REJECTED;
-  const isClosed      = isResolved || isRejected;
+  const typeLabel = ISSUE_TYPE_LABELS[issue.issue_type] ?? issue.issue_type;
+  const isResolved = issue.status === ISSUE_STATUS.RESOLVED;
+  const isRejected = issue.status === ISSUE_STATUS.REJECTED;
+  const isClosed = isResolved || isRejected;
 
   return (
     <>
@@ -398,11 +398,11 @@ const AdminIssueDetailPage = () => {
           {/* Issue Details */}
           <SectionCard title="Issue Details" icon={FileText}>
             <div className="divide-y divide-gray-50">
-              <InfoRow label="Booking ID"   value={`#${issue.booking_id}`} />
-              <InfoRow label="Issue Type"   value={typeLabel} />
-              <InfoRow label="Reported By"  value={issue.reported_by?.email ?? issue.reported_by_id ?? "—"} />
-              <InfoRow label="Against User" value={issue.against_user?.email ?? issue.against_user_id ?? "—"} />
-              <InfoRow label="Submitted"    value={formatDate(issue.created_at)} />
+              <InfoRow label="Booking ID" value={`#${issue.booking_id}`} />
+              <InfoRow label="Issue Type" value={typeLabel} />
+              <InfoRow label="Reported By" value={issue.raised_by_email ?? issue.raised_by_id ?? "—"} />
+              <InfoRow label="Against User" value={issue.against_user_email ?? issue.against_user_id ?? "—"} />
+              <InfoRow label="Submitted" value={formatDate(issue.created_at)} />
               <InfoRow label="Last Updated" value={formatDate(issue.updated_at)} />
             </div>
 
@@ -494,29 +494,25 @@ const AdminIssueDetailPage = () => {
           {/* Closed state banner */}
           {isClosed && (
             <div
-              className={`rounded-xl border px-5 py-4 flex items-start gap-3 ${
-                isResolved
+              className={`rounded-xl border px-5 py-4 flex items-start gap-3 ${isResolved
                   ? "bg-green-50 border-green-200"
                   : "bg-red-50 border-red-200"
-              }`}
+                }`}
             >
               <CheckCircle
-                className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                  isResolved ? "text-green-600" : "text-red-500"
-                }`}
+                className={`w-5 h-5 mt-0.5 flex-shrink-0 ${isResolved ? "text-green-600" : "text-red-500"
+                  }`}
               />
               <div>
                 <p
-                  className={`text-sm font-semibold ${
-                    isResolved ? "text-green-800" : "text-red-700"
-                  }`}
+                  className={`text-sm font-semibold ${isResolved ? "text-green-800" : "text-red-700"
+                    }`}
                 >
                   {isResolved ? "Issue Resolved" : "Issue Rejected"}
                 </p>
                 <p
-                  className={`text-xs mt-0.5 ${
-                    isResolved ? "text-green-700" : "text-red-600"
-                  }`}
+                  className={`text-xs mt-0.5 ${isResolved ? "text-green-700" : "text-red-600"
+                    }`}
                 >
                   {isResolved
                     ? "This issue has been closed with a resolution."

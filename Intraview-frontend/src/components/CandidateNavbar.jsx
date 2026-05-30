@@ -989,9 +989,9 @@ export default function CandidateNavbar() {
 
   // Tokens config: Candidate uses s.candidateWallet?.summary?.tokens_balance. (If it's token_balance from API, let's try token_balance first, then fallback to s.wallet)
   const tokenBalance = useSelector((s) =>
-    s.candidateWallet?.summary?.tokens_balance ??
-    s.candidateWallet?.summary?.token_balance ??
-    s.wallet?.overview?.data?.tokens_balance ?? null
+    s.candidateWallet?.summary?.available_balance ??
+    // s.candidateWallet?.summary?.total_balance ??
+    s.wallet?.overview?.data?.total_balance ?? null
   );
   // Notifications config: the slice stores it as unreadCount, not unread_count
   const unreadCount = useSelector((s) => s.notifications?.unreadCount ?? 0);

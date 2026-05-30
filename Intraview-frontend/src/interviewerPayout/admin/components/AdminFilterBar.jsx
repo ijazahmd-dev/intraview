@@ -55,14 +55,14 @@ const AdminFilterBar = ({ filters, onFilterChange, onExport, exportLoading }) =>
               Clear
             </button>
           )}
-          <button
+          {/* <button
             onClick={onExport}
             disabled={exportLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
             {exportLoading ? 'Exporting...' : 'Export CSV'}
-          </button>
+          </button> */}
         </div>
       </div>
 
