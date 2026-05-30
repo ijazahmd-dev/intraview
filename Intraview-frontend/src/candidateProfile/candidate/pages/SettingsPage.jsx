@@ -1,6 +1,6 @@
-// src/pages/candidate/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import {
   Lock,
   Mail,
@@ -18,6 +18,9 @@ import ProfileSidebar from '../components/ProfileSidebar';
 import { useProfileData } from '../hooks/useProfileData';
 import useProfileForm from '../hooks/useProfileForm';
 import { changePassword } from '../../../api/authApi';
+import CandidateNavbar from '../../../components/CandidateNavbar';
+import CandidateFooter from '../../../components/CandidateFooter';
+import { logoutUser } from '../../../authentication/authSlice';
 
 // ============================================
 // CHANGE PASSWORD SECTION
@@ -598,83 +601,90 @@ const DangerZoneSection = ({ onLogout }) => {
 
 const SettingsPage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user } = useProfileData();
 
-  const handleLogout = () => {
-    // Clear auth tokens, etc.
-    // localStorage.removeItem('token');
-    // dispatch logout action if using Redux auth
-    navigate('/auth/login');
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+      navigate('/login');
+    } catch {
+      toast.error('Failed to log out');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-        {/* Sidebar */}
-        <ProfileSidebar onLogout={handleLogout} />
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      <CandidateNavbar />
+      <div className="flex-1 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
+          {/* Sidebar */}
+          <ProfileSidebar onLogout={handleLogout} />
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col gap-6">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-indigo-100 mb-1">
-                  Account Management
-                </p>
-                <h1 className="text-2xl sm:text-3xl font-black">Account Settings</h1>
-                <p className="text-sm text-indigo-100 mt-2 max-w-md">
-                  Manage your password, login methods, and account preferences.
-                </p>
-              </div>
-              <Lock className="w-16 h-16 text-indigo-300 opacity-50" />
-            </div>
-          </div>
-
-          {/* Security Alert */}
-          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-amber-900">
-                Keep your account secure
-              </p>
-              <p className="text-xs text-amber-800 mt-1">
-                Use a strong password and review your login methods regularly.
-              </p>
-            </div>
-          </div>
-
-          {/* Sections */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <ChangePasswordSection />
-              {/* <ConnectedLoginsSection />
-              <AccountPreferencesSection /> */}
-            </div>
-
-            {/* Sidebar Info */}
-            <div className="space-y-4">
-              <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 shadow-sm sticky top-4">
-                <h3 className="text-sm font-bold text-slate-900 mb-3">
-                  Account info
-                </h3>
-                <div className="space-y-2 text-xs text-slate-600">
-                  <p>
-                    <span className="font-semibold">Email:</span>{' '}
-                    {user?.email}
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col gap-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-semibold text-indigo-100 mb-1">
+                    Account Management
                   </p>
-                  <p>
-                    <span className="font-semibold">Name:</span>{' '}
-                    {user?.firstName || 'Not set'}
+                  <h1 className="text-2xl sm:text-3xl font-black">Account Settings</h1>
+                  <p className="text-sm text-indigo-100 mt-2 max-w-md">
+                    Manage your password, login methods, and account preferences.
                   </p>
                 </div>
+                <Lock className="w-16 h-16 text-indigo-300 opacity-50" />
+              </div>
+            </div>
+
+            {/* Security Alert */}
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Keep your account secure
+                </p>
+                <p className="text-xs text-amber-800 mt-1">
+                  Use a strong password and review your login methods regularly.
+                </p>
+              </div>
+            </div>
+
+            {/* Sections */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <ChangePasswordSection />
+                {/* <ConnectedLoginsSection />
+              <AccountPreferencesSection /> */}
               </div>
 
-              <DangerZoneSection onLogout={handleLogout} />
+              {/* Sidebar Info */}
+              <div className="space-y-4">
+                <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 shadow-sm sticky top-4">
+                  <h3 className="text-sm font-bold text-slate-900 mb-3">
+                    Account info
+                  </h3>
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <p>
+                      <span className="font-semibold">Email:</span>{' '}
+                      {user?.email}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Name:</span>{' '}
+                      {user?.firstName || 'Not set'}
+                    </p>
+                  </div>
+                </div>
+
+                <DangerZoneSection onLogout={handleLogout} />
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
+      <CandidateFooter />
     </div>
   );
 };

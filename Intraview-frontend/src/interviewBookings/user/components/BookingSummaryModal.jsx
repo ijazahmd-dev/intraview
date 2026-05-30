@@ -39,6 +39,21 @@ const BookingSummaryModal = ({
     const goalLabel = CANDIDATE_GOALS.find(g => g.value === sessionConfig.candidate_goal)?.label || sessionConfig.candidate_goal;
     const goalIcon = CANDIDATE_GOALS.find(g => g.value === sessionConfig.candidate_goal)?.icon || '🎯';
 
+    const formatTime = (timeString) => {
+        if (!timeString) return '';
+        try {
+            const parts = timeString.split(':');
+            if (parts.length < 2) return timeString;
+            const h = parseInt(parts[0], 10);
+            const m = parts[1];
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const h12 = h % 12 || 12;
+            return `${h12}:${m} ${ampm}`;
+        } catch {
+            return timeString;
+        }
+    };
+
     const Row = ({ label, value, valueClass = '' }) => (
         <div className="flex items-start justify-between py-3 border-b border-slate-100 last:border-0">
             <span className="text-sm text-slate-500 font-medium">{label}</span>
@@ -89,7 +104,7 @@ const BookingSummaryModal = ({
                         />
                         <Row
                             label={<span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> Time</span>}
-                            value={`${slot.start_time} – ${slot.end_time}`}
+                            value={`${formatTime(slot.start_time)} – ${formatTime(slot.end_time)}`}
                         />
                         <Row label="Duration" value={`${slot.duration_minutes || '—'} minutes`} />
                         <Row label="Timezone" value={slot.timezone || '—'} />

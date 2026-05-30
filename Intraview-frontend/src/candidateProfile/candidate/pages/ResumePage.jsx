@@ -1,6 +1,7 @@
 // src/pages/candidate/ResumePage.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import {
   Upload,
   FileText,
@@ -17,6 +18,9 @@ import { toast } from 'sonner';
 import ProfileSidebar from '../components/ProfileSidebar';
 import useProfileData from '../hooks/useProfileData';
 import { validateFile } from '../../candidateProfileApi';
+import CandidateNavbar from '../../../components/CandidateNavbar';
+import CandidateFooter from '../../../components/CandidateFooter';
+import { logoutUser } from '../../../authentication/authSlice';
 
 // ============================================
 // MODALS
@@ -125,11 +129,10 @@ const UploadSection = ({
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
-          dragActive
-            ? 'border-indigo-500 bg-indigo-50'
-            : 'border-slate-300 bg-slate-50 hover:border-slate-400'
-        }`}
+        className={`relative rounded-2xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${dragActive
+          ? 'border-indigo-500 bg-indigo-50'
+          : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+          }`}
         onClick={() => fileInputRef.current?.click()}
       >
         <input
@@ -296,6 +299,7 @@ const ResumePreviewSection = ({
 
 const ResumePage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const {
     user,
     resume,
@@ -333,94 +337,103 @@ const ResumePage = () => {
     await handleDeleteResume();
   };
 
-  const handleLogout = () => {
-    navigate('/auth/logout');
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+      navigate('/login');
+    } catch {
+      toast.error('Failed to log out');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-        {/* Sidebar */}
-        <ProfileSidebar onLogout={handleLogout} />
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      <CandidateNavbar />
+      <div className="flex-1 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
+          {/* Sidebar */}
+          <ProfileSidebar onLogout={handleLogout} />
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col gap-6">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-indigo-100 mb-1">
-                  Document Management
-                </p>
-                <h1 className="text-2xl sm:text-3xl font-black">Resume & Documents</h1>
-                <p className="text-sm text-indigo-100 mt-2 max-w-md">
-                  Upload and manage your resume. This helps interviewers prepare for your session.
-                </p>
-              </div>
-              <FileText className="w-16 h-16 text-indigo-300 opacity-50" />
-            </div>
-          </div>
-
-          {/* Content Grid */}
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <UploadSection
-                onUpload={handleUpload}
-                isUploading={isUploadingResume}
-                hasResume={resume.hasResume}
-                onReplace={() => {}}
-              />
-
-              <ResumePreviewSection
-                resumeUrl={resume.resumeUrl}
-                isLoading={false}
-                onDelete={handleDelete}
-                isDeletingResume={isDeletingResume}
-                shareToggle={shareToggle}
-                onShareToggle={setShareToggle}
-              />
-            </div>
-
-            {/* Sidebar Info */}
-            <div className="space-y-4">
-              <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 shadow-sm sticky top-4">
-                <h3 className="text-sm font-bold text-slate-900 mb-3">Resume tips</h3>
-                <div className="space-y-2 text-xs text-slate-600">
-                  <p>
-                    ✅ Keep it concise (1-2 pages)
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col gap-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-semibold text-indigo-100 mb-1">
+                    Document Management
                   </p>
-                  <p>
-                    ✅ Highlight key achievements
-                  </p>
-                  <p>
-                    ✅ Include relevant skills
-                  </p>
-                  <p>
-                    ✅ Add contact information
-                  </p>
-                  <p>
-                    ✅ Use clear formatting
+                  <h1 className="text-2xl sm:text-3xl font-black">Resume & Documents</h1>
+                  <p className="text-sm text-indigo-100 mt-2 max-w-md">
+                    Upload and manage your resume. This helps interviewers prepare for your session.
                   </p>
                 </div>
+                <FileText className="w-16 h-16 text-indigo-300 opacity-50" />
+              </div>
+            </div>
+
+            {/* Content Grid */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <UploadSection
+                  onUpload={handleUpload}
+                  isUploading={isUploadingResume}
+                  hasResume={resume.hasResume}
+                  onReplace={() => { }}
+                />
+
+                <ResumePreviewSection
+                  resumeUrl={resume.resumeUrl}
+                  isLoading={false}
+                  onDelete={handleDelete}
+                  isDeletingResume={isDeletingResume}
+                  shareToggle={shareToggle}
+                  onShareToggle={setShareToggle}
+                />
               </div>
 
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl border border-blue-100 p-4">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-blue-900 mb-1">
-                      Pro tip
+              {/* Sidebar Info */}
+              <div className="space-y-4">
+                <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 shadow-sm sticky top-4">
+                  <h3 className="text-sm font-bold text-slate-900 mb-3">Resume tips</h3>
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <p>
+                      ✅ Keep it concise (1-2 pages)
                     </p>
-                    <p className="text-blue-700">
-                      A well-formatted resume helps interviewers quickly understand your background and prepare better questions.
+                    <p>
+                      ✅ Highlight key achievements
                     </p>
+                    <p>
+                      ✅ Include relevant skills
+                    </p>
+                    <p>
+                      ✅ Add contact information
+                    </p>
+                    <p>
+                      ✅ Use clear formatting
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl border border-blue-100 p-4">
+                  <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <p className="font-semibold text-blue-900 mb-1">
+                        Pro tip
+                      </p>
+                      <p className="text-blue-700">
+                        A well-formatted resume helps interviewers quickly understand your background and prepare better questions.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
+      <CandidateFooter />
     </div>
   );
 };

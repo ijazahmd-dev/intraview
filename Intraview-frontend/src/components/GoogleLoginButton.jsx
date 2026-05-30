@@ -93,7 +93,7 @@ import { googleLogin } from "../api/authApi";
 import toaster from "../utils/toaster";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";           // ← **CHANGE 1: ADD**
-import { loginUser, fetchUser } from "../authentication/authSlice"; // ← **CHANGE 2: ADD**
+import { googleLoginUser, fetchUser } from "../authentication/authSlice"; // ← **CHANGE 2: ADD**
 
 const GoogleLoginButton = ({ disabled }) => {         // ← **CHANGE 3: ADD disabled prop**
   const buttonRef = useRef(null);
@@ -140,15 +140,15 @@ const GoogleLoginButton = ({ disabled }) => {         // ← **CHANGE 3: ADD dis
     setLoading(true);
 
     try {
-      // **CHANGE 6: Use Redux thunk (but googleLogin returns id_token data)**
-      const result = await dispatch(loginUser({ id_token: response.credential }));
-      
-      if (loginUser.fulfilled.match(result)) {
+      // **CHANGE 6: Use Redux thunk (uses /auth/google-login/)**
+      const result = await dispatch(googleLoginUser(response.credential));
+
+      if (googleLoginUser.fulfilled.match(result)) {
         // If no user data returned, fetch from /auth/me/
         if (!result.payload?.user) {
           await dispatch(fetchUser());
         }
-        
+
         toaster.success("Google Login Successful!");
         navigate("/home");
       }
@@ -164,13 +164,13 @@ const GoogleLoginButton = ({ disabled }) => {         // ← **CHANGE 3: ADD dis
   return (
     <div style={{ marginTop: "10px", textAlign: "center" }}>
       {loading && <p>Signing in...</p>}
-      <div 
-        ref={buttonRef} 
-        style={{ 
+      <div
+        ref={buttonRef}
+        style={{
           minHeight: "50px",
           opacity: disabled ? 0.5 : 1,     // ← **CHANGE 7: ADD disabled styling**
           pointerEvents: disabled ? "none" : "auto"  // ← **CHANGE 8: Block clicks when disabled**
-        }} 
+        }}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { login, getCurrentUser, logout } from "../api/authApi";
+import { login, getCurrentUser, logout, googleLogin } from "../api/authApi";
 
 
 // Restore session from cookies
@@ -14,7 +14,7 @@ export const fetchUser = createAsyncThunk(
         return null; // not logged in
       }
       return rejectWithValue(err.response?.data || "Failed to load user");
-    }finally{
+    } finally {
     }
   }
 );
@@ -30,6 +30,20 @@ export const loginUser = createAsyncThunk(
       return res.data;
     } catch (err) {
       return rejectWithValue(err.response?.data || "Login failed");
+    }
+  }
+);
+
+// Google Login
+export const googleLoginUser = createAsyncThunk(
+  "auth/googleLoginUser",
+  async (idToken, { rejectWithValue }) => {
+    try {
+      const res = await googleLogin(idToken);
+      localStorage.setItem("auth_role", "user");
+      return res; // googleLogin function in authApi already returns res.data
+    } catch (err) {
+      return rejectWithValue(err.response?.data || "Google login failed");
     }
   }
 );
@@ -89,6 +103,21 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Login failed";
+      });
+
+    // googleLoginUser
+    builder
+      .addCase(googleLoginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLoginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload || state.user;
+      })
+      .addCase(googleLoginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Google Login failed";
       });
 
     // logoutUser

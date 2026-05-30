@@ -1,19 +1,24 @@
+import React, { useState, useEffect } from 'react';
 
-import React, { useState } from 'react';
-
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 import { Play, Pause, SkipBack, SkipForward, RotateCcw, Settings, Maximize2, Mic, Target, Clock, Lightbulb } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../authentication/authSlice';
 import { Link } from "react-router-dom";
 import NotificationBell from '../features/notification/user/components/NotificationBell';
-
-
+import CandidateNavbar from '../components/CandidateNavbar';
+import CandidateFooter from '../components/CandidateFooter';
+import { fetchSubscriptionPlans } from '../subscriptions/subscriptionSlice';
 export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const { user } = useSelector((state)=>state.auth)
+  const { user } = useSelector((state) => state.auth)
+  const { plans, loading } = useSelector((state) => state.subscription) || { plans: [], loading: false };
   const dispatch = useDispatch()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    dispatch(fetchSubscriptionPlans());
+  }, [dispatch]);
 
   const handleLogin = () => navigate('/login')
   const handleSignup = () => navigate('/signup')
@@ -68,70 +73,7 @@ export default function Home() {
         </div>
       </header> */}
 
-       <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">In</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">IntraView</span>
-            </div>
-            <nav className="hidden md:flex space-x-8">
-              <Link to="/" className="text-gray-600 hover:text-gray-900">
-                Home
-              </Link>
-
-              <Link to="/about" className="text-gray-600 hover:text-gray-900">
-                About
-              </Link>
-
-              <Link to="/candidate/interviewers" className="text-gray-600 hover:text-gray-900">
-                Interviewers
-              </Link>
-
-              <Link to="/candidate/dashboard/upcoming" className="text-gray-600 hover:text-gray-900">
-                Sessions
-              </Link>
-
-              <Link to="/candidate/wallet" className="text-gray-600 hover:text-gray-900">
-                Wallet
-              </Link>
-
-              <Link to="/subscriptions" className="text-gray-600 hover:text-gray-900">
-                Subscriptions
-              </Link>
-            </nav>
-
-              <div className="flex items-center space-x-4">
-              {user ? (
-                <button 
-                  onClick={() => dispatch(logoutUser())}
-                  className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-medium"
-                >
-                  Logout
-                </button>
-              ) : (
-                <>
-                  <button 
-                    onClick={handleLogin}
-                    className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
-                  >
-                    Log In
-                  </button>
-                  <button 
-                    onClick={handleSignup}
-                    className="bg-teal-500 hover:bg-teal-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-medium shadow-sm"
-                  >
-                    Sign Up
-                  </button>
-                </>
-              )}
-            </div>
-            <NotificationBell />
-          </div>
-        </div>
-      </header>
+      <CandidateNavbar />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -222,76 +164,76 @@ export default function Home() {
 
       {/* Demo Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-  <div
-    className="rounded-3xl bg-gray-100 p-10 md:p-16 shadow-xl"
-
-  >
-    <div className="grid md:grid-cols-2 gap-12 items-center">
-
-      {/* LEFT SIDE – TEXT */}
-      <div>
-        <h2 className="text-4xl font-bold text-gray-900 leading-tight mb-6">
-          Become an Interviewer on IntraView
-        </h2>
-
-        <p className="text-gray-600 text-lg leading-relaxed mb-6">
-          Share your expertise and mentor the next generation of professionals.
-          IntraView allows seasoned candidates, working professionals, and
-          industry experts to conduct mock interviews and get paid for each
-          session. Flexible hours. Meaningful impact.
-        </p>
-
-        <ul className="space-y-3 text-gray-700 mb-8">
-          <li className="flex items-start gap-3">
-            <span className="text-green-600 text-xl">•</span>
-            Flexible interview scheduling
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-600 text-xl">•</span>
-            Earn for every mock interview you conduct
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-600 text-xl">•</span>
-            Help candidates improve with real-world insights
-          </li>
-        </ul>
-
-        <button
-          className="px-8 py-3 bg-teal-500 rounded-xl text-white font-semibold shadow-md transition transform hover:scale-[1.02]"
-              onClick={handleInterviewRequest}
-        >
-          Apply to Become an Interviewer →
-        </button>
-      </div>
-
-      {/* RIGHT SIDE – ILLUSTRATION BLOCK */}
-      <div className="relative">
         <div
-          className="rounded-2xl shadow-2xl p-6 md:p-8"
-          style={{ backgroundColor: "#ffffff" }}
+          className="rounded-3xl bg-gray-100 p-10 md:p-16 shadow-xl"
+
         >
-          <img
-            src=""
-            alt="Interviewer illustration"
-            className="w-full h-auto object-contain opacity-95"
-          />
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+
+            {/* LEFT SIDE – TEXT */}
+            <div>
+              <h2 className="text-4xl font-bold text-gray-900 leading-tight mb-6">
+                Become an Interviewer on IntraView
+              </h2>
+
+              <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                Share your expertise and mentor the next generation of professionals.
+                IntraView allows seasoned candidates, working professionals, and
+                industry experts to conduct mock interviews and get paid for each
+                session. Flexible hours. Meaningful impact.
+              </p>
+
+              <ul className="space-y-3 text-gray-700 mb-8">
+                <li className="flex items-start gap-3">
+                  <span className="text-green-600 text-xl">•</span>
+                  Flexible interview scheduling
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-600 text-xl">•</span>
+                  Earn for every mock interview you conduct
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-600 text-xl">•</span>
+                  Help candidates improve with real-world insights
+                </li>
+              </ul>
+
+              <button
+                className="px-8 py-3 bg-teal-500 rounded-xl text-white font-semibold shadow-md transition transform hover:scale-[1.02]"
+                onClick={handleInterviewRequest}
+              >
+                Apply to Become an Interviewer →
+              </button>
+            </div>
+
+            {/* RIGHT SIDE – ILLUSTRATION BLOCK */}
+            <div className="relative">
+              <div
+                className="rounded-2xl shadow-2xl p-6 md:p-8"
+                style={{ backgroundColor: "#ffffff" }}
+              >
+                <img
+                  src=""
+                  alt="Interviewer illustration"
+                  className="w-full h-auto object-contain opacity-95"
+                />
+              </div>
+
+              {/* Decorative floating shape */}
+              <div
+                className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30 blur-xl"
+                style={{ backgroundColor: "#A1BC98" }}
+              ></div>
+
+              <div
+                className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full opacity-20 blur-xl"
+                style={{ backgroundColor: "#D2DCB6" }}
+              ></div>
+            </div>
+
+          </div>
         </div>
-
-        {/* Decorative floating shape */}
-        <div
-          className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-30 blur-xl"
-          style={{ backgroundColor: "#A1BC98" }}
-        ></div>
-
-        <div
-          className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full opacity-20 blur-xl"
-          style={{ backgroundColor: "#D2DCB6" }}
-        ></div>
-      </div>
-
-    </div>
-  </div>
-</section>
+      </section>
 
 
 
@@ -299,70 +241,102 @@ export default function Home() {
       <section className="bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
-            Say Goodbye to $200 Mock Interviews
+            Interview Smarter. Prepare Better.
           </h2>
           <p className="text-center text-gray-600 mb-12">
-            Our unlimited, voice-based mock interviews for less than a <span className="font-semibold">cappuccino a session</span>.<br />
-            Practice as you'd like — whenever you need it.
+            Get access to AI mock interviews, expert interviewers, and guided feedback — all in one platform.
           </p>
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="bg-white border-2 border-gray-200 rounded-xl p-8">
-              <p className="text-sm font-medium text-gray-600 mb-2">Starter</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">$14</span>
-                <span className="text-gray-600"> /month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center text-gray-700">
-                  <span className="text-teal-500 mr-2">✓</span>
-                  10 mock interviews / month
-                </li>
-                <li className="flex items-center text-gray-700">
-                  <span className="text-teal-500 mr-2">✓</span>
-                  Multiple interview types
-                </li>
-                <li className="flex items-center text-gray-700">
-                  <span className="text-teal-500 mr-2">✓</span>
-                  Role-specific prompts
-                </li>
-                <li className="flex items-center text-gray-700">
-                  <span className="text-teal-500 mr-2">✓</span>
-                  Smart AI model
-                </li>
-              </ul>
-              <button className="w-full bg-teal-500 text-white py-3 rounded-lg hover:bg-teal-600 transition font-medium">
-                Start Now
-              </button>
+
+          {loading ? (
+            <div className="text-center text-gray-500 py-10">Loading plans...</div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              {plans?.filter(p => !p.name.toLowerCase().includes("basic") && p.is_active).map(plan => {
+                const isPro = plan.name.toLowerCase().includes("pro");
+                return (
+                  <div key={plan.id} className={isPro ? "bg-gray-900 text-white rounded-xl p-8 relative" : "bg-white border-2 border-gray-200 rounded-xl p-8 relative"}>
+
+                    {!isPro && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-500 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
+                        Most Popular
+                      </span>
+                    )}
+
+                    <p className={`text-sm font-medium mb-1 ${isPro ? "text-gray-400" : "text-gray-600"}`}>
+                      {plan.name}
+                    </p>
+                    <div className="mb-2">
+                      <span className={`text-4xl font-bold ${isPro ? "text-white" : "text-gray-900"}`}>₹{plan.price_inr}</span>
+                      <span className={isPro ? "text-gray-400" : "text-gray-600"}> /{plan.billing_cycle_days === 30 ? "month" : plan.billing_cycle_days + " days"}</span>
+                    </div>
+
+                    <p className={`text-sm mb-6 ${isPro ? "text-gray-400" : "text-gray-500"}`}>
+                      {plan.description || (isPro ? "Built for serious candidates preparing aggressively." : "Best for beginners preparing consistently.")}
+                    </p>
+
+                    <ul className={`space-y-3 mb-8 ${isPro ? "text-white" : "text-gray-700"}`}>
+                      <li className="flex items-center">
+                        <span className={`mr-3 ${isPro ? "text-yellow-400" : "text-teal-500"}`}>✓</span>
+                        {plan.monthly_free_tokens} free tokens/month
+                      </li>
+                      <li className="flex items-center">
+                        <span className={`mr-3 ${isPro ? "text-yellow-400" : "text-teal-500"}`}>✓</span>
+                        {plan.ai_interviews_per_month === -1 || plan.ai_interviews_per_month > 999 ? "Unlimited AI interviews" : `${plan.ai_interviews_per_month} AI mock interviews`}
+                      </li>
+
+                      {!isPro && (
+                        <>
+                          <li className="flex items-center">
+                            <span className="text-teal-500 mr-3">✓</span>
+                            Practice with multiple interview types
+                          </li>
+                          <li className="flex items-center">
+                            <span className="text-teal-500 mr-3">✓</span>
+                            Technical + behavioral preparation
+                          </li>
+                          <li className="flex items-center">
+                            <span className="text-teal-500 mr-3">✓</span>
+                            Better interview readiness
+                          </li>
+                        </>
+                      )}
+
+                      {isPro && (
+                        <>
+                          {plan.has_priority_booking && (
+                            <li className="flex items-center">
+                              <span className="text-yellow-400 mr-3">✓</span>
+                              Priority booking
+                            </li>
+                          )}
+                          {plan.has_advanced_ai_feedback && (
+                            <li className="flex items-center">
+                              <span className="text-yellow-400 mr-3">✓</span>
+                              Advanced AI feedback
+                            </li>
+                          )}
+                          <li className="flex items-center">
+                            <span className="text-yellow-400 mr-3">✓</span>
+                            Faster interview preparation
+                          </li>
+                          <li className="flex items-center">
+                            <span className="text-yellow-400 mr-3">✓</span>
+                            Premium mock interview experience
+                          </li>
+                        </>
+                      )}
+                    </ul>
+                    <button
+                      onClick={() => navigate('/subscriptions')}
+                      className={`w-full py-3 mt-auto rounded-lg transition font-medium shadow-sm ${isPro ? "bg-yellow-400 text-gray-900 hover:bg-yellow-500" : "bg-teal-500 text-white hover:bg-teal-600"}`}
+                    >
+                      {isPro ? "Go Pro" : "Start Preparing"}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            <div className="bg-gray-900 text-white rounded-xl p-8 relative">
-              <p className="text-sm font-medium text-gray-400 mb-2">Pro</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">$39</span>
-                <span className="text-gray-400"> /month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <span className="text-yellow-400 mr-2">✓</span>
-                  Unlimited mock interviews
-                </li>
-                <li className="flex items-center">
-                  <span className="text-yellow-400 mr-2">✓</span>
-                  All interview types
-                </li>
-                <li className="flex items-center">
-                  <span className="text-yellow-400 mr-2">✓</span>
-                  Advanced performance feedback
-                </li>
-                <li className="flex items-center">
-                  <span className="text-yellow-400 mr-2">✓</span>
-                  Priority support access
-                </li>
-              </ul>
-              <button className="w-full bg-yellow-400 text-gray-900 py-3 rounded-lg hover:bg-yellow-500 transition font-medium">
-                Get Unlimited
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -382,23 +356,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap justify-center space-x-8 mb-6">
-            <a href="#" className="hover:text-white">Home</a>
-            <a href="#" className="hover:text-white">About</a>
-            <a href="#" className="hover:text-white">Blog</a>
-            <a href="#" className="hover:text-white">FAQ</a>
-            <a href="#" className="hover:text-white">Interview</a>
-            <a href="#" className="hover:text-white">Support</a>
-            <a href="#" className="hover:text-white">Privacy Policy</a>
-          </div>
-          <p className="text-center text-sm">
-            © 2025 IntraView. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <CandidateFooter />
     </div>
   );
 }

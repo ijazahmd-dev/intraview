@@ -48,7 +48,8 @@ class CandidateAvailabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = InterviewerAvailability
         fields = [
-            "id", "title", "start_datetime", "end_datetime",
+            "id", "title", "date", "start_time", "end_time", 
+            "start_datetime", "end_datetime",
             "remaining_capacity", "timezone", "duration_minutes", "token_cost",
         ]
 
@@ -374,12 +375,12 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
     def get_start_time(self, obj):
         if obj.start_datetime:
-            return obj.start_datetime.strftime("%I:%M %p")
+            return timezone.localtime(obj.start_datetime).strftime("%H:%M:%S")
         return None
 
     def get_end_time(self, obj):
         if obj.end_datetime:
-            return obj.end_datetime.strftime("%I:%M %p")
+            return timezone.localtime(obj.end_datetime).strftime("%H:%M:%S")
         return None
 
     def get_proposed_slot(self, obj):
@@ -389,8 +390,8 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         return {
             "id":         slot.id,
             "date":       str(slot.date),
-            "start_time": slot.start_time.strftime("%I:%M %p"),
-            "end_time":   slot.end_time.strftime("%I:%M %p"),
+            "start_time": slot.start_time.strftime("%H:%M:%S"),
+            "end_time":   slot.end_time.strftime("%H:%M:%S"),
         }
 
     def get_feedback_evaluation_id(self, obj):

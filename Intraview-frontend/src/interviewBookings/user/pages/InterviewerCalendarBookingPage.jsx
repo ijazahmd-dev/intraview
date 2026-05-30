@@ -26,6 +26,21 @@ const CalendarBookingPage = () => {
   const [availableDates, setAvailableDates] = useState([]);
   const [bookingLoading, setBookingLoading] = useState(false);
 
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    try {
+      const parts = timeString.split(':');
+      if (parts.length < 2) return timeString;
+      const h = parseInt(parts[0], 10);
+      const m = parts[1];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${m} ${ampm}`;
+    } catch {
+      return timeString;
+    }
+  };
+
   // Transform slots → date summaries for calendar
   const transformSlotsToDates = (slots) => {
     if (!slots || !Array.isArray(slots)) {
@@ -368,16 +383,6 @@ const CalendarBookingPage = () => {
 
             {renderCalendar()}
 
-            <div className="mt-12 pt-8 border-t border-slate-200 space-y-3">
-              <button className="w-full py-4 px-6 border-2 border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-xl bg-white/80 backdrop-blur-sm flex items-center justify-center gap-3 text-sm font-semibold text-slate-700 transition-all hover:scale-[1.02]">
-                <Calendar className="w-5 h-5" />
-                Sync with Google Calendar
-              </button>
-              <button className="w-full py-4 px-6 border-2 border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-xl bg-white/80 backdrop-blur-sm flex items-center justify-center gap-3 text-sm font-semibold text-slate-700 transition-all hover:scale-[1.02]">
-                <Calendar className="w-5 h-5" />
-                Sync with Outlook
-              </button>
-            </div>
           </div>
 
           <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-200 p-8">
@@ -434,7 +439,7 @@ const CalendarBookingPage = () => {
                       <div className="flex items-center gap-4 z-10">
                         <Clock className={`w-7 h-7 ${canBook ? 'text-white' : 'text-slate-400'}`} />
                         <div>
-                          <div className="font-black text-xl tracking-wide">{slot.start_time} - {slot.end_time}</div>
+                          <div className="font-black text-xl tracking-wide">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</div>
                           <div className={`text-sm mt-1 font-semibold ${canBook ? 'text-white/90' : 'text-slate-500'
                             }`}>
                             {slot.remaining_capacity} spots remaining

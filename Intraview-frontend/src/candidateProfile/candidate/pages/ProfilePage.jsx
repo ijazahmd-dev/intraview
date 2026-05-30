@@ -26,6 +26,9 @@ import PreferencesSection from '../components/sections/PreferencesSection';
 import TokenSummary from '../components/sections/TokenSummary';
 import BookingSummary from '../components/sections/BookingSummary';
 import FeedbackSection from '../components/sections/FeedbackSection';
+import CandidateNavbar from '../../../components/CandidateNavbar';
+import CandidateFooter from '../../../components/CandidateFooter';
+import { logoutUser } from '../../../authentication/authSlice';
 
 // 🔹 Main Profile Header
 const ProfileHeader = ({ user, completionPercent }) => {
@@ -125,21 +128,18 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative px-4 py-4 sm:px-6 sm:py-5 text-center border-b-2 transition-all ${
-                isActive
-                  ? 'border-indigo-600 bg-indigo-50'
-                  : 'border-transparent hover:bg-slate-50'
-              }`}
+              className={`relative px-4 py-4 sm:px-6 sm:py-5 text-center border-b-2 transition-all ${isActive
+                ? 'border-indigo-600 bg-indigo-50'
+                : 'border-transparent hover:bg-slate-50'
+                }`}
             >
               <Icon
-                className={`w-5 h-5 mx-auto mb-1 ${
-                  isActive ? 'text-indigo-600' : 'text-slate-400'
-                }`}
+                className={`w-5 h-5 mx-auto mb-1 ${isActive ? 'text-indigo-600' : 'text-slate-400'
+                  }`}
               />
               <p
-                className={`text-xs font-bold ${
-                  isActive ? 'text-indigo-600' : 'text-slate-700'
-                }`}
+                className={`text-xs font-bold ${isActive ? 'text-indigo-600' : 'text-slate-700'
+                  }`}
               >
                 {tab.label}
               </p>
@@ -196,8 +196,13 @@ const ProfilePage = () => {
     navigate(`/candidate/profile?tab=${tab}`);
   };
 
-  const handleLogout = () => {
-    navigate('/auth/logout');
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+      navigate('/login');
+    } catch {
+      toast.error('Failed to log out');
+    }
   };
 
   if (isLoadingProfile && !candidateProfile) {
@@ -237,99 +242,103 @@ const ProfilePage = () => {
     : getCompletionPercentage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
-        {/* Sidebar (desktop) */}
-        <ProfileSidebar onLogout={handleLogout} />
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      <CandidateNavbar />
+      <div className="flex-1 min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 py-8 px-4 sm:px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
+          {/* Sidebar (desktop) */}
+          <ProfileSidebar onLogout={handleLogout} />
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col gap-6">
-          {/* Header */}
-          <ProfileHeader user={user} completionPercent={completionPercent} />
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col gap-6">
+            {/* Header */}
+            <ProfileHeader user={user} completionPercent={completionPercent} />
 
-          {/* Tab Navigation */}
-          <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
+            {/* Tab Navigation */}
+            <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
-          {/* Mobile navigation hint */}
-          <div className="lg:hidden mb-2">
-            <p className="text-xs text-slate-500 text-center">
-              Use tabs above to navigate between sections. For Resume & Settings, use desktop sidebar.
-            </p>
-          </div>
+            {/* Mobile navigation hint */}
+            <div className="lg:hidden mb-2">
+              <p className="text-xs text-slate-500 text-center">
+                Use tabs above to navigate between sections. For Resume & Settings, use desktop sidebar.
+              </p>
+            </div>
 
-          {/* ========== OVERVIEW TAB ========== */}
-          {activeTab === 'overview' && (
-            <section className="space-y-6">
-              <div className="grid lg:grid-cols-3 gap-6">
-                {/* Main Content (2/3 width on desktop) */}
-                <div className="lg:col-span-2 space-y-6">
-                  <BasicInfoSection />
-                  <CareerInfoSection />
-                  <LinksSection />
-                </div>
+            {/* ========== OVERVIEW TAB ========== */}
+            {activeTab === 'overview' && (
+              <section className="space-y-6">
+                <div className="grid lg:grid-cols-3 gap-6">
+                  {/* Main Content (2/3 width on desktop) */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <BasicInfoSection />
+                    <CareerInfoSection />
+                    <LinksSection />
+                  </div>
 
-                {/* Sidebar Content (1/3 width on desktop) */}
-                <div className="space-y-6">
-                  <BookingSummary />
+                  {/* Sidebar Content (1/3 width on desktop) */}
+                  <div className="space-y-6">
+                    <BookingSummary />
 
-                  {/* Quick Actions */}
-                  <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm">
-                    <h3 className="text-sm font-bold text-slate-900 mb-3">
-                      Quick Actions
-                    </h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => navigate('/candidate/resume')}
-                        className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
-                      >
-                        <span>Manage Resume</span>
-                        <FileText className="w-4 h-4 text-slate-500" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          navigate('/candidate/profile?tab=preferences')
-                        }
-                        className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
-                      >
-                        <span>Edit Preferences</span>
-                        <Heart className="w-4 h-4 text-slate-500" />
-                      </button>
-                      <button
-                        onClick={() => navigate('/candidate/settings')}
-                        className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
-                      >
-                        <span>Account Settings</span>
-                        <Settings className="w-4 h-4 text-slate-500" />
-                      </button>
+                    {/* Quick Actions */}
+                    <div className="bg-white/80 rounded-3xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+                      <h3 className="text-sm font-bold text-slate-900 mb-3">
+                        Quick Actions
+                      </h3>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => navigate('/candidate/resume')}
+                          className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
+                        >
+                          <span>Manage Resume</span>
+                          <FileText className="w-4 h-4 text-slate-500" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            navigate('/candidate/profile?tab=preferences')
+                          }
+                          className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
+                        >
+                          <span>Edit Preferences</span>
+                          <Heart className="w-4 h-4 text-slate-500" />
+                        </button>
+                        <button
+                          onClick={() => navigate('/candidate/settings')}
+                          className="w-full flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all text-xs sm:text-sm font-medium"
+                        >
+                          <span>Account Settings</span>
+                          <Settings className="w-4 h-4 text-slate-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </section>
-          )}
+              </section>
+            )}
 
-          {/* ========== PREFERENCES TAB ========== */}
-          {activeTab === 'preferences' && (
-            <section className="space-y-6">
-              <PreferencesSection />
-            </section>
-          )}
+            {/* ========== PREFERENCES TAB ========== */}
+            {activeTab === 'preferences' && (
+              <section className="space-y-6">
+                <PreferencesSection />
+              </section>
+            )}
 
-          {/* ========== FEEDBACK TAB ========== */}
-          {activeTab === 'feedback' && (
-            <section className="space-y-6">
-              <FeedbackSection />
-            </section>
-          )}
+            {/* ========== FEEDBACK TAB ========== */}
+            {activeTab === 'feedback' && (
+              <section className="space-y-6">
+                <FeedbackSection />
+              </section>
+            )}
 
-          {/* ========== TOKENS TAB ========== */}
-          {activeTab === 'tokens' && (
-            <section className="space-y-6">
-              <TokenSummary />
-            </section>
-          )}
-        </main>
+            {/* ========== TOKENS TAB ========== */}
+            {activeTab === 'tokens' && (
+              <section className="space-y-6">
+                <TokenSummary />
+              </section>
+            )}
+          </main>
+        </div>
       </div>
+      <CandidateFooter />
     </div>
   );
 };
