@@ -91,12 +91,24 @@ class IssueDetailSerializer(serializers.ModelSerializer):
         source="get_priority_display", read_only=True
     )
 
-    raised_by_name = serializers.CharField(
-        source="raised_by.get_full_name", read_only=True
-    )
-    against_user_name = serializers.CharField(
-        source="against_user.get_full_name", read_only=True
-    )
+    raised_by_name = serializers.SerializerMethodField()
+    against_user_name = serializers.SerializerMethodField()
+
+    def get_raised_by_name(self, obj):
+        if not obj.raised_by:
+            return None
+        first_name = obj.raised_by.first_name or ""
+        last_name = obj.raised_by.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else obj.raised_by.email
+
+    def get_against_user_name(self, obj):
+        if not obj.against_user:
+            return None
+        first_name = obj.against_user.first_name or ""
+        last_name = obj.against_user.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else obj.against_user.email
 
     class Meta:
         model = SessionIssue

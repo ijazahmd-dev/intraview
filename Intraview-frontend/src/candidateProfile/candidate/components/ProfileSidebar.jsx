@@ -8,6 +8,8 @@ import {
   WalletCards,
   ShieldCheck,
   LogOut,
+  AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { setActiveTab } from '../../profileSlice';
@@ -42,6 +44,18 @@ const navItems = [
     label: 'Account Settings',
     icon: ShieldCheck,
     to: '/candidate/settings',
+  },
+  {
+    id: 'issues',
+    label: 'My Issues',
+    icon: AlertCircle,
+    to: '/my-issues',
+  },
+  {
+    id: 'feedback',
+    label: 'My Feedbacks',
+    icon: MessageSquare,
+    to: '/candidate/feedback',
   },
 ];
 
@@ -79,6 +93,12 @@ const ProfileSidebar = ({ onLogout }) => {
     if (item.id === 'settings' && location.pathname === '/candidate/settings') {
       return true;
     }
+    if (item.id === 'issues' && location.pathname.startsWith('/my-issues')) {
+      return true;
+    }
+    if (item.id === 'feedback' && location.pathname.startsWith('/candidate/feedback')) {
+      return true;
+    }
     return false;
   };
 
@@ -102,11 +122,10 @@ const ProfileSidebar = ({ onLogout }) => {
             <button
               key={item.id}
               onClick={() => handleNavClick(item)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${
-                active
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${active
                   ? 'bg-indigo-600 text-white shadow-lg'
                   : 'text-slate-700 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-slate-500'}`} />
               <span>{item.label}</span>

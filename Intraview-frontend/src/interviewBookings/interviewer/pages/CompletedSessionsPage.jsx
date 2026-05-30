@@ -6,33 +6,24 @@ import { toast } from 'sonner';
 
 const CompletedSessionsPage = () => {
   const navigate = useNavigate();
-  const [data, setData] = useState({ completed_sessions: [], cancelled_sessions: [] });
+  const [data, setData] = useState({ sessions: [], tokens_earned: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('completed');
+  const [filter, setFilter] = useState('ALL');
 
   useEffect(() => {
-    fetchCompletedSessions();
+    fetchHistorySessions();
   }, []);
 
-  const fetchCompletedSessions = async () => {
+  const fetchHistorySessions = async () => {
     try {
       setLoading(true);
       const res = await interviewerBookingsApi.getCompletedSessions();
-      console.log('Completed Sessions API Response:', res.data); // ✅ DEBUG
-      const cancelled = res.data.completed_sessions?.filter(session => 
-        session.status?.includes('CANCELLED')
-      ) || [];
-      const completed = res.data.completed_sessions?.filter(session => 
-        !session.status?.includes('CANCELLED')
-      ) || [];
-      
       setData({
-        completed_sessions: completed,
-        cancelled_sessions: cancelled,
+        sessions: res.data.completed_sessions || [],
         tokens_earned: res.data.tokens_earned || 0
       });
     } catch (error) {
-      toast.error('Failed to load completed sessions');
+      toast.error('Failed to load session history');
     } finally {
       setLoading(false);
     }
@@ -44,16 +35,18 @@ const CompletedSessionsPage = () => {
       CANCELLED: 'bg-rose-100 text-rose-800',
       CANCELLED_BY_CANDIDATE: 'bg-amber-100 text-amber-800',
       CANCELLED_BY_INTERVIEWER: 'bg-rose-100 text-rose-800',
+      CONFIRMED: 'bg-indigo-100 text-indigo-800',
+      CANDIDATE_NO_SHOW: 'bg-slate-200 text-slate-800',
+      INTERVIEWER_NO_SHOW: 'bg-slate-200 text-slate-800',
     };
-    
+
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${config[status] || 'bg-slate-100 text-slate-800'}`}>
-        {status?.replace('_', ' ')}
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${config[status] || 'bg-slate-100 text-slate-800'}`}>
+        {status?.replace(/_/g, ' ')}
       </span>
     );
   };
 
-  // ✅ FIXED: Helper to combine date + time
   const formatDateTime = (date, time) => {
     if (!date || !time) return 'N/A';
     try {
@@ -64,32 +57,35 @@ const CompletedSessionsPage = () => {
     }
   };
 
-  const renderSessions = (sessions, isCompletedTab) => {
-    if (sessions.length === 0) {
+  const filteredSessions = React.useMemo(() => {
+    if (filter === 'ALL') return data.sessions;
+    if (filter === 'CANCELLED') return data.sessions.filter(s => s.status?.includes('CANCELLED'));
+    if (filter === 'NO_SHOW') return data.sessions.filter(s => s.status?.includes('NO_SHOW'));
+    return data.sessions.filter(s => s.status === filter);
+  }, [data.sessions, filter]);
+
+  const renderSessions = () => {
+    if (filteredSessions.length === 0) {
       return (
         <div className="text-center py-20">
-          <div className={`w-24 h-24 ${isCompletedTab ? 'bg-emerald-100' : 'bg-slate-100'} rounded-3xl flex items-center justify-center mx-auto mb-6`}>
-            <svg className={`w-12 h-12 ${isCompletedTab ? 'text-emerald-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isCompletedTab ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636 9 9 0 0018.364 18.364zm0 0A9 9 0 005.636 5.636 9 9 0 0018.364 18.364z" />
-              )}
+          <div className="w-24 h-24 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h3 className="text-xl font-semibold text-slate-900 mb-2">
-            {isCompletedTab ? 'No completed sessions' : 'No cancelled sessions'}
+            No sessions found
           </h3>
-          <p className="text-slate-600">{isCompletedTab ? 'Completed sessions will appear here.' : 'Cancelled sessions will appear here.'}</p>
+          <p className="text-slate-600">No sessions match your selected filter.</p>
         </div>
       );
     }
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sessions.map((booking) => {
+        {filteredSessions.map((booking) => {
           const dateTime = formatDateTime(booking.date, booking.start_time);
-          
+
           return (
             <div
               key={booking.id}
@@ -106,7 +102,6 @@ const CompletedSessionsPage = () => {
                 <StatusBadge status={booking.status} />
               </div>
 
-              {/* ✅ FIXED: Date & Time */}
               <div className="space-y-3 mb-6">
                 <div className="flex items-center gap-2 text-sm text-slate-700">
                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,19 +117,17 @@ const CompletedSessionsPage = () => {
                 </div>
               </div>
 
-              {/* ✅ Tokens - Fixed fallback */}
-              {activeTab === 'completed' && (
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold">
+              {booking.status === 'COMPLETED' && (
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-semibold">
                     +{booking.token_cost || 0} earned
                   </span>
                 </div>
               )}
 
-              {/* ✅ Cancel reason */}
-              {activeTab === 'cancelled' && booking.cancellation_reason && (
+              {booking.status?.includes('CANCELLED') && booking.cancellation_reason && (
                 <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200">
-                  <p className="text-sm text-rose-700 whitespace-pre-line">{booking.cancellation_reason}</p>
+                  <p className="text-sm text-rose-700 whitespace-pre-line truncate">{booking.cancellation_reason}</p>
                 </div>
               )}
             </div>
@@ -154,42 +147,30 @@ const CompletedSessionsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Session History</h1>
           <p className="text-slate-600 mt-2">
             Total earnings: <span className="font-bold text-emerald-600">+{data.tokens_earned || 0} tokens</span>
           </p>
         </div>
+
+        {/* Filter Dropdown */}
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="px-4 py-3 border border-slate-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-semibold bg-white shadow-sm hover:shadow-md transition-all duration-200"
+        >
+          <option value="ALL">All Past Sessions</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="CONFIRMED">Past Pending</option>
+          <option value="CANCELLED">Cancelled</option>
+          <option value="NO_SHOW">No Show</option>
+        </select>
       </div>
 
-      {/* Manual Tabs */}
-      <div className="flex bg-slate-100 rounded-2xl p-1 shadow-sm mb-8">
-        <button
-          onClick={() => setActiveTab('completed')}
-          className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-200 ${
-            activeTab === 'completed'
-              ? 'bg-white shadow-lg text-slate-900 border-2 border-white -m-px'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-          }`}
-        >
-          Completed ({data.completed_sessions?.length || 0})
-        </button>
-        <button
-          onClick={() => setActiveTab('cancelled')}
-          className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-200 ${
-            activeTab === 'cancelled'
-              ? 'bg-white shadow-lg text-slate-900 border-2 border-white -m-px'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-          }`}
-        >
-          Cancelled ({data.cancelled_sessions?.length || 0})
-        </button>
-      </div>
-
-      <div className="space-y-6">
-        {activeTab === 'completed' && renderSessions(data.completed_sessions, true)}
-        {activeTab === 'cancelled' && renderSessions(data.cancelled_sessions, false)}
+      <div className="space-y-6 pt-4">
+        {renderSessions()}
       </div>
     </div>
   );

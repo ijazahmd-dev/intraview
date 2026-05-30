@@ -376,18 +376,17 @@ const UpcomingSessionsPage = () => {
                     </div>
                   )}
 
-                  {/* Original action buttons */}
+                  {/* Action buttons */}
                   <div className="flex gap-3 pt-4 border-t border-slate-200">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        openCancelModal(booking.id);
+                        navigate(`/interview/room/${booking.id}`);
                       }}
-                      disabled={cancelLoading}
-                      className="flex-1 bg-white border-2 border-rose-200 hover:border-rose-300 hover:bg-rose-50 text-rose-700 font-semibold py-4 px-6 rounded-2xl transition-all duration-200 disabled:opacity-50"
+                      className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       <svg
-                        className="w-4 h-4 mr-2 inline"
+                        className="w-5 h-5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -396,10 +395,10 @@ const UpcomingSessionsPage = () => {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                         />
                       </svg>
-                      Cancel Session
+                      Join Now
                     </button>
 
                     <button
@@ -420,16 +419,6 @@ const UpcomingSessionsPage = () => {
           </div>
         )}
       </div>
-
-      {/* Cancel modal (unchanged) */}
-      {cancelModalOpen && selectedBookingId && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-          <div className="bg-white/95 backdrop-blur-2xl rounded-3xl max-w-md w-full shadow-2xl border border-white/50 max-h-[90vh] overflow-y-auto">
-            {/* ... existing cancel modal content ... */}
-            {/* (keep your current cancel modal exactly as you have it now) */}
-          </div>
-        </div>
-      )}
 
       {/* NEW: Reschedule reject modal */}
       {rescheduleRejectModalOpen && rescheduleRejectBookingId && (

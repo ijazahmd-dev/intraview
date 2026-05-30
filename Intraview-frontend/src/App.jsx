@@ -176,6 +176,13 @@ function AppInner() {
 
         <Route path="/candidate/progress" element={<CandidateProgressPage />} />
 
+        <Route path="/candidate/bookings/:bookingId/review" element={<SubmitInterviewerReviewPage />} />
+        <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
+        <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
+
+        <Route path="/my-issues" element={<MyIssuesPage />} />
+        <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
+
 
 
 
@@ -223,7 +230,11 @@ function AppInner() {
           <Route path="bookings/:bookingId" element={<InterviewerBookingDetailPage />} />
           <Route path="wallet" element={<InterviewerWalletPage />} />
           <Route path="subscriptions" element={<InterviewerSubscriptionsPage />} />
+          <Route path="my-issues" element={<InterviewerMyIssuesPage />} />
+          <Route path="evaluations" element={< EvaluationsDashboard />} />
+
         </Route>
+
 
         <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
         <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
@@ -234,24 +245,20 @@ function AppInner() {
         <Route path="/interviewer/payout/:id" element={<PayoutDetailPage />} />
 
         {/* feedback routes */}
-        <Route path="/interviewer/evaluations" element={< EvaluationsDashboard />} />
+
         <Route path="/interviewer/evaluations/:evaluationId" element={< FeedbackDetail />} />
         <Route path="/interviewer/bookings/:bookingId/evaluate" element={< SubmitEvaluationWrapper />} />
-        <Route path="/candidate/bookings/:bookingId/review" element={<SubmitInterviewerReviewPage />} />
-        <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
-        <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
+
 
 
 
         <Route path="/notifications" element={< NotificationsPage />} />
 
 
-        <Route path="/my-issues" element={<MyIssuesPage />} />
-        <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
-        <Route path="/interviewer/my-issues" element={<InterviewerMyIssuesPage />} />
+
+
         <Route path="/interviewer/my-issues/:issueId" element={<InterviewerIssueDetailPage />} />
-        <Route path="admin/issues" element={<AdminIssuesPage />} />
-        <Route path="admin/issues/:issueId" element={<AdminIssueDetailPage />} />
+
 
 
 
@@ -319,6 +326,17 @@ function AppInner() {
         <Route path="/admin/sessions" element={
           <AdminProtectedRoute>
             <AdminSessionsPage />
+          </AdminProtectedRoute>
+        } />
+
+        <Route path="admin/issues" element={
+          <AdminProtectedRoute>
+            <AdminIssuesPage />
+          </AdminProtectedRoute>
+        } />
+        <Route path="admin/issues/:issueId" element={
+          <AdminProtectedRoute>
+            <AdminIssueDetailPage />
           </AdminProtectedRoute>
         } />
 

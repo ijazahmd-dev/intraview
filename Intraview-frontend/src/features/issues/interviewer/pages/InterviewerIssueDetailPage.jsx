@@ -275,7 +275,7 @@ const InterviewerIssueDetailPage = () => {
 
         {/* Back */}
         <button
-          onClick={() => navigate("/interviewer/my-issues")}
+          onClick={() => navigate("/interviewer/dashboard/my-issues")}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Back to My Issues
@@ -346,26 +346,26 @@ const InterviewerIssueDetailPage = () => {
         {/* Presence data — useful for no-show reports */}
         {(issue.candidate_presence_minutes != null ||
           issue.interviewer_presence_minutes != null) && (
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-2">
-              Session Presence Data
-            </h2>
-            {issue.interviewer_presence_minutes != null && (
-              <InfoRow
-                icon={Clock}
-                label="Your Presence"
-                value={`${issue.interviewer_presence_minutes} min`}
-              />
-            )}
-            {issue.candidate_presence_minutes != null && (
-              <InfoRow
-                icon={Clock}
-                label="Candidate Presence"
-                value={`${issue.candidate_presence_minutes} min`}
-              />
-            )}
-          </div>
-        )}
+            <div className="bg-white rounded-xl border border-gray-100 p-6">
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">
+                Session Presence Data
+              </h2>
+              {issue.interviewer_presence_minutes != null && (
+                <InfoRow
+                  icon={Clock}
+                  label="Your Presence"
+                  value={`${issue.interviewer_presence_minutes} min`}
+                />
+              )}
+              {issue.candidate_presence_minutes != null && (
+                <InfoRow
+                  icon={Clock}
+                  label="Candidate Presence"
+                  value={`${issue.candidate_presence_minutes} min`}
+                />
+              )}
+            </div>
+          )}
 
         {/* Description card */}
         <div className="bg-white rounded-xl border border-gray-100 p-6">

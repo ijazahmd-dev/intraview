@@ -18,6 +18,9 @@ import {
   Info,
 } from "lucide-react";
 
+import CandidateNavbar from "../../../../components/CandidateNavbar";
+import CandidateFooter from "../../../../components/CandidateFooter";
+
 import {
   fetchCandidateIssueDetail,
   clearCandidateSelectedIssue,
@@ -266,96 +269,100 @@ const CandidateIssueDetailPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+    <>
+      <CandidateNavbar />
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="flex-grow max-w-2xl w-full mx-auto px-4 py-8 space-y-4">
 
-        {/* Back */}
-        <button
-          onClick={() => navigate("/my-issues")}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to My Issues
-        </button>
+          {/* Back */}
+          <button
+            onClick={() => navigate("/my-issues")}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to My Issues
+          </button>
 
-        {/* Title card */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{typeLabel}</h1>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Issue #{issue.id} · Booking #{issue.booking_id}
-              </p>
+          {/* Title card */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">{typeLabel}</h1>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Issue #{issue.id} · Booking #{issue.booking_id}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <IssuePriorityBadge priority={issue.priority} />
+                <IssueStatusBadge status={issue.status} />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <IssuePriorityBadge priority={issue.priority} />
-              <IssueStatusBadge status={issue.status} />
-            </div>
+
+            {/* Status banner */}
+            {(issue.status !== "OPEN" && issue.status !== "UNDER_REVIEW") && (
+              <div className="mt-4">
+                <StatusBanner status={issue.status} resolution={issue.resolution} />
+              </div>
+            )}
           </div>
 
-          {/* Status banner */}
-          {(issue.status !== "OPEN" && issue.status !== "UNDER_REVIEW") && (
-            <div className="mt-4">
-              <StatusBanner status={issue.status} resolution={issue.resolution} />
-            </div>
-          )}
-        </div>
-
-        {/* Details card */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">
-            Issue Details
-          </h2>
-          <InfoRow icon={User} label="Raised By" value={issue.raised_by_name} />
-          <InfoRow icon={User} label="Against" value={issue.against_user_name} />
-          <InfoRow
-            icon={Calendar}
-            label="Reported On"
-            value={formatDate(issue.created_at)}
-          />
-          {issue.issue_deadline && (
+          {/* Details card */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2">
+              Issue Details
+            </h2>
+            <InfoRow icon={User} label="Raised By" value={issue.raised_by_name} />
+            <InfoRow icon={User} label="Against" value={issue.against_user_name} />
             <InfoRow
-              icon={Clock}
-              label="Issue Deadline"
-              value={formatDate(issue.issue_deadline)}
+              icon={Calendar}
+              label="Reported On"
+              value={formatDate(issue.created_at)}
             />
-          )}
-          {issue.resolved_at && (
-            <InfoRow
-              icon={CheckCircle2}
-              label="Resolved On"
-              value={formatDate(issue.resolved_at)}
-            />
-          )}
-        </div>
-
-        {/* Description card */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">
-            Your Description
-          </h2>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {issue.description}
-          </p>
-        </div>
-
-        {/* Timeline card */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">
-            Issue Timeline
-          </h2>
-          <div>
-            {timeline.map((item, idx) => (
-              <TimelineItem
-                key={idx}
-                {...item}
-                isLast={idx === timeline.length - 1}
+            {issue.issue_deadline && (
+              <InfoRow
+                icon={Clock}
+                label="Issue Deadline"
+                value={formatDate(issue.issue_deadline)}
               />
-            ))}
+            )}
+            {issue.resolved_at && (
+              <InfoRow
+                icon={CheckCircle2}
+                label="Resolved On"
+                value={formatDate(issue.resolved_at)}
+              />
+            )}
           </div>
-        </div>
 
+          {/* Description card */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2">
+              Your Description
+            </h2>
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {issue.description}
+            </p>
+          </div>
+
+          {/* Timeline card */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+              Issue Timeline
+            </h2>
+            <div>
+              {timeline.map((item, idx) => (
+                <TimelineItem
+                  key={idx}
+                  {...item}
+                  isLast={idx === timeline.length - 1}
+                />
+              ))}
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+      <CandidateFooter />
+    </>
   );
 };
 

@@ -86,7 +86,7 @@ const EvaluationsDashboard = () => {
               </div>
               <div>
                 <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-                  My Evaluations
+                  Evaluations Given
                 </h1>
                 <p className="text-xl text-slate-600 mt-2">
                   {evaluations.length} evaluations submitted

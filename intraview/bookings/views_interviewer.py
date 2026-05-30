@@ -124,28 +124,6 @@ class InterviewerCancelBookingAPIView(APIView):
 
 
 
-# class InterviewerUpcomingSessionsAPIView(APIView):
-#     authentication_classes = [InterviewerCookieJWTAuthentication]
-#     permission_classes = [IsAuthenticated, IsActiveInterviewer]
-
-#     def get(self, request):
-#         qs = (
-#             InterviewBooking.objects
-#             .filter(
-#                 interviewer=request.user,
-#                 status=InterviewBooking.Status.CONFIRMED,
-#             )
-#             .select_related("candidate", "availability")
-#             .order_by("start_datetime")
-#         )
-
-#         serializer = InterviewerUpcomingSerializer(qs, many=True)
-#         return Response(serializer.data)
-    
-
-
-
-
 
 
 class InterviewerHistoryAPIView(APIView):
@@ -153,16 +131,22 @@ class InterviewerHistoryAPIView(APIView):
     permission_classes = [IsAuthenticated, IsActiveInterviewer]
 
     def get(self, request):
+        now = timezone.now()
         qs = (
             InterviewBooking.objects
             .filter(
-                interviewer=request.user,
-                status__in=[
-                    InterviewBooking.Status.COMPLETED,
-                    InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
-                    InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
-                    InterviewBooking.Status.CANCELLED
-                ]
+                models.Q(interviewer=request.user) &
+                (
+                    models.Q(status__in=[
+                        InterviewBooking.Status.COMPLETED,
+                        InterviewBooking.Status.CANCELLED_BY_CANDIDATE,
+                        InterviewBooking.Status.CANCELLED_BY_INTERVIEWER,
+                        InterviewBooking.Status.CANCELLED,
+                        InterviewBooking.Status.CANDIDATE_NO_SHOW,
+                        InterviewBooking.Status.INTERVIEWER_NO_SHOW,
+                    ]) |
+                    models.Q(status=InterviewBooking.Status.CONFIRMED, start_datetime__lt=now)
+                )
             )
             .select_related("candidate", "availability")
             .order_by("-end_datetime")
@@ -374,13 +358,6 @@ class InterviewerRescheduleBookingView(APIView):
 
 
 
-
-
-
-
-
-
-
 class InterviewerUpcomingSessionsAPIView(APIView):
     authentication_classes = [InterviewerCookieJWTAuthentication]
     permission_classes     = [IsAuthenticated, IsActiveInterviewer]
@@ -391,6 +368,7 @@ class InterviewerUpcomingSessionsAPIView(APIView):
             .filter(
                 interviewer=request.user,
                 status=InterviewBooking.Status.CONFIRMED,
+                end_datetime__gte=timezone.now()
             )
             .select_related(
                 "candidate",

@@ -19,10 +19,10 @@
 //   const dispatch = useDispatch();
 //   const { user } = useSelector(state => state.auth);
 //   const { selectedEvaluation } = useSelector(state => state.feedback); // Redux integration
-  
+
 //   const [evaluation, setEvaluation] = useState(null);
 //   const [loading, setLoading] = useState(true);
-  
+
 //   // Score colors (unchanged)
 //   const getScoreColor = (score) => {
 //     if (score >= 4) return { bg: 'bg-emerald-500', text: 'text-emerald-100', ring: 'ring-emerald-400/30' };
@@ -30,7 +30,7 @@
 //     if (score >= 2) return { bg: 'bg-amber-500', text: 'text-amber-100', ring: 'ring-amber-400/30' };
 //     return { bg: 'bg-red-500', text: 'text-red-100', ring: 'ring-red-400/30' };
 //   };
-  
+
 //   // Hire badge styles (unchanged)
 //   const getHireBadge = (recommendation) => {
 //     const badges = {
@@ -42,20 +42,20 @@
 //     };
 //     return badges[recommendation] || { color: 'from-slate-400 to-slate-500', label: 'N/A', icon: '' };
 //   };
-  
+
 //   // Load evaluation data (SIMPLIFIED - Your API is perfect!)
 //   useEffect(() => {
 //     const fetchData = async () => {
 //       try {
 //         setLoading(true);
-        
+
 //         // ✅ YOUR PERFECT API - No changes needed!
 //         const evalResponse = await feedbackApi.getEvaluation(evaluationId);
 //         setEvaluation(evalResponse);
-        
+
 //         // Optional: Set in Redux for dashboard sync
 //         dispatch(setSelectedEvaluation(evalResponse));
-        
+
 //       } catch (error) {
 //         console.error('Evaluation fetch error:', error);
 //         toast.error('Failed to load feedback details');
@@ -64,12 +64,12 @@
 //         setLoading(false);
 //       }
 //     };
-    
+
 //     if (evaluationId) {
 //       fetchData();
 //     }
 //   }, [evaluationId, navigate, dispatch]);
-  
+
 //   if (loading) {
 //     return (
 //       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-8">
@@ -81,7 +81,7 @@
 //       </div>
 //     );
 //   }
-  
+
 //   if (!evaluation) {
 //     return (
 //       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-8">
@@ -99,15 +99,15 @@
 //       </div>
 //     );
 //   }
-  
+
 //   const score = parseFloat(evaluation.overall_score);
 //   const { bg, text, ring } = getScoreColor(score);
 //   const { color, label, icon } = getHireBadge(evaluation.hire_recommendation);
-  
+
 //   return (
 //     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/30 py-12 px-4 sm:px-6 lg:px-8">
 //       <div className="max-w-6xl mx-auto">
-        
+
 //         {/* Header */}
 //         <div className="mb-12 text-center">
 //           <div className="inline-flex items-center bg-white/70 backdrop-blur-xl px-8 py-4 rounded-3xl shadow-xl border border-white/50 mb-8">
@@ -134,7 +134,7 @@
 //               </div>
 //             </div>
 //           </div>
-          
+
 //           {/* Score & Recommendation */}
 //           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
 //             {/* Main Score */}
@@ -156,7 +156,7 @@
 //                 </div>
 //               </div>
 //             </div>
-            
+
 //             {/* Recommendation & Context */}
 //             <div className="text-center lg:text-right">
 //               <div className="inline-flex items-center bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50">
@@ -191,7 +191,7 @@
 //             </div>
 //           </div>
 //         </div>
-        
+
 //         {/* Individual Scores */}
 //         <section className="mb-20">
 //           <h2 className="text-3xl font-bold text-slate-900 text-center mb-16">
@@ -226,7 +226,7 @@
 //             })}
 //           </div>
 //         </section>
-        
+
 //         {/* Detailed Feedback - ALL FROM EVALUATION OBJECT */}
 //         <section className="max-w-4xl mx-auto space-y-16 mb-24">
 //           {/* Strengths */}
@@ -243,7 +243,7 @@
 //               </div>
 //             </div>
 //           </div>
-          
+
 //           {/* Areas for Improvement */}
 //           <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-white/50">
 //             <h2 className="text-3xl font-bold text-slate-900 mb-2 flex items-center justify-center lg:justify-start">
@@ -258,7 +258,7 @@
 //               </div>
 //             </div>
 //           </div>
-          
+
 //           {/* Actionable Suggestions */}
 //           <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-white/50">
 //             <h2 className="text-3xl font-bold text-slate-900 mb-2 flex items-center justify-center lg:justify-start">
@@ -273,7 +273,7 @@
 //               </div>
 //             </div>
 //           </div>
-          
+
 //           {/* Additional Notes */}
 //           {evaluation.additional_notes?.trim() && (
 //             <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-10 shadow-2xl border border-white/50">
@@ -290,7 +290,7 @@
 //             </div>
 //           )}
 //         </section>
-        
+
 //         {/* Footer Actions */}
 //         <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50 max-w-4xl mx-auto text-center">
 //           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
@@ -606,9 +606,8 @@ const FeedbackDetail = () => {
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
                         key={i}
-                        className={`w-8 h-8 ${
-                          i <= score ? 'text-amber-500 fill-amber-500 shadow-lg' : 'text-slate-300 shadow-sm'
-                        }`}
+                        className={`w-8 h-8 ${i <= score ? 'text-amber-500 fill-amber-500 shadow-lg' : 'text-slate-300 shadow-sm'
+                          }`}
                       />
                     ))}
                   </div>
@@ -935,18 +934,6 @@ const FeedbackDetail = () => {
         <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50 max-w-4xl mx-auto text-center">
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <button
-              className="flex items-center space-x-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1"
-            >
-              <Download className="w-5 h-5" />
-              <span>Download PDF Report</span>
-            </button>
-            <button
-              className="flex items-center space-x-2 px-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all border border-slate-200"
-            >
-              <Share2 className="w-5 h-5" />
-              <span>Share with Candidate</span>
-            </button>
-            <button
               type="button"
               onClick={handleEditToggle}
               className="flex items-center space-x-2 px-8 py-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all border border-emerald-200"
@@ -957,11 +944,11 @@ const FeedbackDetail = () => {
             </button>
           </div>
           <button
-            onClick={() => navigate('/interviewer/evaluations')}
+            onClick={() => navigate('/interviewer/dashboard/evaluations')}
             className="inline-flex items-center space-x-2 text-slate-600 hover:text-slate-900 font-semibold text-lg transition-all hover:underline"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>← Back to All Evaluations</span>
+            <span> Back to All Evaluations</span>
           </button>
         </div>
       </div>

@@ -8,6 +8,8 @@ import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Plus, RefreshCw, FileX } from "lucide-react";
+import CandidateNavbar from "../../../../components/CandidateNavbar";
+import CandidateFooter from "../../../../components/CandidateFooter";
 
 import {
   fetchCandidateMyIssues,
@@ -128,76 +130,80 @@ const MyIssuesPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
+    <>
+      <CandidateNavbar />
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="flex-grow max-w-2xl w-full mx-auto px-4 py-8">
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">My Issues</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Track all issues you have raised for your interviews.
-            </p>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">My Issues</h1>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Track all issues you have raised for your interviews.
+              </p>
+            </div>
+            {issues.length > 0 && (
+              <button
+                onClick={() => dispatch(fetchCandidateMyIssues())}
+                disabled={loading}
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition disabled:opacity-40"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            )}
           </div>
-          {issues.length > 0 && (
-            <button
-              onClick={() => dispatch(fetchCandidateMyIssues())}
-              disabled={loading}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition disabled:opacity-40"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
+
+          {/* Error state */}
+          {error && !loading && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>
+                {error?.detail ?? "Failed to load issues."}
+              </span>
+              <button
+                onClick={() => dispatch(fetchCandidateMyIssues())}
+                className="ml-auto text-red-600 underline text-xs hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Loading skeletons */}
+          {loading && (
+            <div className="space-y-3">
+              {[1, 2, 3].map((n) => (
+                <IssueSkeleton key={n} />
+              ))}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && issues.length === 0 && (
+            <EmptyState onRaise={handleRaiseClick} />
+          )}
+
+          {/* Issues list */}
+          {!loading && issues.length > 0 && (
+            <div className="space-y-3">
+              {issues.map((issue) => (
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  onClick={handleCardClick}
+                />
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Error state */}
-        {error && !loading && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-700">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <span>
-              {error?.detail ?? "Failed to load issues."}
-            </span>
-            <button
-              onClick={() => dispatch(fetchCandidateMyIssues())}
-              className="ml-auto text-red-600 underline text-xs hover:no-underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Loading skeletons */}
-        {loading && (
-          <div className="space-y-3">
-            {[1, 2, 3].map((n) => (
-              <IssueSkeleton key={n} />
-            ))}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !error && issues.length === 0 && (
-          <EmptyState onRaise={handleRaiseClick} />
-        )}
-
-        {/* Issues list */}
-        {!loading && issues.length > 0 && (
-          <div className="space-y-3">
-            {issues.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                onClick={handleCardClick}
-              />
-            ))}
-          </div>
-        )}
+        {/* Modal — always mounted here, opens via Redux state */}
+        <RaiseIssueModal role="candidate" />
       </div>
-
-      {/* Modal — always mounted here, opens via Redux state */}
-      <RaiseIssueModal role="candidate" />
-    </div>
+      <CandidateFooter />
+    </>
   );
 };
 

@@ -493,6 +493,7 @@ class InterviewerCancelBookingSerializer(serializers.Serializer):
 
 class InterviewerBookingDetailSerializer(serializers.ModelSerializer):
     candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+    candidate_name = serializers.SerializerMethodField()
 
     # Availability snapshot
     date = serializers.DateField(source="availability.date", read_only=True)
@@ -508,6 +509,7 @@ class InterviewerBookingDetailSerializer(serializers.ModelSerializer):
             "start_datetime",
             "end_datetime",
             "candidate_email",
+            "candidate_name",
             "date",
             "start_time",
             "end_time",
@@ -522,12 +524,19 @@ class InterviewerBookingDetailSerializer(serializers.ModelSerializer):
             "selected_specialties",
         ]
 
+    def get_candidate_name(self, obj):
+        first_name = obj.candidate.first_name or ""
+        last_name = obj.candidate.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else "Candidate"
+
 
 
 
 
 class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
     candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+    candidate_name = serializers.SerializerMethodField()
 
     date = serializers.DateField(source="availability.date", read_only=True)
     start_time = serializers.TimeField(source="availability.start_time", read_only=True)
@@ -538,6 +547,7 @@ class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "candidate_email",
+            "candidate_name",
             "date",
             "start_time",
             "end_time",
@@ -545,6 +555,12 @@ class InterviewerCompletedSessionSerializer(serializers.ModelSerializer):
             "token_cost",
             "created_at",
         ]
+
+    def get_candidate_name(self, obj):
+        first_name = obj.candidate.first_name or ""
+        last_name = obj.candidate.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else "Candidate"
 
 
 
@@ -662,6 +678,7 @@ class AdminInterviewBookingSerializer(serializers.ModelSerializer):
 class AdminBookingDetailSerializer(serializers.ModelSerializer):
     # Candidate
     candidate_email = serializers.EmailField(source="candidate.email", read_only=True)
+    candidate_name = serializers.SerializerMethodField()
     candidate_token_balance = serializers.IntegerField(
         source="candidate.token_balance", read_only=True
     )
@@ -700,6 +717,7 @@ class AdminBookingDetailSerializer(serializers.ModelSerializer):
             "token_cost",
             # Candidate
             "candidate_email",
+            "candidate_name",
             "candidate_token_balance",
             # Interviewer
             "interviewer_email",
@@ -716,6 +734,12 @@ class AdminBookingDetailSerializer(serializers.ModelSerializer):
             "token_unlock_tx",
             "token_transfer_tx",
         ]
+
+    def get_candidate_name(self, obj):
+        first_name = obj.candidate.first_name or ""
+        last_name = obj.candidate.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else "Candidate"
 
     def get_interviewer_has_subscription(self, obj):
         return SubscriptionEntitlementService.has_subscription(obj.interviewer)
@@ -975,10 +999,10 @@ class InterviewerUpcomingSerializer(serializers.ModelSerializer):
         ]
  
     def get_candidate_name(self, obj):
-        return (
-            f"{obj.candidate.first_name} {obj.candidate.last_name}".strip()
-            or obj.candidate.email
-        )
+        first_name = obj.candidate.first_name or ""
+        last_name = obj.candidate.last_name or ""
+        name = f"{first_name} {last_name}".strip()
+        return name if name else obj.candidate.email
  
     def get_proposed_slot(self, obj):
         if obj.proposed_availability:
