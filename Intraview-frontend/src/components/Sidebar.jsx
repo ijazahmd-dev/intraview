@@ -1,35 +1,36 @@
 import React, { useState } from 'react';
-import { 
-  Home, Users, UserCheck, Building2, Video, 
-  FileText, Database, Bell, CreditCard, 
+import {
+  Home, Users, UserCheck, Building2, Video,
+  FileText, Database, Bell, CreditCard,
   Settings, HelpCircle, ChevronLeft, ChevronRight, X, Share2, IdCard, Layers, Package
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
 
 export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const navigate = useNavigate();  // ✅ Already imported correctly
-  
+
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/admin/dashboard', fullLabel: 'Dashboard' },
     { icon: Users, label: 'Users', path: '/admin/users', fullLabel: 'User Management' },
     { icon: UserCheck, label: 'Interviewer Applicati...', path: '/admin/interviewers', fullLabel: 'Interviewer Applications' },
-    { icon: IdCard, label: 'Interviewer KYC', path: '/admin/interviewers/verifications', fullLabel: 'Interviewer Verification',},
+    { icon: IdCard, label: 'Interviewer KYC', path: '/admin/interviewers/verifications', fullLabel: 'Interviewer Verification', },
     { icon: CreditCard, label: 'Token Packs', path: '/admin/token-packs', fullLabel: 'Token Packs' },
     { icon: FileText, label: 'User Plans', path: '/admin/subscription-plans', fullLabel: 'User Subscription Plans' },
     { icon: UserCheck, label: 'Interviewer Plans', path: '/admin/interviewer-subscription-plans', fullLabel: 'Interviewer Subscription Plans' },
-    { icon: Building2, label: 'Companies', path: '/admin/companies', fullLabel: 'Companies' },
-    { icon: Video, label: 'Sessions', path: '/admin/sessions', badge: 12, fullLabel: 'Interview Sessions' },
-    { icon: FileText, label: 'Reports', path: '/admin/reports', fullLabel: 'Reports' },
-    { icon: Database, label: 'CMS', path: '/admin/cms', fullLabel: 'Content Management' },
-    { icon: Bell, label: 'Notifications', path: '/admin/notifications', badge: 3, fullLabel: 'Notifications' },
-    { icon: CreditCard, label: 'Payments', path: '/admin/payments', fullLabel: 'Payments' },
+    { icon: Video, label: 'Sessions', path: '/admin/sessions', fullLabel: 'Interview Sessions' },
+    { icon: Layers, label: 'Payout Queue', path: '/admin/payout/queue', fullLabel: 'Payout Queue', },
+    { icon: Package, label: 'Payout History', path: '/admin/payout/history', fullLabel: 'Payout History', },
+    { icon: FileText, label: 'Reports', path: '/admin/issues', fullLabel: 'Reports' },
+    { icon: Bell, label: 'Notifications', path: '/notifications', fullLabel: 'Notifications' },
+
+    // { icon: CreditCard, label: 'Payments', path: '/admin/payments', fullLabel: 'Payments' },
   ];
 
-  const bottomItems = [
-    { icon: Settings, label: 'Settings', path: '/admin/settings', fullLabel: 'Settings' },
-    { icon: HelpCircle, label: 'Support', path: '/admin/support', fullLabel: 'Support' },
-  ];
+  // const bottomItems = [
+  //   { icon: Settings, label: 'Settings', path: '/admin/settings', fullLabel: 'Settings' },
+  //   { icon: HelpCircle, label: 'Support', path: '/admin/support', fullLabel: 'Support' },
+  // ];
 
   // ✅ NAVIGATION HANDLER
   const handleNavigation = (path) => {
@@ -70,10 +71,9 @@ export default function Sidebar() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <div 
-        className={`${
-          isCollapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-gray-200 flex flex-col transition-all duration-300 relative`}
+      <div
+        className={`${isCollapsed ? 'w-20' : 'w-64'
+          } bg-white border-r border-gray-200 flex flex-col transition-all duration-300 relative`}
       >
         {/* Header */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
@@ -85,9 +85,9 @@ export default function Sidebar() {
               <span className="font-semibold text-gray-800 text-lg">IntraView</span>
             )}
           </div>
-          
+
           {!isCollapsed && (
-            <button 
+            <button
               onClick={() => setIsCollapsed(true)}  // ✅ COLLAPSE HANDLER
               className="p-1.5 hover:bg-gray-100 rounded-md transition-colors"
             >
@@ -106,13 +106,13 @@ export default function Sidebar() {
         </div>
 
         {/* Bottom Items */}
-        <div className="border-t border-gray-200 py-4 px-3">
+        {/* <div className="border-t border-gray-200 py-4 px-3">
           <nav className="space-y-1">
             {bottomItems.map((item, index) => (
               <MenuItem key={index} {...item} />
             ))}
           </nav>
-        </div>
+        </div> */}
 
         {/* Collapse Button */}
         <button

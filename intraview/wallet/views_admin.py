@@ -659,58 +659,38 @@ class AdminPayoutStatsAPIView(APIView):
     def get(self, request):
         """
         Get payout statistics
-        
-        Response:
-        {
-            "total_payouts": 150,
-            "pending_requested": 5,
-            "pending_approved": 3,
-            "completed": 120,
-            "rejected": 22,
-            "total_amount_paid": 1200000.00,
-            "total_tokens_paid": 120000,
-            "pending_amount": 80000.00,
-            "pending_tokens": 8000
-        }
         """
-        
         from django.db.models import Sum, Count, Q
+        from django.utils import timezone
+        
+        now = timezone.now()
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         stats = PayoutRequest.objects.aggregate(
             total_payouts=Count('id'),
             
-            # Pending counts
-            pending_requested=Count('id', filter=Q(status=PayoutRequestStatus.REQUESTED)),
-            pending_approved=Count('id', filter=Q(status=PayoutRequestStatus.APPROVED)),
+            # Pending counts (Only 'REQUESTED' for the Queue view)
+            pending_count=Count('id', filter=Q(status=PayoutRequestStatus.REQUESTED)),
             
-            # Completed/Rejected counts
-            completed=Count('id', filter=Q(status=PayoutRequestStatus.PAID)),
-            rejected=Count('id', filter=Q(status=PayoutRequestStatus.REJECTED)),
+            # Pending amount (Only 'REQUESTED' so it matches the table)
+            pending_amount=Sum('amount_inr', filter=Q(status=PayoutRequestStatus.REQUESTED)),
             
-            # Paid amounts
-            total_amount_paid=Sum('amount_inr', filter=Q(status=PayoutRequestStatus.PAID)),
-            total_tokens_paid=Sum('tokens_requested', filter=Q(status=PayoutRequestStatus.PAID)),
+            # Paid calculations for this month
+            paid_count_this_month=Count('id', filter=Q(status=PayoutRequestStatus.PAID, updated_at__gte=start_of_month)),
+            paid_this_month=Sum('amount_inr', filter=Q(status=PayoutRequestStatus.PAID, updated_at__gte=start_of_month)),
             
-            # Pending amounts
-            pending_amount=Sum('amount_inr', filter=Q(
-                status__in=[PayoutRequestStatus.REQUESTED, PayoutRequestStatus.APPROVED]
-            )),
-            pending_tokens=Sum('tokens_requested', filter=Q(
-                status__in=[PayoutRequestStatus.REQUESTED, PayoutRequestStatus.APPROVED]
-            ))
+            # Rejected calculations for this month
+            rejected_count_this_month=Count('id', filter=Q(status=PayoutRequestStatus.REJECTED, updated_at__gte=start_of_month))
         )
         
         # Handle None values
         return Response({
             "total_payouts": stats['total_payouts'] or 0,
-            "pending_requested": stats['pending_requested'] or 0,
-            "pending_approved": stats['pending_approved'] or 0,
-            "completed": stats['completed'] or 0,
-            "rejected": stats['rejected'] or 0,
-            "total_amount_paid": float(stats['total_amount_paid'] or 0),
-            "total_tokens_paid": stats['total_tokens_paid'] or 0,
+            "pending_count": stats['pending_count'] or 0,
             "pending_amount": float(stats['pending_amount'] or 0),
-            "pending_tokens": stats['pending_tokens'] or 0,
+            "paid_count_this_month": stats['paid_count_this_month'] or 0,
+            "paid_this_month": float(stats['paid_this_month'] or 0),
+            "rejected_count_this_month": stats['rejected_count_this_month'] or 0,
         })
 
 
