@@ -1,5 +1,6 @@
 # intraview_agent/runtime.py
 
+
 import asyncio
 import json
 import logging
@@ -24,7 +25,6 @@ from runtime_guard import RuntimeGuard, RuntimeOwnershipLost
 from config import get_interview_defaults
 from constants import (
     TIMEOUT_LOOP_INTERVAL_SECONDS,
-    MAX_FOLLOWUPS_PER_QUESTION,
     ASSISTANT_GENERATION_TIMEOUT_SECONDS,
     TRANSCRIPT_STABILIZATION_SECONDS,
     SPEECH_END_GRACE_SECONDS,
@@ -33,7 +33,7 @@ from constants import (
     TRANSCRIPT_SIMILARITY_THRESHOLD,
     MAX_TRANSCRIPT_UPDATES_PER_PROMPT,
     NO_ANSWER_TIMEOUT_SECONDS,
-    FOLLOWUP_SUFFICIENT_WORD_COUNT,
+    
 )
 from planner import InterviewConfig, QuestionPlanner
 from state import InterviewState, StateMachine
@@ -1108,8 +1108,11 @@ class InterviewRuntime:
         """
         Process ONE finalized stabilized answer.
 
-        This was previously embedded directly inside
-        conversation_item_added().
+        Records the base answer, sends frontend events,
+        transitions to PROCESSING state, then calls _finalize_base_turn().
+
+        Every committed answer always goes directly to _finalize_base_turn()
+        with no follow-up branching.
         """
 
         assert self.tm is not None
@@ -1122,20 +1125,14 @@ class InterviewRuntime:
             self.tm.state.last_question_text or ""
         )
 
-        should_followup = False
-
         logger.info(
             (
                 "PROCESS ANSWER START → "
                 "turn=%s "
-                "is_followup=%s "
-                "followup_count=%s "
                 "answer_words=%s "
                 "answer=%r"
             ),
             turn_index_1based,
-            self.tm.state.is_followup_active,
-            self.tm.state.followup_count,
             len(
                 re.findall(
                     r"\b[\w'-]+\b",
@@ -1145,283 +1142,52 @@ class InterviewRuntime:
             answer_text[:300],
         )
 
+        # Always treat as base question answer.
+        self.tm.record_base_answer(
+            answer_text=answer_text
+        )
+
         await self._send_data(
             {
                 "type": "answer",
                 "index": turn_index_1based,
                 "question": question_text,
                 "answer": answer_text,
-                "is_followup": (
-                    self.tm.state.is_followup_active
-                ),
+                "is_followup": False,
             }
         )
 
-        #
-        # FOLLOW-UP ANSWER
-        #
-        #
-        # FOLLOW-UP ANSWER
-        #
-        if self.tm.state.is_followup_active:
-
-            self.tm.mark_followup_answer_received(
-                answer_text=answer_text
+        try:
+            self.state_machine.transition(
+                InterviewState.PROCESSING
             )
-
-            try:
-                self.state_machine.transition(
-                    InterviewState.PROCESSING
-                )
-            except ValueError:
-                logger.warning(
-                    "Illegal state transition to PROCESSING "
-                    "from %s",
-                    self.state_machine.value.name,
-                )
-
-            await self._send_data(
-                {
-                    "type": "state",
-                    "state": (
-                        self.state_machine.value.name
-                    ),
-                    "current_index": (
-                        turn_index_1based
-                    ),
-                    "max_questions": total_q,
-                }
-            )
-
-            await self._sync_runtime_state()
-
-            #
-            # CRITICAL FIX:
-            # Never recursively ask followups forever.
-            #
-            if self.tm.followup_budget_exhausted(
-                MAX_FOLLOWUPS_PER_QUESTION
-            ):
-                should_followup = False
-                self.tm.mark_followup_phase_completed()
-                self._followup_phase_closed = True
-            else:
-                should_followup = self._should_ask_followup(
-                    self._build_turn_answer_text()
-                )
-
-        #
-        # BASE QUESTION ANSWER
-        #
-        else:
-
-            self.tm.record_base_answer(
-                answer_text=answer_text
-            )
-
-            try:
-                self.state_machine.transition(
-                    InterviewState.PROCESSING
-                )
-            except ValueError:
-                logger.warning(
-                    "Illegal state transition to PROCESSING "
-                    "from %s",
-                    self.state_machine.value.name,
-                )
-
-            await self._send_data(
-                {
-                    "type": "state",
-                    "state": (
-                        self.state_machine.value.name
-                    ),
-                    "current_index": (
-                        turn_index_1based
-                    ),
-                    "max_questions": total_q,
-                }
-            )
-
-            await self._sync_runtime_state()
-
-            should_followup = self._should_ask_followup(
-                self._build_turn_answer_text()
-            )
-
-        #
-        # HARD FOLLOW-UP LIMIT
-        #
-        if self.tm.followup_budget_exhausted(
-            MAX_FOLLOWUPS_PER_QUESTION
-        ):
-            should_followup = False
-            self.tm.mark_followup_phase_completed()
-            self._followup_phase_closed = True
-
-
-
-        logger.warning(
-            (
-                "FOLLOWUP GATE CHECK → "
-                "should_followup=%s "
-                "followup_count=%s "
-                "budget_exhausted=%s "
-                "followup_active=%s "
-                "base_answer_words=%s "
-                "base_answer=%r"
-            ),
-            should_followup,
-            self.tm.state.followup_count,
-            self.tm.followup_budget_exhausted(
-                MAX_FOLLOWUPS_PER_QUESTION
-            ),
-            self.tm.state.is_followup_active,
-            len(
-                re.findall(
-                    r"\b[\w'-]+\b",
-                    self.tm.state.base_answer_text or "",
-                )
-            ),
-            (
-                self.tm.state.base_answer_text[:200]
-                if self.tm.state.base_answer_text
-                else None
-            ),
-        )
-
-        #
-        # NEXT ACTION
-        #
-        if should_followup:
-            await self._ask_followup(total_q)
-        else:
-            await self._finalize_base_turn(total_q)        
-
-
-    # ---------- follow-up decision (NEW) ----------
-
-    def _should_ask_followup(self, answer_text: str) -> bool:
-        assert self.tm is not None
-
-        # Runtime-level hard stop.
-        if self._followup_phase_closed:
-            return False
-
-        # Hard follow-up budget enforcement.
-        if self.tm.followup_budget_exhausted(
-            MAX_FOLLOWUPS_PER_QUESTION
-        ):
-            self._followup_phase_closed = True
-            return False
-
-        # Evaluate the COMPLETE accumulated answer instead of
-        # only the latest response fragment.
-        #
-        # This prevents recursive follow-ups when the candidate
-        # gradually answers across multiple turns.
-
-        text = (answer_text or "").strip()
-        if not text:
-            text = self._build_turn_answer_text()
-
-        if not text:
-            return False
-
-        word_count = len(
-            re.findall(r"\b[\w'-]+\b", text)
-        )
-
-        lower = text.lower()
-        refusal_markers = (
-            "i can't reveal",
-            "i cannot reveal",
-            "prefer not to say",
-            "confidential",
-            "cannot share",
-            "can't share",
-            "stop asking follow",
-            "stop asking",
-            "personal",           # ← comma was missing before, now fixed
-            "no more follow",
-            "move on",
-            "next question",
-            "skip this",
-            "go to the next",
-        )
-        if any(m in lower for m in refusal_markers):
-            return False
-
-
-
-        # Sufficiently detailed answers never need follow-up.
-        # Anything >= 12 words is considered adequate.
-        if word_count >= 12:
-            logger.info(
-                (
-                    "FOLLOWUP DECISION=False "
-                    "reason=sufficient_answer_length "
-                    "words=%s "
-                    "text=%r"
-                ),
-                word_count,
-                text[:200],
-            )
-            return False
-
-        # Only truly minimal answers (< 5 words) need clarification,
-        # and only if no follow-up has been asked yet for this question.
-        if word_count < 5 and self.tm.state.followup_count == 0:
+        except ValueError:
             logger.warning(
-                (
-                    "FOLLOWUP DECISION=True "
-                    "reason=very_short_answer "
-                    "words=%s "
-                    "text=%r"
-                ),
-                word_count,
-                text[:200],
+                "Illegal state transition to PROCESSING from %s",
+                self.state_machine.value.name,
             )
-            return True
 
-        # For 5-11 word answers: only follow up if genuinely vague
-        # AND this is the first follow-up attempt.
-        vague_markers = (
-            "some stuff",
-            "kind of",
-            "sort of",
-            "like that",
-            "many things",
-        )
-        if (
-            word_count < 12
-            and self.tm.state.followup_count == 0
-            and any(m in lower for m in vague_markers)
-        ):
-            logger.warning(
-                (
-                    "FOLLOWUP DECISION=True "
-                    "reason=vague_answer "
-                    "words=%s "
-                    "text=%r"
+        await self._send_data(
+            {
+                "type": "state",
+                "state": (
+                    self.state_machine.value.name
                 ),
-                word_count,
-                text[:200],
-            )
-            return True
-
-        logger.info(
-            (
-                "FOLLOWUP DECISION=False "
-                "reason=acceptable_answer "
-                "words=%s "
-                "text=%r"
-            ),
-            word_count,
-            text[:200],
+                "current_index": (
+                    turn_index_1based
+                ),
+                "max_questions": total_q,
+            }
         )
 
-        return False
+        await self._sync_runtime_state()
+
+        # Always finalize the base turn directly.
+        # No follow-up logic of any kind.
+        await self._finalize_base_turn(total_q)      
+
+
+    
 
     # ---------- LiveKit conversation handling ----------
 
@@ -2228,108 +1994,22 @@ class InterviewRuntime:
 
             task.add_done_callback(_cleanup_task)
 
-    # ---------- follow-up helper (NEW) ----------
-
-    async def _ask_followup(self, total_q: int):
-        """
-        [NEW] Generate and speak a follow-up question for the current base question.
-        Called from within _turn_lock, so must not re-acquire it.
-        """
-        assert self.session is not None
-        assert self.planner is not None
-        assert self.tm is not None
-        assert self.cfg is not None
-
-        # Runtime already finalized follow-up phase.
-        # Never allow re-entry.
-        if self.tm.state.followup_phase_completed:
-            logger.warning(
-                "Blocked follow-up generation because phase is closed."
-            )
-            return
-
-        # Hard follow-up budget enforcement.
-        if not self.tm.can_ask_followup(
-            MAX_FOLLOWUPS_PER_QUESTION
-        ):
-            logger.warning(
-                "Blocked follow-up generation because budget exhausted."
-            )
-
-            self.tm.mark_followup_phase_completed()
-            self._followup_phase_closed = True
-
-            return
-
-        idx = self.tm.current_turn_index_0based()
-        base_q = self.planner.base_question_for_turn(idx)
-
-        # Determine the most recent answer to pass to the follow-up prompt.
-        # If we already had a follow-up exchange, use the last follow-up answer.
-        # Otherwise use the base answer.
-        if self.tm.state.followup_exchanges:
-            last_answer = self.tm.state.followup_exchanges[-1]["answer"]
-        else:
-            last_answer = self.tm.state.base_answer_text
-
-        instr = self.planner.build_followup_instruction(
-            turn_index=idx,
-            base_q=base_q,
-            base_question_text=self.tm.state.base_question_text or "",
-            last_answer=last_answer,
-            followup_num=self.tm.state.followup_count + 1,
-            max_followups=MAX_FOLLOWUPS_PER_QUESTION,
-        )
-
-        try:
-            self.state_machine.transition(InterviewState.ASKING)
-        except ValueError:
-            logger.warning(
-                "Illegal state transition to ASKING from %s",
-                self.state_machine.value.name,
-            )
-
-        await self._send_data(
-            {
-                "type": "state",
-                "state": self.state_machine.value.name,
-                "current_index": self.tm.current_turn_index_1based(),
-                "max_questions": total_q,
-            }
-        )
-
-        logger.warning(
-            (
-                "FOLLOWUP GENERATED → "
-                "count=%s/%s "
-                "base_answer_words=%s "
-                "last_answer=%r"
-            ),
-            self.tm.state.followup_count + 1,
-            MAX_FOLLOWUPS_PER_QUESTION,
-            len(
-                re.findall(
-                    r"\b[\w'-]+\b",
-                    last_answer or "",
-                )
-            ),
-            (last_answer or "")[:200],
-        )
-
-        await self._safe_generate_reply(
-            instructions=instr,
-            generation_type="FOLLOWUP",
-        )
+   
 
     # ---------- base turn finalization (NEW) ----------
 
     async def _finalize_base_turn(self, total_q: int):
         """
-        [NEW] Post the completed base turn (with follow-up metadata) to the backend,
-        then advance turn_index and ask the next base question.
+        Post the completed base turn to the backend, then advance turn_index
+        and ask the next base question (or end the interview).
 
-        Called after the follow-up phase is done (or skipped entirely).
-        Called from within _turn_lock, so must not re-acquire it.
+        Always called for every finalized answer:
+        - From _process_finalized_answer (normal transcript commit path)
+        - From _timeout_loop (timeout skip path)
+
+        With no follow-ups, combined_answer_text == base_answer_text.
+        The follow-up hard close (mark_followup_phase_completed) is harmless
+        when called in base-only mode.
         """
 
         combined_answer_text = self._build_turn_answer_text()
