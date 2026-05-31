@@ -87,12 +87,12 @@ export default function Home() {
               AI-powered mock interviews that feel authentic. Practice with voice, get instant feedback, and build the confidence to land the job.
             </p>
             <div className="flex flex-wrap gap-4 mb-8">
-              <button className="bg-teal-500 text-white px-8 py-3 rounded-lg hover:bg-teal-600 transition font-medium">
-                Start Mock Interview Now
+              <button onClick={() => navigate('/ai-interview/roles')} className="bg-teal-500 text-white px-8 py-3 rounded-lg hover:bg-teal-600 transition font-medium">
+                Start AI Mock Interview Now
               </button>
-              <button className="text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-100 transition font-medium flex items-center">
+              {/* <button className="text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-100 transition font-medium flex items-center">
                 Try a Demo →
-              </button>
+              </button> */}
             </div>
             <p className="text-sm text-gray-500">
               Trusted by candidates preparing for roles at

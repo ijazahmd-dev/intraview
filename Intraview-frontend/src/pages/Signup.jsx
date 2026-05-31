@@ -33,13 +33,17 @@ const Signup = () => {
     },
     validationSchema: Yup.object({
       username: Yup.string()
-        .min(3, "At least 3 characters")
+        .matches(/^[a-zA-Z0-9_]+$/, "Only letters, numbers, and underscores allowed")
         .required("Username is required"),
       email: Yup.string()
         .email("Invalid email")
         .required("Email is required"),
       password: Yup.string()
         .min(8, "Password must be at least 8 characters")
+        .matches(/[A-Z]/, "Must contain at least one uppercase letter")
+        .matches(/[a-z]/, "Must contain at least one lowercase letter")
+        .matches(/[0-9]/, "Must contain at least one number")
+        .matches(/[!@#$%^&*(),.?":{}|<>]/, "Must contain at least one special character")
         .required("Password is required"),
       confirmPassword: Yup.string()
         .oneOf([Yup.ref("password"), null], "Passwords must match")
@@ -62,9 +66,21 @@ const Signup = () => {
         toaster.success("OTP sent to your email!");
 
       } catch (err) {
-        setStatus({
-          error: err.response?.data?.error || "Signup failed",
-        });
+        const errData = err.response?.data;
+        let errMsg = "Signup failed. Please try again.";
+        if (errData) {
+          if (errData.non_field_errors) errMsg = errData.non_field_errors[0];
+          else if (errData.email) errMsg = errData.email[0];
+          else if (errData.username) errMsg = errData.username[0];
+          else if (errData.error) errMsg = errData.error;
+          else if (typeof errData === 'object' && Object.values(errData)[0]) {
+            const firstVal = Object.values(errData)[0];
+            errMsg = Array.isArray(firstVal) ? firstVal[0] : firstVal;
+          } else if (typeof errData === 'string') {
+            errMsg = errData;
+          }
+        }
+        setStatus({ error: errMsg });
       } finally {
         setSubmitting(false);
       }
