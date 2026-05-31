@@ -1,4 +1,9 @@
-// src/pages/candidate/ProfilePage.jsx
+// src/candidateProfile/candidate/pages/ProfilePage.jsx
+
+
+
+
+
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -26,67 +31,68 @@ import PreferencesSection from '../components/sections/PreferencesSection';
 import TokenSummary from '../components/sections/TokenSummary';
 import BookingSummary from '../components/sections/BookingSummary';
 import FeedbackSection from '../components/sections/FeedbackSection';
+import ProfileHeader from '../components/sections/ProfileHeader'; // 
 import CandidateNavbar from '../../../components/CandidateNavbar';
 import CandidateFooter from '../../../components/CandidateFooter';
 import { logoutUser } from '../../../authentication/authSlice';
 
-// 🔹 Main Profile Header
-const ProfileHeader = ({ user, completionPercent }) => {
-  const initials = (user?.firstName || user?.email || 'U')
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+// // 🔹 Main Profile Header
+// const ProfileHeader = ({ user, completionPercent }) => {
+//   const initials = (user?.firstName || user?.email || 'U')
+//     .split(' ')
+//     .map((n) => n[0])
+//     .join('')
+//     .toUpperCase()
+//     .slice(0, 2);
 
-  return (
-    <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border-2 border-white/40 flex items-center justify-center text-2xl font-bold">
-              {initials}
-            </div>
-            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-400 border-2 border-indigo-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-            </span>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-white/80 mb-1">
-              Candidate Profile
-            </p>
-            <h1 className="text-2xl sm:text-3xl font-black">
-              {user?.firstName || user?.email || 'Your Profile'}
-            </h1>
-            <p className="text-sm text-indigo-100 mt-1">{user?.email}</p>
-          </div>
-        </div>
+//   return (
+//     <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-6">
+//       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+//         <div className="flex items-center gap-4 sm:gap-6">
+//           <div className="relative">
+//             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border-2 border-white/40 flex items-center justify-center text-2xl font-bold">
+//               {initials}
+//             </div>
+//             <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-400 border-2 border-indigo-600 flex items-center justify-center">
+//               <CheckCircle2 className="w-4 h-4 text-white" />
+//             </span>
+//           </div>
+//           <div>
+//             <p className="text-xs uppercase tracking-wider font-semibold text-white/80 mb-1">
+//               Candidate Profile
+//             </p>
+//             <h1 className="text-2xl sm:text-3xl font-black">
+//               {user?.firstName || user?.email || 'Your Profile'}
+//             </h1>
+//             <p className="text-sm text-indigo-100 mt-1">{user?.email}</p>
+//           </div>
+//         </div>
 
-        <div className="flex flex-col items-start sm:items-end gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <Activity className="w-4 h-4 text-emerald-200" />
-            <span className="font-semibold">Profile completion</span>
-          </div>
-          <div className="w-56">
-            <div className="flex items-center justify-between text-xs text-indigo-100 mb-1">
-              <span>Overview</span>
-              <span>{completionPercent.toFixed(0)}%</span>
-            </div>
-            <div className="h-2 bg-indigo-800/60 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-400 rounded-full transition-all"
-                style={{ width: `${completionPercent}%` }}
-              />
-            </div>
-            <p className="text-[11px] text-indigo-100 mt-1">
-              Complete your profile to get better interview matches.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+//         <div className="flex flex-col items-start sm:items-end gap-3">
+//           <div className="flex items-center gap-2 text-sm">
+//             <Activity className="w-4 h-4 text-emerald-200" />
+//             <span className="font-semibold">Profile completion</span>
+//           </div>
+//           <div className="w-56">
+//             <div className="flex items-center justify-between text-xs text-indigo-100 mb-1">
+//               <span>Overview</span>
+//               <span>{completionPercent.toFixed(0)}%</span>
+//             </div>
+//             <div className="h-2 bg-indigo-800/60 rounded-full overflow-hidden">
+//               <div
+//                 className="h-full bg-emerald-400 rounded-full transition-all"
+//                 style={{ width: `${completionPercent}%` }}
+//               />
+//             </div>
+//             <p className="text-[11px] text-indigo-100 mt-1">
+//               Complete your profile to get better interview matches.
+//             </p>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 // 🔹 Tab Navigation Component
 const TabNavigation = ({ activeTab, onTabChange }) => {
@@ -157,13 +163,9 @@ const TabNavigation = ({ activeTab, onTabChange }) => {
 // 🔹 Main ProfilePage Component
 const ProfilePage = () => {
   const {
-    user,
     candidateProfile,
-    completion,
     isLoadingProfile,
-    isLoadingCompletion,
     profileError,
-    getCompletionPercentage,
   } = useProfileData();
 
   const location = useLocation();
@@ -237,9 +239,9 @@ const ProfilePage = () => {
     );
   }
 
-  const completionPercent = isLoadingCompletion
-    ? completion.percentage || 0
-    : getCompletionPercentage();
+  // const completionPercent = isLoadingCompletion
+  //   ? completion.percentage || 0
+  //   : getCompletionPercentage();
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -252,7 +254,8 @@ const ProfilePage = () => {
           {/* Main Content */}
           <main className="flex-1 flex flex-col gap-6">
             {/* Header */}
-            <ProfileHeader user={user} completionPercent={completionPercent} />
+            {/* Header */}
+            <ProfileHeader onEditClick={() => dispatch(setActiveTab('overview'))} />
 
             {/* Tab Navigation */}
             <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />

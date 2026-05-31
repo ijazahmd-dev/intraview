@@ -18,6 +18,7 @@ from decimal import Decimal
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
+import cloudinary
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -237,6 +238,15 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': 'zgWHzRrv74xbOfb2PTJnMcPbREQ',
 }
 
+
+
+
+cloudinary.config(
+    cloud_name="dpn42vumz",
+    api_key="441922657799877",
+    api_secret="zgWHzRrv74xbOfb2PTJnMcPbREQ",
+    secure=True,
+)
 
 STORAGES = {
     "default": {

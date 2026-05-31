@@ -1,4 +1,8 @@
-// src/hooks/useProfileData.js
+// src/candidateProfile/candidate/hooks/useProfileData.js
+
+
+
+
 import { useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -109,13 +113,6 @@ export const useProfileData = () => {
   );
 
   /**
-   * Get profile picture URL
-   */
-  const getProfilePicture = useCallback(() => {
-    return user?.profilePicture || `https://ui-avatars.com/api/?name=${user?.firstName}+${user?.lastName}&background=random`;
-  }, [user?.profilePicture, user?.firstName, user?.lastName]);
-
-  /**
    * Get full name
    */
   const getFullName = useCallback(() => {
@@ -124,6 +121,18 @@ export const useProfileData = () => {
     }
     return `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
   }, [candidateProfile?.full_name, user?.firstName, user?.lastName]);
+
+
+  /**
+   * Get profile picture URL
+   */
+  const getProfilePicture = useCallback(() => {
+    if (user?.profilePicture) return user.profilePicture;
+    const name = encodeURIComponent(
+      getFullName() || user?.email?.split("@")[0] || "User"
+    );
+    return `https://ui-avatars.com/api/?name=${name}&background=random&size=200`;
+  }, [user?.profilePicture, user?.email, getFullName]);
 
   // ============================================
   // RETURN OBJECT

@@ -1,4 +1,7 @@
-// src/store/slices/profileSlice.js
+// src/candidateProfile/profileSlice.js
+
+
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as candidateProfileApi from './candidateProfileApi';
 
@@ -228,15 +231,25 @@ const profileSlice = createSlice({
       })
       .addCase(fetchProfile.fulfilled, (state, action) => {
         state.loading.profile = false;
+        const data = action.payload;
+
+        // Normalize serializer snake_case → camelCase
         state.user = {
-          id: action.payload.user_id,
-          email: action.payload.user_email,
-          firstName: action.payload.user_first_name,
-          lastName: action.payload.user_last_name,
-          profilePicture: action.payload.user_profile_picture,
-          joinedAt: action.payload.joined_at,
+          id: data.user_id,
+          email: data.user_email,
+          firstName: data.user_first_name,
+          lastName: data.user_last_name,
+          profilePicture: data.user_profile_picture || null,  // ← key fix
+          joinedAt: data.joined_at,
         };
-        state.candidateProfile = action.payload;
+
+        // Strip user-level fields so candidateProfile stays clean
+        const {
+          user_id, user_email, user_first_name, user_last_name,
+          user_profile_picture, joined_at,
+          ...profileData
+        } = data;
+        state.candidateProfile = profileData;
       })
       .addCase(fetchProfile.rejected, (state, action) => {
         state.loading.profile = false;
@@ -366,15 +379,16 @@ const profileSlice = createSlice({
       })
       .addCase(uploadProfilePictureAsync.fulfilled, (state, action) => {
         state.loading.pictureUpload = false;
-        if (state.user) {
-          state.user.profilePicture = action.payload.picture_url || action.payload.data?.picture_url;
+        // Backend returns { message, pictureurl } directly — no .data wrapper
+        const pictureUrl =
+          action.payload?.pictureurl ||
+          action.payload?.data?.pictureurl ||
+          null;
+        if (state.user && pictureUrl) {
+          state.user.profilePicture = pictureUrl;
         }
-        state.success.picture = 'Profile picture updated successfully!';
-
-        // Clear success after 3 seconds
-        setTimeout(() => {
-          state.success.picture = null;
-        }, 3000);
+        state.success.picture = "Profile picture updated successfully!";
+        setTimeout(() => { state.success.picture = null; }, 3000);
       })
       .addCase(uploadProfilePictureAsync.rejected, (state, action) => {
         state.loading.pictureUpload = false;
