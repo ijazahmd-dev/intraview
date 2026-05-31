@@ -179,6 +179,7 @@ class InterviewRuntime:
         self._last_speech_end_at: float = 0.0
 
         # True while finalized answer
+        # True while finalized answer
         # processing is running.
         #
         # Prevents timeout retry race:
