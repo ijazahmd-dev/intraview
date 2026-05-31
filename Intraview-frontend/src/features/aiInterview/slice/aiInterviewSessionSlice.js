@@ -231,6 +231,9 @@ import {
   joinAiInterviewSession as joinAiInterviewSessionApi,
   endAiInterviewSession as endAiInterviewSessionApi,
   pingAiInterview,
+  getAiInterviewSessionDetail,
+  getAiInterviewEligibility,
+  getAiInterviewQuota,
 } from "../api/aiInterviewSessionApi";
 import { getRoleDetail } from "../api/aiInterviewApi";
 
@@ -328,6 +331,34 @@ export const fetchAiInterviewSessionDetail = createAsyncThunk(
   }
 );
 
+export const checkAiInterviewEligibility = createAsyncThunk(
+  "aiInterviewSession/checkEligibility",
+  async (durationMinutes, { rejectWithValue }) => {
+    try {
+      const res = await getAiInterviewEligibility(durationMinutes);
+      return res.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { detail: "Failed to check eligibility." }
+      );
+    }
+  }
+);
+
+export const fetchAiInterviewQuota = createAsyncThunk(
+  "aiInterviewSession/fetchQuota",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await getAiInterviewQuota();
+      return res.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { detail: "Failed to fetch quota." }
+      );
+    }
+  }
+);
+
 const initialState = {
   role: null,
   roleLoading: false,
@@ -353,9 +384,9 @@ const initialState = {
     status: "idle", // "idle" | "creating" | "ready" | "error"
     createError: null,
     data: null,
-      detail: null,
-      detailStatus: "idle", // idle | loading | success | error
-      detailError: null,
+    detail: null,
+    detailStatus: "idle", // idle | loading | success | error
+    detailError: null,
   },
 
   join: {
@@ -366,6 +397,18 @@ const initialState = {
 
   end: {
     status: "idle", // "idle" | "ending" | "success" | "error"
+    data: null,
+    error: null,
+  },
+
+  eligibility: {
+    status: "idle",
+    data: null,
+    error: null,
+  },
+
+  quota: {
+    status: "idle",
     data: null,
     error: null,
   },
@@ -386,6 +429,11 @@ const aiInterviewSessionSlice = createSlice({
       const { field, value } = action.payload;
       state.systemCheck[field] = value;
     },
+    resetEligibility(state) {
+      state.eligibility.status = "idle";
+      state.eligibility.data = null;
+      state.eligibility.error = null;
+    }
   },
   extraReducers: (builder) => {
     // Role fetch
@@ -482,7 +530,8 @@ const aiInterviewSessionSlice = createSlice({
         state.end.error =
           action.payload?.detail || "Failed to end AI interview session.";
       });
-      // Session detail fetch
+
+    // Session detail fetch
     builder
       .addCase(fetchAiInterviewSessionDetail.pending, (state) => {
         state.session.detailStatus = "loading";
@@ -497,6 +546,38 @@ const aiInterviewSessionSlice = createSlice({
         state.session.detailError =
           action.payload?.detail ?? "Failed to fetch session detail.";
       });
+
+    // Eligibility check
+    builder
+      .addCase(checkAiInterviewEligibility.pending, (state) => {
+        state.eligibility.status = "loading";
+        state.eligibility.error = null;
+      })
+      .addCase(checkAiInterviewEligibility.fulfilled, (state, action) => {
+        state.eligibility.status = "ready";
+        state.eligibility.data = action.payload;
+      })
+      .addCase(checkAiInterviewEligibility.rejected, (state, action) => {
+        state.eligibility.status = "error";
+        state.eligibility.error =
+          action.payload?.detail ?? "Failed to check eligibility.";
+      });
+
+    // Quota fetch
+    builder
+      .addCase(fetchAiInterviewQuota.pending, (state) => {
+        state.quota.status = "loading";
+        state.quota.error = null;
+      })
+      .addCase(fetchAiInterviewQuota.fulfilled, (state, action) => {
+        state.quota.status = "ready";
+        state.quota.data = action.payload;
+      })
+      .addCase(fetchAiInterviewQuota.rejected, (state, action) => {
+        state.quota.status = "error";
+        state.quota.error =
+          action.payload?.detail ?? "Failed to fetch quota.";
+      });
   },
 });
 
@@ -504,6 +585,7 @@ export const {
   resetAiInterviewSessionState,
   setConfigField,
   setSystemCheckField,
+  resetEligibility,
 } = aiInterviewSessionSlice.actions;
 
 export default aiInterviewSessionSlice.reducer;

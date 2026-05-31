@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { fetchWalletSummary } from '../../../../wallets/candidateWalletSlice';
 import { fetchCurrentSubscription, fetchSubscriptionPlans } from '../../../../subscriptions/subscriptionSlice';
+import { fetchAiInterviewQuota } from '../../../../features/aiInterview/slice/aiInterviewSessionSlice';
 
 const plans = [
   {
@@ -67,18 +68,23 @@ const TokenSummary = () => {
   const { current: currentSub, plans: apiPlans, loading: subLoading } = useSelector(
     (state) => state.subscription
   );
+  const { quota: aiQuota } = useSelector(
+    (state) => state.aiInterviewSession
+  );
 
-  const isLoading = walletLoading || subLoading;
+  const isLoading = walletLoading || subLoading || aiQuota.status === "loading";
 
   useEffect(() => {
     dispatch(fetchWalletSummary());
     dispatch(fetchCurrentSubscription());
     dispatch(fetchSubscriptionPlans());
+    dispatch(fetchAiInterviewQuota());
   }, [dispatch]);
 
   const handleRetry = () => {
     dispatch(fetchWalletSummary());
     dispatch(fetchCurrentSubscription());
+    dispatch(fetchAiInterviewQuota());
   };
 
   // Normalise wallet fields
@@ -191,6 +197,36 @@ const TokenSummary = () => {
               </div>
             </div>
           </div>
+
+          {/* AI Quota Summary */}
+          {aiQuota.status === "ready" && aiQuota.data && (aiQuota.data.free_ai_interviews_remaining > 0 || aiQuota.data.subscription_ai_interviews_remaining > 0 || aiQuota.data.has_unlimited_ai) && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-[10px] font-bold mb-2 text-indigo-100 uppercase tracking-widest text-white/70">Interview Quotas</p>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                {aiQuota.data.has_unlimited_ai ? (
+                  <div>
+                    <p className="text-white/60">Pro Access</p>
+                    <p className="font-bold text-emerald-300">Unlimited</p>
+                  </div>
+                ) : (
+                  <>
+                    {aiQuota.data.subscription_ai_interviews_remaining > 0 && (
+                      <div>
+                        <p className="text-white/60">Subscription</p>
+                        <p className="font-bold">{aiQuota.data.subscription_ai_interviews_remaining} Left</p>
+                      </div>
+                    )}
+                    {aiQuota.data.free_ai_interviews_remaining > 0 && (
+                      <div>
+                        <p className="text-white/60">Free Quota</p>
+                        <p className="font-bold">{aiQuota.data.free_ai_interviews_remaining} Left</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CTA */}

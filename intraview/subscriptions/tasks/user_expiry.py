@@ -21,25 +21,32 @@ def expire_user_subscriptions(self):
     Expire user subscriptions whose end_date has passed.
 
     Side effects:
-    - NONE (feature access is gated dynamically)
+    - Resets AI interview quota on the associated CandidateProfile.
     """
+    from ai_interviews.service.quota_service import AIInterviewSubscriptionSync
 
     now = timezone.now()
 
     expired_qs = UserSubscription.objects.filter(
         status=SubscriptionStatus.ACTIVE,
         end_date__lt=now,
-    )
+    ).select_related("user")
 
-    count = expired_qs.count()
+    count = 0
+
+    for subscription in expired_qs:
+        with transaction.atomic():
+            subscription.status = SubscriptionStatus.EXPIRED
+            subscription.save(update_fields=["status", "updated_at"])
+
+            # Reset AI quota on the candidate profile
+            AIInterviewSubscriptionSync.on_subscription_expired(user=subscription.user)
+
+        count += 1
 
     if count == 0:
         logger.info("User subscription expiry task: nothing to expire")
-        return 0
-
-    with transaction.atomic():
-        expired_qs.update(status=SubscriptionStatus.EXPIRED)
-
-    logger.info("User subscription expiry task: expired %s subscriptions", count)
+    else:
+        logger.info("User subscription expiry task: expired %s subscriptions", count)
 
     return count

@@ -26,6 +26,8 @@ class TokenTransactionType(models.TextChoices):
     PAYOUT_DEBIT = "PAYOUT_DEBIT", "Payout Debit"
     PAYOUT_UNLOCK = "PAYOUT_UNLOCK", "Payout Token Unlock"
 
+    AI_INTERVIEW_PAYMENT = "AI_INTERVIEW_PAYMENT", "AI Interview Token Payment"
+
 
 
 

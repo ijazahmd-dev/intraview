@@ -96,7 +96,26 @@ class CandidateProfile(models.Model):
 
     profile_completion = models.FloatField(default=0.0, editable=False)
     interviews_completed = models.PositiveIntegerField(default=0, editable=False)
-    
+
+    # ---- AI Interview Quota ----
+    free_ai_interviews_remaining = models.PositiveIntegerField(
+        default=3,
+        help_text="Free onboarding AI interviews for new signups.",
+    )
+    subscription_ai_interviews_remaining = models.IntegerField(
+        default=0,
+        help_text="Remaining AI interview quota from paid subscription. -1 means unlimited (Pro).",
+    )
+    has_unlimited_ai = models.BooleanField(
+        default=False,
+        help_text="True for Pro plan users — no quota or token deduction.",
+    )
+    ai_subscription_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the subscription-based AI quota expires.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

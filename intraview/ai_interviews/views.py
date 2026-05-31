@@ -914,3 +914,103 @@ class AIInterviewTurnEvaluationDetailAPIView(APIView):
 
         serializer = AIInterviewTurnEvaluationDetailSerializer(evaluation)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# AI Interview Eligibility
+# ---------------------------------------------------------------------------
+
+
+class AIInterviewEligibilityAPIView(APIView):
+    """
+    GET /api/ai-interview/eligibility/?duration=<minutes>
+
+    Returns whether the authenticated candidate can start an AI interview
+    for the given duration, and how the payment will be handled.
+
+    Call this BEFORE /session/start/ so the frontend can show pricing info.
+
+    Response examples:
+      { "can_start": true,  "payment_type": "UNLIMITED" }
+      { "can_start": true,  "payment_type": "SUBSCRIPTION", "remaining_subscription": 8, "cost": 0 }
+      { "can_start": true,  "payment_type": "FREE_QUOTA", "remaining_free": 2, "cost": 0 }
+      { "can_start": true,  "payment_type": "TOKENS", "cost": 20, "remaining_tokens": 50 }
+      { "can_start": false, "message": "Insufficient tokens." }
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from ai_interviews.service.quota_service import AIInterviewQuotaService, VALID_DURATIONS
+
+        raw_duration = request.query_params.get("duration")
+        if not raw_duration:
+            return Response(
+                {"detail": "Query param 'duration' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            duration_minutes = int(raw_duration)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": f"'duration' must be an integer. Valid values: {sorted(VALID_DURATIONS)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = AIInterviewQuotaService.check_eligibility(
+            user=request.user,
+            duration_minutes=duration_minutes,
+        )
+
+        return Response(result.to_response_dict(), status=status.HTTP_200_OK)
+
+
+class AIInterviewQuotaStatusAPIView(APIView):
+    """
+    GET /api/ai-interview/quota/
+
+    Returns the current quota state for the authenticated candidate.
+    Useful for the frontend dashboard / pre-interview screen.
+
+    Response:
+    {
+      "free_ai_interviews_remaining": 2,
+      "subscription_ai_interviews_remaining": 8,
+      "has_unlimited_ai": false,
+      "ai_subscription_expires_at": "2026-06-30T00:00:00Z",
+      "pricing": { "5": 5, "15": 10, "30": 20 },
+      "token_balance": 45
+    }
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from ai_interviews.service.quota_service import AI_INTERVIEW_PRICING
+        from wallet.services import TokenService
+        from candidates.models import CandidateProfile
+
+        try:
+            profile = CandidateProfile.objects.get(user=request.user)
+        except CandidateProfile.DoesNotExist:
+            return Response(
+                {"detail": "Candidate profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        wallet = TokenService.get_or_create_wallet(request.user)
+
+        return Response(
+            {
+                "free_ai_interviews_remaining": profile.free_ai_interviews_remaining,
+                "subscription_ai_interviews_remaining": profile.subscription_ai_interviews_remaining,
+                "has_unlimited_ai": profile.has_unlimited_ai,
+                "ai_subscription_expires_at": profile.ai_subscription_expires_at,
+                "pricing": {str(k): v for k, v in AI_INTERVIEW_PRICING.items()},
+                "token_balance": wallet.balance,
+            },
+            status=status.HTTP_200_OK,
+        )

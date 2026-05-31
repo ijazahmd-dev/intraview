@@ -27,4 +27,7 @@ urlpatterns = [
     path("session/<int:pk>/report/",views.AIInterviewFinalReportAPIView.as_view(),name="ai-session-report",),
     path("turns/<int:turn_id>/evaluation/", views.AIInterviewTurnEvaluationDetailAPIView.as_view(), name="ai-turn-evaluation-detail"),
     path("session/<int:pk>/evaluations/", views.AIInterviewSessionEvaluationsAPIView.as_view(), name="ai-session-evaluations"),
+    # Quota / eligibility
+    path("eligibility/", views.AIInterviewEligibilityAPIView.as_view(), name="ai-eligibility"),
+    path("quota/", views.AIInterviewQuotaStatusAPIView.as_view(), name="ai-quota-status"),
 ]

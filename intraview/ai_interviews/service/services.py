@@ -80,10 +80,22 @@ class AIInterviewSessionService:
         difficulty: str,
         duration_minutes: int,
     ) -> AIInterviewSession:
+        from ai_interviews.service.quota_service import AIInterviewQuotaService
+        from wallet.services import InsufficientBalanceError
+
         role = RoleRepository.get_by_slug(role_slug)
         if not role:
             raise ValueError("Invalid or inactive role.")
 
+        # ── Eligibility gate (read-only, fast path) ──────────────────────────
+        eligibility = AIInterviewQuotaService.check_eligibility(
+            user=user,
+            duration_minutes=duration_minutes,
+        )
+        if not eligibility.can_start:
+            raise ValueError(eligibility.message or "Cannot start AI interview.")
+
+        # ── Create the session record ─────────────────────────────────────────
         session = AIInterviewSessionRepository.create_session_for_user(
             user=user,
             role=role,
@@ -92,12 +104,25 @@ class AIInterviewSessionService:
             duration_minutes=duration_minutes,
         )
 
+        # ── Deduct quota / tokens atomically (BEFORE interview begins) ────────
+        try:
+            AIInterviewQuotaService.consume_quota(
+                user=user,
+                duration_minutes=duration_minutes,
+                session_id=session.id,
+            )
+        except (ValueError, InsufficientBalanceError) as exc:
+            # Roll back the session creation if quota deduction fails
+            session.delete()
+            raise ValueError(str(exc))
+
         # Enforce one active session: cancel all others
         AIInterviewSessionService._cancel_other_active_sessions(
             user=user, keep_session_id=session.id
         )
 
         return session
+
 
     @staticmethod
     def get_session_for_user(session_id: int, user) -> Optional[AIInterviewSession]:

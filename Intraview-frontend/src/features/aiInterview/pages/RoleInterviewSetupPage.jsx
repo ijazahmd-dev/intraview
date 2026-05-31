@@ -1529,6 +1529,8 @@ import {
   setSystemCheckField,
   resetAiInterviewSessionState,
   checkAiInterviewNetwork,
+  checkAiInterviewEligibility,
+  resetEligibility,
 } from "../slice/aiInterviewSessionSlice";
 
 const ROUND_OPTIONS_BASE = [
@@ -1564,7 +1566,7 @@ export default function RoleInterviewSetupPage() {
   const animationFrameRef = useRef(null);
   const videoRef = useRef(null);
 
-  const { role, roleLoading, roleError, config, systemCheck, session } =
+  const { role, roleLoading, roleError, config, systemCheck, session, eligibility } =
     useSelector((state) => state.aiInterviewSession);
 
   useEffect(() => {
@@ -1577,23 +1579,36 @@ export default function RoleInterviewSetupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, dispatch]);
 
+  useEffect(() => {
+    if (config.durationMinutes) {
+      dispatch(checkAiInterviewEligibility(config.durationMinutes));
+    } else {
+      dispatch(resetEligibility());
+    }
+  }, [config.durationMinutes, dispatch]);
+
   const isCodingRole = useMemo(() => {
     if (!role) return false;
     const haystack = `${role.name ?? ""} ${role.category ?? ""}`.toLowerCase();
-    return ["engineer","developer","software","backend","front-end","frontend","full stack","programmer","sde","swe"].some((kw) => haystack.includes(kw));
+    return ["engineer", "developer", "software", "backend", "front-end", "frontend", "full stack", "programmer", "sde", "swe"].some((kw) => haystack.includes(kw));
   }, [role]);
 
   const visibleRoundOptions = useMemo(() =>
     isCodingRole ? ROUND_OPTIONS_BASE : ROUND_OPTIONS_BASE.filter((o) => o.value !== "CODING"),
-  [isCodingRole]);
+    [isCodingRole]);
 
   const configComplete = useMemo(() =>
     !!config.roundType && !!config.difficulty && !!config.durationMinutes && !!role,
-  [config.roundType, config.difficulty, config.durationMinutes, role]);
+    [config.roundType, config.difficulty, config.durationMinutes, role]);
 
   const canStartInterview = useMemo(() =>
-    configComplete && systemCheck.browserOk && systemCheck.micPermission === "granted" && session.status !== "creating",
-  [configComplete, systemCheck.browserOk, systemCheck.micPermission, session.status]);
+    configComplete &&
+    systemCheck.browserOk &&
+    systemCheck.micPermission === "granted" &&
+    session.status !== "creating" &&
+    eligibility.status === "ready" &&
+    eligibility.data?.can_start,
+    [configComplete, systemCheck.browserOk, systemCheck.micPermission, session.status, eligibility.status, eligibility.data?.can_start]);
 
   const handleTestDevices = async () => {
     setLocalError(null);
@@ -1607,7 +1622,7 @@ export default function RoleInterviewSetupPage() {
       mediaStreamRef.current = stream;
       dispatch(setSystemCheckField({ field: "micPermission", value: "granted" }));
       dispatch(setSystemCheckField({ field: "cameraPermission", value: "granted" }));
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => { }); }
       setupAudioAnalyser(stream);
     } catch (err) {
       dispatch(setSystemCheckField({ field: "micPermission", value: "denied" }));
@@ -1639,7 +1654,7 @@ export default function RoleInterviewSetupPage() {
 
   const stopMediaAndAudio = () => {
     if (animationFrameRef.current) { cancelAnimationFrame(animationFrameRef.current); animationFrameRef.current = null; }
-    if (audioContextRef.current) { audioContextRef.current.close().catch(() => {}); audioContextRef.current = null; }
+    if (audioContextRef.current) { audioContextRef.current.close().catch(() => { }); audioContextRef.current = null; }
     if (mediaStreamRef.current) { mediaStreamRef.current.getTracks().forEach((t) => t.stop()); mediaStreamRef.current = null; }
   };
 
@@ -1756,13 +1771,13 @@ export default function RoleInterviewSetupPage() {
         <div className="mb-7">
           {roleLoading && (
             <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
               Loading role details…
             </div>
           )}
           {roleError && (
             <div className="mb-3 inline-flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-xs font-medium rounded-lg px-3 py-2">
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
               {roleError}
             </div>
           )}
@@ -1787,11 +1802,10 @@ export default function RoleInterviewSetupPage() {
                   </span>
                 )}
                 {config.difficulty && (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-3 py-1 ${
-                    selectedDifficulty?.color === "emerald" ? "bg-emerald-100 text-emerald-700" :
-                    selectedDifficulty?.color === "amber" ? "bg-amber-100 text-amber-700" :
-                    "bg-rose-100 text-rose-700"
-                  }`}>
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-3 py-1 ${selectedDifficulty?.color === "emerald" ? "bg-emerald-100 text-emerald-700" :
+                      selectedDifficulty?.color === "amber" ? "bg-amber-100 text-amber-700" :
+                        "bg-rose-100 text-rose-700"
+                    }`}>
                     {selectedDifficulty?.label}
                   </span>
                 )}
@@ -1868,7 +1882,7 @@ export default function RoleInterviewSetupPage() {
                       </div>
                       {active && (
                         <div className="ml-auto shrink-0 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
                         </div>
                       )}
                     </button>
@@ -1885,19 +1899,18 @@ export default function RoleInterviewSetupPage() {
                   const active = config.difficulty === opt.value;
                   const colors = {
                     emerald: { bg: "bg-emerald-500", ring: "ring-emerald-300", light: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-                    amber:   { bg: "bg-amber-400",   ring: "ring-amber-300",   light: "bg-amber-50   border-amber-200   text-amber-700"   },
-                    rose:    { bg: "bg-rose-500",     ring: "ring-rose-300",     light: "bg-rose-50   border-rose-200   text-rose-700"     },
+                    amber: { bg: "bg-amber-400", ring: "ring-amber-300", light: "bg-amber-50   border-amber-200   text-amber-700" },
+                    rose: { bg: "bg-rose-500", ring: "ring-rose-300", light: "bg-rose-50   border-rose-200   text-rose-700" },
                   }[opt.color];
                   return (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => dispatch(setConfigField({ field: "difficulty", value: opt.value }))}
-                      className={`diff-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-center ${
-                        active
+                      className={`diff-btn flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border text-center ${active
                           ? `${colors.light} ring-2 ${colors.ring} border-transparent`
                           : "border-gray-200 bg-white hover:border-gray-300"
-                      }`}
+                        }`}
                     >
                       <div className={`w-2 h-2 rounded-full ${active ? colors.bg : "bg-gray-300"}`} />
                       <p className={`text-[11px] font-bold ${active ? "" : "text-gray-700"}`}>{opt.label}</p>
@@ -1928,6 +1941,110 @@ export default function RoleInterviewSetupPage() {
                 })}
               </div>
             </div>
+
+            {/* ── Premium Payment Summary Card ── */}
+            {config.durationMinutes && (
+              <div className="mt-2 border border-gray-100 rounded-xl bg-gradient-to-br from-white to-gray-50/50 p-4 shadow-sm relative overflow-hidden">
+                {/* Background decoration */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-full blur-3xl opacity-50 -mr-10 -mt-10 pointer-events-none" />
+
+                <div className="flex items-center gap-2 mb-3 relative z-10">
+                  <div className="w-1 h-4 bg-teal-500 rounded-full" />
+                  <h3 className="font-display font-bold text-gray-900 text-sm">Interview Access</h3>
+                </div>
+
+                {eligibility.status === "loading" && (
+                  <div className="flex items-center gap-3 relative z-10 py-2">
+                    <svg className="w-4 h-4 text-teal-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    <span className="text-xs font-semibold text-gray-500 animate-pulse">Checking pricing & access...</span>
+                  </div>
+                )}
+
+                {eligibility.status === "error" && (
+                  <div className="relative z-10 py-1 text-xs text-red-500 font-semibold flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {eligibility.error}
+                  </div>
+                )}
+
+                {eligibility.status === "ready" && eligibility.data && (
+                  <div className="relative z-10 space-y-3">
+                    {eligibility.data.can_start ? (
+                      <>
+                        <div className="flex flex-wrap gap-2 mb-1">
+                          {eligibility.data.payment_type === "UNLIMITED" && (
+                            <span className="inline-flex items-center gap-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-sm uppercase tracking-wider">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143z" /></svg>
+                              Pro Plan — Unlimited
+                            </span>
+                          )}
+                          {eligibility.data.payment_type === "SUBSCRIPTION" && (
+                            <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-800 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                              Using Subscription
+                            </span>
+                          )}
+                          {eligibility.data.payment_type === "FREE_QUOTA" && (
+                            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                              Free Interview
+                            </span>
+                          )}
+                          {eligibility.data.payment_type === "TOKENS" && (
+                            <span className="inline-flex items-center gap-1 bg-slate-900 text-white text-[10px] font-bold px-2.5 py-1 rounded-md shadow-sm uppercase tracking-wider">
+                              Token Payment
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Duration</p>
+                            <p className="text-sm font-bold text-gray-900">{config.durationMinutes} minutes</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Cost</p>
+                            <p className="text-sm font-bold text-gray-900">
+                              {eligibility.data.cost === 0 ? "Free" : `${eligibility.data.cost} Tokens`}
+                            </p>
+                          </div>
+                          {eligibility.data.payment_type === "SUBSCRIPTION" && (
+                            <div className="col-span-2 border-t border-gray-100 pt-2 mt-1">
+                              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Remaining Subs</p>
+                              <p className="text-xs font-semibold text-gray-700">{eligibility.data.remaining_subscription} interviews</p>
+                            </div>
+                          )}
+                          {eligibility.data.payment_type === "FREE_QUOTA" && (
+                            <div className="col-span-2 border-t border-gray-100 pt-2 mt-1">
+                              <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Remaining Free</p>
+                              <p className="text-xs font-semibold text-gray-700">{eligibility.data.remaining_free} interviews</p>
+                            </div>
+                          )}
+                          {eligibility.data.payment_type === "TOKENS" && (
+                            <div className="col-span-2 border-t border-gray-100 pt-2 mt-1 flex items-center justify-between">
+                              <div>
+                                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Wallet Balance</p>
+                                <p className="text-xs font-semibold text-gray-700">{eligibility.data.remaining_tokens} Tokens</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                          <div>
+                            <p className="text-xs font-bold text-red-800">Insufficient Tokens</p>
+                            <p className="text-[11px] text-red-600 mt-0.5">
+                              {eligibility.data?.message || "You don't have enough tokens for this interview duration."}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="text-[11px] text-gray-400 border-t border-gray-100 pt-3">
               * These settings can be changed by creating a new session at any time.
@@ -1975,7 +2092,7 @@ export default function RoleInterviewSetupPage() {
                     {!mediaStreamRef.current && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
                         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.72v6.56a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                          <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.72v6.56a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
                         </div>
                         <p className="text-[10px] text-white/40 text-center px-3">Camera preview after you allow access</p>
                       </div>
@@ -2034,7 +2151,7 @@ export default function RoleInterviewSetupPage() {
             {/* Errors */}
             {(localError || session.createError) && (
               <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
-                <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9v4a1 1 0 102 0V9a1 1 0 10-2 0zm1-4a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd"/></svg>
+                <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9v4a1 1 0 102 0V9a1 1 0 10-2 0zm1-4a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" /></svg>
                 <p className="text-xs text-red-600">{localError || session.createError}</p>
               </div>
             )}
@@ -2046,18 +2163,19 @@ export default function RoleInterviewSetupPage() {
                 <div className="mb-3 flex flex-wrap gap-2">
                   {!configComplete && <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1 font-medium">⚠ Complete interview setup</span>}
                   {systemCheck.micPermission !== "granted" && <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-1 font-medium">⚠ Enable microphone access</span>}
+                  {eligibility.status === "loading" && <span className="text-[11px] text-teal-600 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1 font-medium">↻ Checking access...</span>}
+                  {eligibility.status === "ready" && eligibility.data?.can_start === false && <span className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-full px-2.5 py-1 font-medium">⚠ Insufficient balance</span>}
                 </div>
               )}
 
               <button
                 type="button"
-                disabled={!canStartInterview}
+                disabled={!canStartInterview || eligibility.status === "loading"}
                 onClick={handleStartInterview}
-                className={`start-btn w-full py-3.5 rounded-xl text-sm font-bold text-white relative overflow-hidden ${
-                  canStartInterview
+                className={`start-btn w-full py-3.5 rounded-xl text-sm font-bold text-white relative overflow-hidden ${canStartInterview
                     ? "bg-teal-500 hover:bg-teal-600 cursor-pointer"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 {canStartInterview && (
                   <span className="absolute inset-0 bg-gradient-to-r from-teal-500 via-teal-400 to-teal-500 opacity-0 hover:opacity-100 transition-opacity" />
@@ -2065,13 +2183,13 @@ export default function RoleInterviewSetupPage() {
                 <span className="relative flex items-center justify-center gap-2">
                   {session.status === "creating" ? (
                     <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                       Starting session…
                     </>
                   ) : (
                     <>
                       Start Interview
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                     </>
                   )}
                 </span>
@@ -2093,17 +2211,16 @@ function ChecklistItem({ label, description, done, warn, required }) {
   return (
     <div className="checklist-item flex items-start gap-3 px-3.5 py-3">
       {/* Icon */}
-      <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-        done
+      <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${done
           ? "bg-emerald-500"
           : warn
-          ? "bg-amber-100 border-2 border-amber-300"
-          : "bg-gray-100 border-2 border-gray-200"
-      }`}>
+            ? "bg-amber-100 border-2 border-amber-300"
+            : "bg-gray-100 border-2 border-gray-200"
+        }`}>
         {done ? (
-          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" /></svg>
         ) : warn ? (
-          <svg className="w-2.5 h-2.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+          <svg className="w-2.5 h-2.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
         ) : (
           <div className="w-2 h-2 rounded-full bg-gray-300" />
         )}

@@ -42,3 +42,15 @@ export const endAiInterviewSession = (sessionId, payload) => {
  */
 export const getAiInterviewSessionDetail = (sessionId) =>
   API.get(`/api/ai-interview/session/${sessionId}/`);
+
+/**
+ * GET /api/ai-interview/eligibility/?duration=X
+ */
+export const getAiInterviewEligibility = (duration) =>
+  API.get(`/api/ai-interview/eligibility/?duration=${duration}`);
+
+/**
+ * GET /api/ai-interview/quota/
+ */
+export const getAiInterviewQuota = () =>
+  API.get(`/api/ai-interview/quota/`);
