@@ -27,11 +27,13 @@ from constants import (
     MAX_FOLLOWUPS_PER_QUESTION,
     ASSISTANT_GENERATION_TIMEOUT_SECONDS,
     TRANSCRIPT_STABILIZATION_SECONDS,
+    SPEECH_END_GRACE_SECONDS,
     MIN_TRANSCRIPT_COMMIT_WORDS,
     TRANSCRIPT_BUFFER_MAX_SECONDS,
     TRANSCRIPT_SIMILARITY_THRESHOLD,
     MAX_TRANSCRIPT_UPDATES_PER_PROMPT,
     NO_ANSWER_TIMEOUT_SECONDS,
+    FOLLOWUP_SUFFICIENT_WORD_COUNT,
 )
 from planner import InterviewConfig, QuestionPlanner
 from state import InterviewState, StateMachine
@@ -406,32 +408,22 @@ class InterviewRuntime:
 
             finally:
                 self._generation_in_progress = False
-                if (
-                    self._active_generation_owner
-                    and self._active_generation_owner.get("type")
-                    == generation_type
-                ):
-                    owner_age = (
-                        time.monotonic()
-                        - self._active_generation_owner["started_at"]
-                    )
-
-                    #
-                    # Generation finished but
-                    # assistant item never arrived.
-                    #
-                    if owner_age > 15:
-                        logger.warning(
-                            (
-                                "Clearing stale generation owner → "
-                                "type=%s age=%s"
-                            ),
-                            generation_type,
-                            owner_age,
-                        )
-
-                        self._active_generation_owner = None
-                        self._pending_generation_type = None
+                #
+                # IMPORTANT: Do NOT clear _active_generation_owner
+                # or _pending_generation_type here.
+                #
+                # generate_reply() returns when LLM text is submitted
+                # to the TTS pipeline, but conversation_item_added
+                # fires SECONDS LATER after TTS finishes speaking.
+                #
+                # If we clear the owner here, the item arrives with
+                # no owner → classified as AUTONOMOUS → the runtime
+                # never registers questions → transcripts are never
+                # processed → backend turn POST never fires.
+                #
+                # The conversation handler (QUESTION/FOLLOWUP/RETRY
+                # branches) is responsible for clearing these when
+                # it successfully consumes the item.
 
 
 
@@ -729,11 +721,14 @@ class InterviewRuntime:
         )
 
         #
-        # Short natural pause tolerance.
+        # Use dedicated speech grace window.
+        #
+        # Decoupled from transcript stabilization because
+        # candidates naturally pause 2-4s mid-thought.
         #
         return (
             silence_duration
-            < TRANSCRIPT_STABILIZATION_SECONDS
+            < SPEECH_END_GRACE_SECONDS
         )
 
     async def _schedule_transcript_commit(
@@ -871,6 +866,35 @@ class InterviewRuntime:
             )
 
             if not self.tm.has_pending_question():
+                return
+
+            #
+            # HARD GUARD: Never finalize while candidate
+            # is actively speaking.
+            #
+            # This catches cases where stabilization timer
+            # fires but VAD still reports active speech.
+            #
+            if self._candidate_is_speaking:
+                logger.info(
+                    "COMMIT BLOCKED → candidate still speaking"
+                )
+                if (
+                    self._runtime_alive
+                    and self.tm.has_pending_question()
+                ):
+                    task = asyncio.create_task(
+                        self._schedule_transcript_commit(
+                            total_q=total_q
+                        )
+                    )
+                    self._transcript_stabilization_task = task
+                    self._background_tasks.add(task)
+
+                    def _cleanup_task(t: asyncio.Task):
+                        self._background_tasks.discard(t)
+
+                    task.add_done_callback(_cleanup_task)
                 return
             
             #
@@ -1328,12 +1352,28 @@ class InterviewRuntime:
 
 
 
-        # Extremely short answers usually need clarification.
-        if word_count < 8:
+        # Sufficiently detailed answers never need follow-up.
+        # Anything >= 12 words is considered adequate.
+        if word_count >= 12:
+            logger.info(
+                (
+                    "FOLLOWUP DECISION=False "
+                    "reason=sufficient_answer_length "
+                    "words=%s "
+                    "text=%r"
+                ),
+                word_count,
+                text[:200],
+            )
+            return False
+
+        # Only truly minimal answers (< 5 words) need clarification,
+        # and only if no follow-up has been asked yet for this question.
+        if word_count < 5 and self.tm.state.followup_count == 0:
             logger.warning(
                 (
                     "FOLLOWUP DECISION=True "
-                    "reason=short_answer "
+                    "reason=very_short_answer "
                     "words=%s "
                     "text=%r"
                 ),
@@ -1342,6 +1382,8 @@ class InterviewRuntime:
             )
             return True
 
+        # For 5-11 word answers: only follow up if genuinely vague
+        # AND this is the first follow-up attempt.
         vague_markers = (
             "some stuff",
             "kind of",
@@ -1350,7 +1392,8 @@ class InterviewRuntime:
             "many things",
         )
         if (
-            word_count < 25
+            word_count < 12
+            and self.tm.state.followup_count == 0
             and any(m in lower for m in vague_markers)
         ):
             logger.warning(
@@ -1368,7 +1411,7 @@ class InterviewRuntime:
         logger.info(
             (
                 "FOLLOWUP DECISION=False "
-                "reason=sufficient_answer "
+                "reason=acceptable_answer "
                 "words=%s "
                 "text=%r"
             ),
@@ -1563,9 +1606,20 @@ class InterviewRuntime:
                         - owner["started_at"]
                     )
 
-                    # ownership survives short LiveKit delay
-                    if owner_age <= 15:
+                    # ownership survives TTS pipeline delay
+                    # (TTS can take 5-15s after generate_reply returns)
+                    if owner_age <= 60:
                         expected_generation_type = owner["type"]
+                    else:
+                        # Stale owner — clear it and treat as autonomous
+                        logger.warning(
+                            "Clearing stale generation owner: "
+                            "age=%.1fs type=%s",
+                            owner_age,
+                            owner["type"],
+                        )
+                        self._active_generation_owner = None
+                        self._pending_generation_type = None
 
                 if (
                     expected_generation_type is None
@@ -1776,6 +1830,23 @@ class InterviewRuntime:
                         self.tm.state.waiting_for_answer,
                         text[:200],
                     )
+                    #
+                    # CRITICAL FIX:
+                    # Interrupt any in-progress TTS playback.
+                    #
+                    # Previously we only returned here, but the
+                    # autonomous speech had already been queued
+                    # to the TTS pipeline and would still play.
+                    #
+                    try:
+                        self.session.interrupt()
+                        logger.info(
+                            "Interrupted autonomous assistant speech."
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Failed to interrupt autonomous speech."
+                        )
                     return
                 return
 
@@ -2366,9 +2437,9 @@ class InterviewRuntime:
             else:
 
                 logger.warning(
-                    "Skipping backend turn post "
-                    "because answer is empty. "
-                    "Advancing to next question."
+                    "Empty answer detected. "
+                    "Re-asking SAME question "
+                    "(not consuming question slot)."
                 )
 
                 self._reset_transcript_buffer()
@@ -2377,19 +2448,19 @@ class InterviewRuntime:
 
                 self._followup_phase_closed = True
 
-                self.tm.mark_answer_received()
-
                 #
-                # Empty turn fully handled.
+                # FIX: Do NOT call mark_answer_received()
+                # which would advance turn_index and
+                # consume a question slot for nothing.
                 #
-                self.tm.complete_turn_finalization()
+                # Instead, reset current turn state
+                # so the same question can be re-asked.
+                #
+                self.tm.reset_current_turn_state()
 
                 await self._sync_runtime_state()
 
-                # CRITICAL: Ask the next question even when skipping an empty turn.
-                # Without this, the interview gets permanently stuck because no
-                # pending question exists and Gemini generates autonomous questions
-                # indefinitely.
+                # Re-ask the SAME question (turn_index unchanged).
                 if self.tm.can_ask_new_question():
                     _idx = self.tm.current_turn_index_0based()
                     _base_q = self.planner.base_question_for_turn(_idx)

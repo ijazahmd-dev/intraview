@@ -7,7 +7,7 @@ This file prevents scattering magic numbers across the codebase.
 """
 
 # How long to wait for a candidate answer before a gentle retry.
-NO_ANSWER_TIMEOUT_SECONDS: float = 60.0
+NO_ANSWER_TIMEOUT_SECONDS: float = 75.0
 
 # Maximum multiplier for total no-answer wait after retry.
 # 40s (initial) + 40s (retry) = 80s total window.
@@ -39,6 +39,10 @@ MAX_FOLLOWUPS_PER_QUESTION: int = 2
 # using real interview session analytics later.
 FOLLOWUP_MIN_ANSWER_WORDS: int = 18
 FOLLOWUP_MIN_ANSWER_CHARS: int = 80
+
+# Word count above which an answer is considered sufficiently detailed
+# and should NOT trigger a follow-up question.
+FOLLOWUP_SUFFICIENT_WORD_COUNT: int = 25
 
 # Hard safety guard against infinite clarification loops.
 #
@@ -115,7 +119,16 @@ TURN_FINALIZATION_TIMEOUT_SECONDS: float = 15.0
 # - STT provider emits final chunks
 # - no new transcript arrives for this duration
 # => runtime commits transcript
-TRANSCRIPT_STABILIZATION_SECONDS: float = 2.2
+TRANSCRIPT_STABILIZATION_SECONDS: float = 3.0
+
+# How long after candidate stops speaking before runtime
+# considers them truly finished.
+#
+# Decoupled from TRANSCRIPT_STABILIZATION_SECONDS because:
+# - transcript similarity timing serves dedup
+# - speech grace timing serves answer completeness
+# - candidates naturally pause 2-4s mid-thought
+SPEECH_END_GRACE_SECONDS: float = 4.0
 
 # Minimum transcript size before runtime considers
 # the answer meaningful enough to commit.
