@@ -350,7 +350,7 @@ export default function Home() {
             Get started free and build the confidence to ace your next interview with<br />
             personalized, voice-driven sessions.
           </p>
-          <button className="bg-white text-teal-600 px-8 py-3 rounded-lg hover:bg-gray-100 transition font-medium">
+          <button onClick={() => navigate('/candidate/interviewers')} className="bg-white text-teal-600 px-8 py-3 rounded-lg hover:bg-gray-100 transition font-medium">
             Start Mock Interview Now
           </button>
         </div>

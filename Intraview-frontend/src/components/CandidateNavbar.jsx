@@ -913,7 +913,7 @@
 
 
 
-// src/components/navbar/CandidateNavbar.jsx
+// src/components/CandidateNavbar.jsx
 /**
  * CandidateNavbar — Floating Pill Design
  *

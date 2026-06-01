@@ -1,3 +1,8 @@
+// src/components/CandidateFooter.jsx
+
+
+
+
 import React from 'react';
 
 export default function CandidateFooter() {
