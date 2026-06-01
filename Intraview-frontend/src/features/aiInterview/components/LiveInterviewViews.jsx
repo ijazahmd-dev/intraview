@@ -204,11 +204,11 @@ function LiveInterviewInner({
       </div>
 
       {/* AgentTranscriptPanel handles current question + transcript + history */}
-      <AgentTranscriptPanel
+      {/* <AgentTranscriptPanel
         currentQuestion={currentQuestion}
         transcript={transcript}
         questionHistory={questionHistory}
-      />
+      /> */}
     </div>
   );
 }
