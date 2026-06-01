@@ -1,10 +1,11 @@
 # intraview_agent/runtime.py
 
 
+
 import asyncio
 import json
 import logging
-import re          # [NEW] for word count in _should_ask_followup
+import re         
 import time
 from typing import Optional, Set
 from difflib import SequenceMatcher
@@ -91,7 +92,7 @@ class InterviewRuntime:
 
         # Classify what we expect the next assistant message to be.
         # [NEW] Added "FOLLOWUP" as a valid value alongside "QUESTION".
-        self._pending_generation_type: Optional[str] = None  # "QUESTION" | "FOLLOWUP" | "RETRY" | None
+        self._pending_generation_type: Optional[str] = None  # "QUESTION" | "RETRY" | None
 
         # Explicit ownership marker for the assistant message
         # we are currently expecting from LiveKit.
@@ -101,9 +102,6 @@ class InterviewRuntime:
         self._generation_owner_seq: int = 0
         self._active_generation_owner: Optional[dict] = None
 
-        # Hard runtime guard that prevents recursive follow-up generation.
-        # Once True for a base question, runtime will never ask another follow-up.
-        self._followup_phase_closed: bool = False
 
         # True while a generate_reply() call is actively running.
         # Prevents overlapping generation requests.
@@ -264,7 +262,15 @@ class InterviewRuntime:
         """
         try:
             data = json.dumps(payload).encode("utf-8")
-            await self.room.local_participant.publish_data(data, reliable=True)
+            await asyncio.wait_for(
+                self.room.local_participant.publish_data(data, reliable=True),
+                timeout=2.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Timed out publishing data message: type=%s",
+                payload.get("type"),
+            )
         except Exception:
             logger.exception("Failed to publish data message")
 
@@ -292,7 +298,15 @@ class InterviewRuntime:
             payload["remaining_seconds"] = remaining
 
         try:
-            await self.backend.update_runtime_state(self.cfg.session_id, payload)
+            await asyncio.wait_for(
+                self.backend.update_runtime_state(self.cfg.session_id, payload),
+                timeout=5.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Timed out syncing runtime state to backend: session_id=%s",
+                self.cfg.session_id,
+            )
         except Exception:
             # Log but do not crash runtime on sync failure.
             logger.exception("Failed to sync runtime state to backend")
@@ -657,10 +671,20 @@ class InterviewRuntime:
         self._last_transcript_update_at = 0.0
         self._transcript_started_at = 0.0
         self._transcript_update_count = 0
+        current_task: Optional[asyncio.Task] = None
+
+        try:
+            current_task = asyncio.current_task()
+        except RuntimeError:
+            current_task = None
 
         if self._transcript_stabilization_task:
 
-            if not self._transcript_stabilization_task.done():
+            if (
+                not self._transcript_stabilization_task.done()
+                and self._transcript_stabilization_task
+                is not current_task
+            ):
                 self._transcript_stabilization_task.cancel()
 
         self._transcript_stabilization_task = None
@@ -673,23 +697,10 @@ class InterviewRuntime:
         """
         Build the canonical committed answer text for the current turn.
 
-        This is the single source of truth for follow-up decisions and
-        debug logging.
+        With follow-ups removed, this is just the base answer text.
         """
         assert self.tm is not None
-
-        parts = []
-
-        base_answer = (self.tm.state.base_answer_text or "").strip()
-        if base_answer:
-            parts.append(base_answer)
-
-        for ex in self.tm.state.followup_exchanges:
-            ans = (ex.get("answer") or "").strip()
-            if ans and ans != "[NO_RESPONSE]":
-                parts.append(ans)
-
-        return " ".join(parts).strip()    
+        return (self.tm.state.base_answer_text or "").strip()
 
 
 
@@ -855,15 +866,12 @@ class InterviewRuntime:
                     "pending=%s "
                     "waiting=%s "
                     "candidate_speaking=%s "
-                    "followup_active=%s "
-                    "followup_count=%s "
                     "buffer=%r"
                 ),
                 self.tm.has_pending_question(),
                 self.tm.state.waiting_for_answer,
                 self._candidate_is_speaking,
-                self.tm.state.is_followup_active,
-                self.tm.state.followup_count,
+
                 self._active_transcript_text[:300],
             )
 
@@ -1044,8 +1052,6 @@ class InterviewRuntime:
                     "FINAL ANSWER COMMITTED → "
                     "answer=%r "
                     "words=%s "
-                    "followup_active=%s "
-                    "followup_count=%s"
                 ),
                 answer_text[:300],
                 len(
@@ -1054,8 +1060,7 @@ class InterviewRuntime:
                         answer_text,
                     )
                 ),
-                self.tm.state.is_followup_active,
-                self.tm.state.followup_count,
+
             )
 
             #
@@ -1080,6 +1085,22 @@ class InterviewRuntime:
                     total_q=total_q,
                 )
 
+            except asyncio.CancelledError:
+                logger.warning(
+                    "Post-answer processing cancelled: session_id=%s turn=%s",
+                    self.cfg.session_id
+                    if self.cfg else None,
+                    self.tm.current_turn_index_1based()
+                    if self.tm else None,
+                )
+                if self.tm is not None and self.tm.state.is_finalizing_turn:
+                    logger.warning(
+                        "Aborting stuck turn finalization after cancellation: turn=%s",
+                        self.tm.current_turn_index_1based(),
+                    )
+                    self.tm.abort_turn_finalization()
+                raise
+
             except Exception:
                 logger.exception(
                     "Post-answer processing failed: "
@@ -1087,6 +1108,12 @@ class InterviewRuntime:
                     self.cfg.session_id
                     if self.cfg else None,
                 )
+                if self.tm is not None and self.tm.state.is_finalizing_turn:
+                    logger.warning(
+                        "Aborting stuck turn finalization after answer-processing failure: turn=%s",
+                        self.tm.current_turn_index_1based(),
+                    )
+                    self.tm.abort_turn_finalization()
 
             finally:
                 #
@@ -1184,6 +1211,10 @@ class InterviewRuntime:
 
         # Always finalize the base turn directly.
         # No follow-up logic of any kind.
+        logger.info(
+            "PROCESS ANSWER PRE-FINALIZE → turn=%s",
+            turn_index_1based,
+        )
         await self._finalize_base_turn(total_q)      
 
 
@@ -1350,15 +1381,12 @@ class InterviewRuntime:
                     "pending_generation_type=%s "
                     "generation_in_progress=%s "
                     "waiting_for_answer=%s "
-                    "followup_active=%s "
-                    "followup_count=%s "
                     "text=%r"
                 ),
                 self._pending_generation_type,
                 self._generation_in_progress,
                 self.tm.state.waiting_for_answer,
-                self.tm.state.is_followup_active,
-                self.tm.state.followup_count,
+
                 text[:200],
             )
         
@@ -1405,8 +1433,6 @@ class InterviewRuntime:
                         "owner_seq=%s "
                         "generation_in_progress=%s "
                         "waiting_for_answer=%s "
-                        "followup_active=%s "
-                        "followup_count=%s "
                         "text=%r"
                     ),
                     expected_generation_type,
@@ -1418,8 +1444,7 @@ class InterviewRuntime:
                     ),
                     self._generation_in_progress,
                     self.tm.state.waiting_for_answer,
-                    self.tm.state.is_followup_active,
-                    self.tm.state.followup_count,
+
                     text[:200],
     )
 
@@ -1443,15 +1468,12 @@ class InterviewRuntime:
                     self._reset_transcript_buffer()    
 
                     self.tm.mark_question_asked(question_text=text)
-                    self._followup_phase_closed = False
                     await self._send_data(
                         {
                             "type": "question",
                             "index": self.tm.current_turn_index_1based(),
                             "text": text,
                             "total": total_q,
-                            "is_followup": False,          # [NEW]
-                            "followup_index": 0,           # [NEW]
                         }
                     )
                     await self._send_data(
@@ -1464,49 +1486,29 @@ class InterviewRuntime:
                     )
                     await self._sync_runtime_state()
 
-                # [NEW] Follow-up question has been spoken.
-                elif expected_generation_type == "FOLLOWUP":
-                    logger.warning(
-                        "ASSISTANT CLASSIFIED → FOLLOWUP"
-                    )
-                    self._pending_generation_type = None
-                    self._active_generation_owner = None
-
-                    try:
-                        self.state_machine.transition(InterviewState.LISTENING)
-                    except ValueError:
-                        logger.warning(
-                            "Illegal state transition to LISTENING from %s",
-                            self.state_machine.value.name,
-                        )
-
-                    #
-                    # Prevent transcript carry-over
-                    # between turns/followups.
-                    #
-                    self._reset_transcript_buffer()
-                    self.tm.mark_followup_asked(question_text=text)
-                    await self._send_data(
-                        {
-                            "type": "question",
-                            "index": self.tm.current_turn_index_1based(),
-                            "text": text,
-                            "total": total_q,
-                            "is_followup": True,                          # [NEW]
-                            "followup_index": self.tm.state.followup_count,  # [NEW]
-                        }
-                    )
-                    await self._send_data(
-                        {
-                            "type": "state",
-                            "state": self.state_machine.value.name,
-                            "current_index": self.tm.current_turn_index_1based(),
-                            "max_questions": total_q,
-                        }
-                    )
-                    await self._sync_runtime_state()
 
                 elif expected_generation_type == "RETRY":
+                    if (
+                        self.tm.state.is_finalizing_turn
+                        or bool((self.tm.state.base_answer_text or "").strip())
+                        or not self.tm.state.waiting_for_answer
+                    ):
+                        logger.warning(
+                            "Discarding stale retry assistant item: turn=%s waiting=%s finalizing=%s text=%r",
+                            self.tm.current_turn_index_1based(),
+                            self.tm.state.waiting_for_answer,
+                            self.tm.state.is_finalizing_turn,
+                            text[:200],
+                        )
+                        self._pending_generation_type = None
+                        self._active_generation_owner = None
+                        try:
+                            self.session.interrupt()
+                        except Exception:
+                            logger.exception(
+                                "Failed to interrupt stale retry speech."
+                            )
+                        return
 
                     logger.warning(
                         "ASSISTANT CLASSIFIED → RETRY"
@@ -1567,7 +1569,6 @@ class InterviewRuntime:
                             "expected_generation_type=%s "
                             "pending_generation_type=%s "
                             "owner_seq=%s "
-                            "followup_active=%s "
                             "waiting_for_answer=%s "
                             "text=%r"
                         ),
@@ -1578,7 +1579,6 @@ class InterviewRuntime:
                             if self._active_generation_owner
                             else None
                         ),
-                        self.tm.state.is_followup_active,
                         self.tm.state.waiting_for_answer,
                         text[:200],
                     )
@@ -1589,12 +1589,11 @@ class InterviewRuntime:
                         (
                             "ASSISTANT CLASSIFIED → AUTONOMOUS "
                             "pending_generation_type=%s "
-                            "followup_active=%s "
+
                             "waiting_for_answer=%s "
                             "text=%r"
                         ),
                         self._pending_generation_type,
-                        self.tm.state.is_followup_active,
                         self.tm.state.waiting_for_answer,
                         text[:200],
                     )
@@ -1886,7 +1885,6 @@ class InterviewRuntime:
                         "merged=%r "
                         "words=%s "
                         "candidate_speaking=%s "
-                        "followup_active=%s "
                         "waiting_for_answer=%s"
                     ),
                     incoming_text[:120],
@@ -1898,7 +1896,6 @@ class InterviewRuntime:
                         )
                     ),
                     self._candidate_is_speaking,
-                    self.tm.state.is_followup_active,
                     self.tm.state.waiting_for_answer,
                 )
 
@@ -2014,18 +2011,14 @@ class InterviewRuntime:
 
         combined_answer_text = self._build_turn_answer_text()
 
-        logger.error(
+        logger.info(
             (
                 "FINALIZE_BASE_TURN ENTERED → "
                 "turn=%s "
-                "followup_active=%s "
-                "followup_count=%s "
                 "base_answer=%r "
                 "combined_answer=%r"
             ),
             self.tm.current_turn_index_1based(),
-            self.tm.state.is_followup_active,
-            self.tm.state.followup_count,
             (
                 self.tm.state.base_answer_text[:200]
                 if self.tm.state.base_answer_text
@@ -2052,31 +2045,15 @@ class InterviewRuntime:
             (
                 "FINALIZE TURN START → "
                 "turn=%s "
-                "followups=%s "
                 "base_answer_exists=%s"
             ),
             turn_index_1based,
-            self.tm.state.followup_count,
             bool(self.tm.state.base_answer_text),
         )
 
-        parts = []
-        base_answer = (
+        answer_text = (
             self.tm.state.base_answer_text or ""
         ).strip()
-
-        if base_answer:
-            parts.append(base_answer)
-
-        for ex in self.tm.state.followup_exchanges:
-            ans = (
-                ex.get("answer") or ""
-            ).strip()
-
-            if ans and ans != "[NO_RESPONSE]":
-                parts.append(ans)
-
-        answer_text = " ".join(parts).strip()
 
         if not answer_text:
 
@@ -2125,10 +2102,6 @@ class InterviewRuntime:
                 )
 
                 self._reset_transcript_buffer()
-
-                self.tm.mark_followup_phase_completed()
-
-                self._followup_phase_closed = True
 
                 #
                 # FIX: Do NOT call mark_answer_received()
@@ -2198,7 +2171,6 @@ class InterviewRuntime:
             "round_type": self.cfg.round_type,
             "difficulty": self.cfg.difficulty,
             "role_slug": self.cfg.role_slug,
-            **self.tm.get_turn_metadata_extras(),   # [NEW] followup_count, followup_exchanges, etc.
         }
 
         try:
@@ -2224,23 +2196,24 @@ class InterviewRuntime:
                 answer_text[:300],
             )
 
-            resp = await self.backend.post_turn(
-                session_id=self.cfg.session_id,
-                turn_index_1based=turn_index_1based,
-                question_text=question_text,
-                answer_text=answer_text,
-                metadata=metadata,
-            )
-            logger.info(
-                "POSTING TURN → session=%s turn=%s",
-                self.cfg.session_id,
-                turn_index_1based,
+            resp = await asyncio.wait_for(
+                self.backend.post_turn(
+                    session_id=self.cfg.session_id,
+                    turn_index_1based=turn_index_1based,
+                    question_text=question_text,
+                    answer_text=answer_text,
+                    metadata=metadata,
+                ),
+                timeout=15.0,
             )
             if resp.status_code >= 400:
                 logger.error(
                     "Backend turn post failed: status=%s body=%s",
                     resp.status_code,
                     resp.text,
+                )
+                raise RuntimeError(
+                    f"Backend turn post failed with status={resp.status_code}"
                 )
             else:
                 logger.info(
@@ -2254,9 +2227,6 @@ class InterviewRuntime:
             self.tm.abort_turn_finalization()
             return
 
-        # Hard close follow-up lifecycle before advancing.
-        self.tm.mark_followup_phase_completed()
-        self._followup_phase_closed = True    
 
         # Now increment turn_index (base question fully finalized).
         self.tm.mark_answer_received()
@@ -2312,11 +2282,7 @@ class InterviewRuntime:
             )
             await self._sync_runtime_state()
 
-            # self._pending_generation_type = (
-            #     "FOLLOWUP"
-            #     if self.tm.state.is_followup_active
-            #     else "QUESTION"
-            # )
+
 
             await self._safe_generate_reply(
                 instructions=instr,
@@ -2635,6 +2601,29 @@ class InterviewRuntime:
 
                     continue
 
+                #
+                # If we already have transcript content or a commit task is still
+                # pending, let transcript finalization finish instead of retrying.
+                #
+                if self._active_transcript_text.strip():
+
+                    logger.debug(
+                        "Suppressing timeout: transcript available for commit."
+                    )
+
+                    continue
+
+                if (
+                    self._transcript_stabilization_task is not None
+                    and not self._transcript_stabilization_task.done()
+                ):
+
+                    logger.debug(
+                        "Suppressing timeout: transcript commit task pending."
+                    )
+
+                    continue
+
                 # Retry once if no answer
                 if self.tm.should_retry_for_no_answer():
                     try:
@@ -2728,12 +2717,6 @@ class InterviewRuntime:
                                 "index": idx_1based,
                             }
                         )
-
-                        # If timed out on a follow-up, finalize using existing base answer.
-                        if self.tm.state.is_followup_active:
-                            self.tm.mark_followup_answer_received(answer_text="[NO_RESPONSE]")
-                            self.tm.mark_followup_phase_completed()
-                            self._followup_phase_closed = True
 
                         skip_confirmed = True
 
@@ -2875,7 +2858,7 @@ class InterviewRuntime:
 
 
 def _build_interview_agent(cfg: InterviewConfig):
-    from livekit.agents import Agent
+    from livekit.agents import Agent, StopResponse
 
     import textwrap
 
@@ -2909,5 +2892,16 @@ def _build_interview_agent(cfg: InterviewConfig):
     class InterviewAgent(Agent):
         def __init__(self):
             super().__init__(instructions=instructions)
+
+        async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
+            """
+            Persist the user's committed turn, but block LiveKit's automatic
+            assistant reply so the runtime alone decides when to ask next.
+            """
+            if self._activity is not None:
+                self._chat_ctx.items.append(new_message)
+                self._activity._session._conversation_item_added(new_message)
+
+            raise StopResponse()
 
     return InterviewAgent()

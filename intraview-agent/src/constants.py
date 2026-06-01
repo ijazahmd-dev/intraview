@@ -30,32 +30,6 @@ MIN_ANSWER_WORDS: int = 3    # ignore 1-word / 2-word fillers
 
 # Maximum number of follow-up questions allowed per base question.
 # Follow-ups do not increment turn_index or count toward max_questions.
-MAX_FOLLOWUPS_PER_QUESTION: int = 2
-
-# Minimum answer size before runtime considers the response
-# potentially "complete enough" to avoid unnecessary follow-ups.
-#
-# These are intentionally conservative and should be tuned
-# using real interview session analytics later.
-FOLLOWUP_MIN_ANSWER_WORDS: int = 18
-FOLLOWUP_MIN_ANSWER_CHARS: int = 80
-
-# Word count above which an answer is considered sufficiently detailed
-# and should NOT trigger a follow-up question.
-FOLLOWUP_SUFFICIENT_WORD_COUNT: int = 25
-
-# Hard safety guard against infinite clarification loops.
-#
-# Even if runtime logic fails, the interview must NEVER
-# exceed this total number of clarification attempts.
-ABSOLUTE_MAX_FOLLOWUP_GENERATIONS: int = 2
-
-# Maximum total assistant follow-up events allowed
-# for a single base question INCLUDING unexpected
-# autonomous assistant generations.
-#
-# This is a final hard safety ceiling.
-MAX_TOTAL_ASSISTANT_FOLLOWUP_EVENTS: int = 3
 
 # Maximum number of duplicate user transcript events
 # tolerated for the same pending prompt.

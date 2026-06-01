@@ -197,7 +197,21 @@ class BackendClient:
             "answer_text": answer_text,
             "metadata": dict(metadata),
         }
-        return await self.client.post(url, json=payload, headers=headers)
+        logger.info(
+            "BackendClient.post_turn sending request: session_id=%s turn=%s question=%r answer_chars=%s",
+            session_id,
+            turn_index_1based,
+            question_text[:120],
+            len(answer_text or ""),
+        )
+        resp = await self.client.post(url, json=payload, headers=headers)
+        logger.info(
+            "BackendClient.post_turn received response: session_id=%s turn=%s status=%s",
+            session_id,
+            turn_index_1based,
+            resp.status_code,
+        )
+        return resp
 
     async def load_runtime_state(self, session_id: int) -> Optional[dict]:
         """
