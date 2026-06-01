@@ -175,10 +175,19 @@ const CandidateBookingsDashboard = () => {
 
     const handleJoinClick = (e) => {
       e.stopPropagation();
-      if (isLive) {
-        navigate(`/interview/room/${booking.id}`);
-      } else if (timeLeft === 'ENDED') {
+
+      if (timeLeft === 'ENDED') {
         toast.info('This session has already ended');
+        return;
+      }
+
+      // Allow join if live OR within 15 minutes of start
+      const now = new Date();
+      const startTime = new Date(booking.start_datetime);
+      const minutesToStart = (startTime - now) / (1000 * 60);
+
+      if (isLive || minutesToStart <= 15) {
+        navigate(`/interview/room/${booking.id}`);
       } else {
         toast.info(`Session starts in ${timeLeft}`);
       }

@@ -962,7 +962,7 @@ const AUTH_NAV = [
 ];
 
 const GUEST_NAV = [
-  { label: "About", path: "/about" },
+  // { label: "About", path: "/about" },
   { label: "Interviewers", path: "/candidate/interviewers" },
   { label: "Pricing", path: "/subscriptions" },
 ];

@@ -16,8 +16,8 @@ const Navbar = () => {
 
   // Mock admin data - replace with your Redux state
   const admin = {
-    name: 'John Anderson',
-    email: 'john.anderson@intraview.com',
+    name: '',
+    email: '',
     role: 'Admin'
   };
   const dispatch = useDispatch();
@@ -71,17 +71,17 @@ const Navbar = () => {
         </button> */}
 
         {/* Notifications */}
-        <button
+        {/* <button
           className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-50 hover:bg-gray-100 transition-all duration-200 relative border border-gray-200"
           title="Notifications"
         >
           <Bell size={18} className="text-gray-600" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        </button> */}
 
         {/* Admin Badge */}
         {admin && (
-          <div className="px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-200 flex items-center gap-2">
+          <div className="px-3 py-1.5 frounded-lg bg-orange-50 border border-orange-200 flex items-center gap-2">
             <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
             <span className="text-xs font-semibold text-orange-700">
               {admin.role}
@@ -148,7 +148,7 @@ const Navbar = () => {
                     </div>
                   </div>
 
-                  <div className="py-2">
+                  {/* <div className="py-2">
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);
@@ -170,7 +170,7 @@ const Navbar = () => {
                       <Settings size={16} className="text-gray-500" />
                       <span>Account Settings</span>
                     </button>
-                  </div>
+                  </div> */}
 
                   <div className="border-t border-gray-200 py-2">
                     <button

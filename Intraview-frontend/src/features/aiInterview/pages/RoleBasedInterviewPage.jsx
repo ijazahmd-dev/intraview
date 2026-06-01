@@ -10,11 +10,7 @@ import {
 } from "../slice/aiInterviewRolesSlice";
 
 const tabs = [
-  "Role Based",
-  "Company Based",
-  "JD Based",
-  "Resume Toolkit",
-  "Create Your Own",
+
 ];
 
 const navLinks = ["Use Cases", "Resources", "Pricing", "Contact Us"];
@@ -136,11 +132,10 @@ function StepMockDifficulty() {
         {["Resume Based", "Scheduled"].map((t) => (
           <span
             key={t}
-            className={`px-2 py-1 rounded-full text-[9px] font-semibold ${
-              t === "Resume Based"
+            className={`px-2 py-1 rounded-full text-[9px] font-semibold ${t === "Resume Based"
                 ? "bg-teal-100 text-teal-700"
                 : "bg-gray-100 text-gray-500"
-            }`}
+              }`}
           >
             {t}
           </span>
@@ -151,11 +146,10 @@ function StepMockDifficulty() {
         {["Warm Up", "Role Related", "Behavioral"].map((r, i) => (
           <div
             key={r}
-            className={`border rounded-lg py-1.5 text-[9px] text-center ${
-              i === 0
+            className={`border rounded-lg py-1.5 text-[9px] text-center ${i === 0
                 ? "border-teal-500 text-teal-600 bg-teal-50"
                 : "border-gray-200 text-gray-500"
-            }`}
+              }`}
           >
             {r}
           </div>
@@ -166,11 +160,10 @@ function StepMockDifficulty() {
         {["10 min", "20 min", "30 min"].map((d, i) => (
           <div
             key={d}
-            className={`border rounded-md px-2 py-1 text-[9px] ${
-              i === 1
+            className={`border rounded-md px-2 py-1 text-[9px] ${i === 1
                 ? "border-teal-500 text-teal-600"
                 : "border-gray-200 text-gray-500"
-            }`}
+              }`}
           >
             {d}
           </div>
@@ -226,9 +219,8 @@ function StepMockReport() {
         ].map((m) => (
           <div key={m.label} className="text-center">
             <div
-              className={`text-lg font-bold ${
-                m.color === "teal" ? "text-teal-500" : "text-amber-400"
-              }`}
+              className={`text-lg font-bold ${m.color === "teal" ? "text-teal-500" : "text-amber-400"
+                }`}
             >
               {m.val}%
             </div>
@@ -335,95 +327,7 @@ export default function RoleBasedInterviewPage() {
         .hero-bg { background: linear-gradient(160deg, #F0FDFA 0%, #E0F2FE 40%, #F8FAFC 100%); }
       `}</style>
 
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center">
-              <span className="text-white font-display font-bold text-sm">
-                IV
-              </span>
-            </div>
-            <span className="font-display font-bold text-gray-900 text-lg tracking-tight">
-              Intraview
-            </span>
-          </div>
-
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <button
-                key={link}
-                className="flex items-center gap-1 px-4 py-2 text-gray-600 text-sm font-medium hover:text-teal-600 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                {link}
-                {(link === "Use Cases" || link === "Resources") && (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M19 9l-7 7-7-7" />
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Right */}
-          <div className="flex items-center gap-3">
-            <button className="hidden sm:flex items-center gap-1 px-4 py-2 text-sm text-gray-600 font-medium hover:text-teal-600 border border-gray-200 rounded-lg transition-colors">
-              Intraview
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <button
-              className="md:hidden p-2 text-gray-600"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d={
-                    mobileMenuOpen
-                      ? "M6 18L18 6M6 6l12 12"
-                      : "M4 6h16M4 12h16M4 18h16"
-                  }
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden px-4 pb-4 border-t border-gray-100 bg-white">
-            {navLinks.map((link) => (
-              <button
-                key={link}
-                className="block w-full text-left px-3 py-2.5 text-gray-600 text-sm font-medium hover:text-teal-600 hover:bg-gray-50 rounded-lg mt-1"
-              >
-                {link}
-              </button>
-            ))}
-          </div>
-        )}
-      </nav>
+      
 
       {/* TAB BAR */}
       <div className="bg-white border-b border-gray-100">
@@ -433,9 +337,8 @@ export default function RoleBasedInterviewPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                  activeTab === tab ? "tab-active" : "tab-inactive"
-                }`}
+                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-semibold transition-all ${activeTab === tab ? "tab-active" : "tab-inactive"
+                  }`}
               >
                 {tab}
               </button>
@@ -589,16 +492,14 @@ export default function RoleBasedInterviewPage() {
               return (
                 <div
                   key={step.number}
-                  className={`flex flex-col ${
-                    isRight ? "lg:flex-row" : "lg:flex-row-reverse"
-                  } items-center gap-10 lg:gap-16`}
+                  className={`flex flex-col ${isRight ? "lg:flex-row" : "lg:flex-row-reverse"
+                    } items-center gap-10 lg:gap-16`}
                 >
                   {/* Text Side */}
                   <div className="flex-1 text-center lg:text-left">
                     <div
-                      className={`${
-                        isRight ? "lg:text-right" : "lg:text-left"
-                      } text-center`}
+                      className={`${isRight ? "lg:text-right" : "lg:text-left"
+                        } text-center`}
                     >
                       <p className="text-xs font-bold text-teal-400 tracking-widest uppercase mb-2">
                         Step {step.number}

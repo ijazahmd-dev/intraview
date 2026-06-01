@@ -22,7 +22,7 @@ export default function Sidebar() {
     { icon: Layers, label: 'Payout Queue', path: '/admin/payout/queue', fullLabel: 'Payout Queue', },
     { icon: Package, label: 'Payout History', path: '/admin/payout/history', fullLabel: 'Payout History', },
     { icon: FileText, label: 'Reports', path: '/admin/issues', fullLabel: 'Reports' },
-    { icon: Bell, label: 'Notifications', path: '/notifications', fullLabel: 'Notifications' },
+    // { icon: Bell, label: 'Notifications', path: '/notifications', fullLabel: 'Notifications' },
 
     // { icon: CreditCard, label: 'Payments', path: '/admin/payments', fullLabel: 'Payments' },
   ];

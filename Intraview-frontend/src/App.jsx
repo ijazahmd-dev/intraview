@@ -139,25 +139,64 @@ function AppInner() {
         <Route path="/subscriptions/success" element={<SubscriptionSuccess />} />
         <Route path="/subscriptions/cancel" element={<SubscriptionCancel />} />
 
-        <Route path="/tokens" element={<TokenBundlesPage />} />
+        <Route path="/tokens" element={
+          <ProtectedRoute>
+            <TokenBundlesPage />
+          </ProtectedRoute>
+        } />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/payment/cancel" element={<PaymentCancel />} />
 
-        <Route path="/candidate/wallet" element={<CandidateWalletPage />} />
+        <Route path="/candidate/wallet" element={
+          <ProtectedRoute>
+            <CandidateWalletPage />
+          </ProtectedRoute>
+        } />
 
-        <Route path="/candidate/interviewers" element={<BrowseInterviewers />} />
-        <Route path="/interviewer/:id" element={<InterviewerDetailPage />} />
-        <Route path="/candidate/dashboard/upcoming" element={<CandidateBookingsDashboard />} />
-        <Route path="/candidate/bookings-detail/:bookingId" element={<BookingDetailPage />} />
-        <Route path="/candidate/interviewers/:interviewerId/calendar" element={<InterviewerCalendarBookingPage />} />
+        <Route path="/candidate/interviewers" element={
+          <ProtectedRoute>
+            <BrowseInterviewers />
+          </ProtectedRoute>
+        } />
+        <Route path="/interviewer/:id" element={
+          <ProtectedRoute>
+            <InterviewerDetailPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/candidate/dashboard/upcoming" element={
+          <ProtectedRoute>
+            <CandidateBookingsDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/candidate/bookings-detail/:bookingId" element={
+          <ProtectedRoute>
+          <BookingDetailPage />
+          </ProtectedRoute>
+          } />
+        <Route path="/candidate/interviewers/:interviewerId/calendar" element={
+          <ProtectedRoute>
+          <InterviewerCalendarBookingPage />
+          </ProtectedRoute>
+          } />
 
 
 
 
         <Route path="/candidate">
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="resume" element={<ResumePage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="profile" element={
+            <ProtectedRoute>
+            <ProfilePage />
+            </ProtectedRoute>
+            } />
+          <Route path="resume" element={
+            <ProtectedRoute>
+            <ResumePage />
+            </ProtectedRoute>} />
+          <Route path="settings" element={
+            <ProtectedRoute>
+            <SettingsPage />
+            </ProtectedRoute>
+            } />
         </Route>
 
         {/* want to register this page named RoleBasedAiInterviewPage.jsx */}
@@ -174,14 +213,34 @@ function AppInner() {
         <Route path="/interview/room/:bookingId" element={< InterviewRoom />} />
         <Route path="/interview/completed/:bookingId" element={<InterviewCompleted />} />
 
-        <Route path="/candidate/progress" element={<CandidateProgressPage />} />
+        <Route path="/candidate/progress" element={
+          <ProtectedRoute>
+          <CandidateProgressPage />
+          </ProtectedRoute>
+          } />
 
         <Route path="/candidate/bookings/:bookingId/review" element={<SubmitInterviewerReviewPage />} />
-        <Route path="/candidate/feedback" element={< CandidateFeedbackListPage />} />
-        <Route path="/candidate/feedback/:evaluationId" element={< CandidateFeedbackDetailPage />} />
+        <Route path="/candidate/feedback" element={
+          <ProtectedRoute>
+          < CandidateFeedbackListPage />
+          </ProtectedRoute>
+          } />
+        <Route path="/candidate/feedback/:evaluationId" element={
+          <ProtectedRoute>
+          < CandidateFeedbackDetailPage />
+          </ProtectedRoute>
+          } />
 
-        <Route path="/my-issues" element={<MyIssuesPage />} />
-        <Route path="/my-issues/:issueId" element={<CandidateIssueDetailPage />} />
+        <Route path="/my-issues" element={
+          <ProtectedRoute>
+          <MyIssuesPage />
+          </ProtectedRoute>
+          } />
+        <Route path="/my-issues/:issueId" element={
+          <ProtectedRoute>
+          <CandidateIssueDetailPage />
+          </ProtectedRoute>
+          } />
 
 
 
