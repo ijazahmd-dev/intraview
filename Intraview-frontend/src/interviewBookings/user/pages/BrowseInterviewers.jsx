@@ -1,13 +1,11 @@
 
-
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import InterviewerCard from '../components/InterviewerCard.jsx';
 import Filters from '../components/Filters.jsx';
 import { candidateBookingsApi } from '../../candidateBookingsApi.js';
-import CandidateNavbar from '../../../components/CandidateNavbar.jsx'; // ← add
+import CandidateNavbar from '../../../components/CandidateNavbar.jsx';
 import CandidateFooter from '../../../components/CandidateFooter.jsx';
 
 /* ─────────────────────────────────────────────
@@ -503,7 +501,6 @@ const BrowseInterviewers = () => {
     return (
       <>
         <style>{styles}</style>
-        <CandidateNavbar />
         <div className="iv-loading">
           <div className="iv-spinner-wrap">
             <div className="iv-spinner" />
@@ -514,16 +511,14 @@ const BrowseInterviewers = () => {
             <span className="iv-loading-dots" />
           </p>
         </div>
-        <CandidateFooter />
       </>
     );
   }
 
   return (
     <>
-      <style>{styles}</style>
-
       <CandidateNavbar />
+      <style>{styles}</style>
 
       <div className="iv-browse-root">
 

@@ -135,8 +135,8 @@ function StepMockDifficulty() {
           <span
             key={t}
             className={`px-2 py-1 rounded-full text-[9px] font-semibold ${t === "Resume Based"
-                ? "bg-teal-100 text-teal-700"
-                : "bg-gray-100 text-gray-500"
+              ? "bg-teal-100 text-teal-700"
+              : "bg-gray-100 text-gray-500"
               }`}
           >
             {t}
@@ -149,8 +149,8 @@ function StepMockDifficulty() {
           <div
             key={r}
             className={`border rounded-lg py-1.5 text-[9px] text-center ${i === 0
-                ? "border-teal-500 text-teal-600 bg-teal-50"
-                : "border-gray-200 text-gray-500"
+              ? "border-teal-500 text-teal-600 bg-teal-50"
+              : "border-gray-200 text-gray-500"
               }`}
           >
             {r}
@@ -163,8 +163,8 @@ function StepMockDifficulty() {
           <div
             key={d}
             className={`border rounded-md px-2 py-1 text-[9px] ${i === 1
-                ? "border-teal-500 text-teal-600"
-                : "border-gray-200 text-gray-500"
+              ? "border-teal-500 text-teal-600"
+              : "border-gray-200 text-gray-500"
               }`}
           >
             {d}
@@ -314,6 +314,7 @@ export default function RoleBasedInterviewPage() {
       className="min-h-screen bg-white font-sans"
       style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}
     >
+      <CandidateNavbar />
       {/* Google Font */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap');
@@ -329,7 +330,7 @@ export default function RoleBasedInterviewPage() {
         .hero-bg { background: linear-gradient(160deg, #F0FDFA 0%, #E0F2FE 40%, #F8FAFC 100%); }
       `}</style>
 
-      
+
 
       {/* TAB BAR */}
       <div className="bg-white border-b border-gray-100">
@@ -542,103 +543,7 @@ export default function RoleBasedInterviewPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-white border-t border-gray-100 pt-14 pb-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-teal-600 flex items-center justify-center">
-                  <span className="text-white font-display font-bold text-xs">
-                    IV
-                  </span>
-                </div>
-                <span className="font-display font-bold text-gray-900">
-                  Intraview
-                </span>
-              </div>
-              <p className="text-gray-500 text-sm mb-4">AI Practice Studio.</p>
-              <div className="flex items-center gap-1.5 mb-5">
-                <div className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-xs text-gray-500 font-medium">
-                  ALL SYSTEMS OPERATIONAL
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                {["twitter", "youtube", "instagram", "linkedin"].map((s) => (
-                  <a
-                    key={s}
-                    href="#"
-                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-teal-600 hover:border-teal-300 transition-colors"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      {s === "twitter" && (
-                        <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" />
-                      )}
-                      {s === "youtube" && (
-                        <path d="M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58a2.78 2.78 0 001.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z" />
-                      )}
-                      {s === "instagram" && (
-                        <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zM17.5 6.5h.01M7.8 2h8.4C18.4 2 22 5.6 22 9.8v8.4c0 4.2-3.6 7.8-7.8 7.8H7.8C3.6 22 0 18.4 0 14.2V9.8C0 5.6 3.6 2 7.8 2z" />
-                      )}
-                      {s === "linkedin" && (
-                        <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zM4 6a2 2 0 100-4 2 2 0 000 4z" />
-                      )}
-                    </svg>
-                  </a>
-                ))}
-              </div>
-            </div>
-
-            {/* Footer Links */}
-            {Object.entries(footerLinks).map(([heading, links]) => (
-              <div key={heading}>
-                <h4 className="text-xs font-bold text-gray-400 tracking-widest uppercase mb-4">
-                  {heading}
-                </h4>
-                <ul className="space-y-2.5">
-                  {links.map((link) => (
-                    <li key={link}>
-                      <a
-                        href="#"
-                        className="text-sm text-gray-600 hover:text-teal-600 transition-colors"
-                      >
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="border-t border-gray-100 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-400">
-            <span>© 2026 Intraview. All Rights Reserved.</span>
-            <div className="flex items-center gap-3 flex-wrap justify-center">
-              {["AI Practice Studio", "Job Interviews", "Visa Interviews", "Resume"].map(
-                (item, i, arr) => (
-                  <span key={item} className="flex items-center gap-3">
-                    <a
-                      href="#"
-                      className="hover:text-teal-500 transition-colors"
-                    >
-                      {item}
-                    </a>
-                    {i < arr.length - 1 && (
-                      <span className="text-gray-200">|</span>
-                    )}
-                  </span>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      </footer>
+      <CandidateFooter />
     </div>
   );
 }

@@ -25,6 +25,9 @@ class CandidateInterviewerListSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(
         source="interviewer_profile.profile_picture"
     )
+    base_session_rate = serializers.IntegerField(
+        source="interviewer_profile.base_session_rate"
+    )
 
     class Meta:
         model = CustomUser
@@ -34,6 +37,7 @@ class CandidateInterviewerListSerializer(serializers.ModelSerializer):
             "headline",
             "years_of_experience",
             "profile_picture",
+            "base_session_rate",
         ]
 
 

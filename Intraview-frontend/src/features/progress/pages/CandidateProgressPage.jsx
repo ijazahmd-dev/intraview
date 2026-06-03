@@ -8,11 +8,13 @@ import {
   fetchStrengthsWeaknesses,
   fetchInterviewHistory,
 } from "../progressSlice";
+import CandidateNavbar from "../../../components/CandidateNavbar";
+import CandidateFooter from "../../../components/CandidateFooter";
 
-import OverviewCards    from "../components/OverviewCards";
-import GrowthChart      from "../components/GrowthChart";
-import SkillRadarChart  from "../components/SkillRadarChart";
-import ReadinessPanel   from "../components/ReadinessPanel";
+import OverviewCards from "../components/OverviewCards";
+import GrowthChart from "../components/GrowthChart";
+import SkillRadarChart from "../components/SkillRadarChart";
+import ReadinessPanel from "../components/ReadinessPanel";
 import InterviewHistory from "../components/InterviewHistory";
 
 export default function CandidateProgressPage() {
@@ -28,6 +30,7 @@ export default function CandidateProgressPage() {
 
   return (
     <div className="progress-page">
+      <CandidateNavbar />
       {/* ─── Page Header ──────────────────────────────────── */}
       <div className="page-header">
         <div className="page-header-inner">
@@ -75,6 +78,7 @@ export default function CandidateProgressPage() {
         </section>
 
       </div>
+      <CandidateFooter />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
