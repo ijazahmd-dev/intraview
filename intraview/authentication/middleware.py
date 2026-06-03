@@ -1,26 +1,26 @@
 from django.utils.deprecation import MiddlewareMixin
-from rest_framework_simplejwt.tokens import AccessToken, TokenError
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, TokenError
 
 class ClearExpiredJWTCookiesMiddleware(MiddlewareMixin):
     def process_request(self, request):
         access = request.COOKIES.get("access_token")
         refresh = request.COOKIES.get("refresh_token")
 
-        # If no tokens → nothing to do
+        # If no tokens at all → nothing to do
         if not access and not refresh:
             return None
 
-        # Validate access token
+        # Validate access token (using AccessToken — correct class)
         if access:
             try:
-                AccessToken(access)  # Just validates; raises error if expired
+                AccessToken(access)
             except TokenError:
                 request._delete_access_token = True
 
-        # Validate refresh token
+        # Validate refresh token (MUST use RefreshToken — not AccessToken)
         if refresh:
             try:
-                AccessToken(refresh)  # Using AccessToken class to check expiration
+                RefreshToken(refresh)
             except TokenError:
                 request._delete_refresh_token = True
 
