@@ -2,14 +2,20 @@
 
 from typing import Optional
 
-from ai_interviews.models import Role, AIInterviewSession, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport
+from ai_interviews.models import (
+    Role,
+    AIInterviewSession,
+    AIInterviewTurn,
+    AIInterviewEvaluation,
+    AIInterviewFinalReport,
+)
 from ai_interviews.repositories import RoleRepository, AIInterviewSessionRepository
 from ai_interviews.tasks import generate_final_report
+from ai_interviews.service.tavus_avatar_service import TavusAvatarSessionService
 from django.utils.crypto import get_random_string
-from django.db import transaction
 
 from django.conf import settings
-from livekit import api as lk_api  # LiveKit Python SDK
+from django.db import transaction
 import json
 from livekit import api as lkapi
 
@@ -116,102 +122,6 @@ class AIInterviewSessionService:
 
 
 
-    # @staticmethod
-    # def build_join_payload(session: AIInterviewSession, user) -> dict:
-    #     """
-    #     Called from /join/:
-
-    #     - Ensure ownership & that session can be joined
-    #     - Ensure room name exists
-    #     - Move READY/CREATED → LIVE (first join)
-    #     - Treat LIVE as resume (no state reset)
-    #     - Generate LiveKit token
-    #     - Return remaining_seconds so frontend never resets duration
-    #     """
-    #     if session.user != user:
-    #         raise PermissionError("You do not own this interview session.")
-
-    #     # Apply time-based transitions first.
-    #     session.refresh_status_from_time()
-
-    #     # Hard guard: if remaining_seconds <= 0, session has ended.
-    #     remaining = session.remaining_seconds()
-    #     if remaining <= 0:
-    #         if session.status == AIInterviewSession.Status.LIVE:
-    #             # Make sure we don't leave a LIVE session without duration.
-    #             session.mark_completed()
-    #         raise ValueError("This interview session has ended.")
-
-    #     if not session.is_owner_join_allowed:
-    #         raise ValueError("This interview is no longer joinable.")
-
-    #     # Ensure room name exists.
-    #     session = AIInterviewSessionService.ensure_room_name(session)
-
-    #     # First-time join: READY/CREATED → LIVE.
-    #     if session.status in {
-    #         AIInterviewSession.Status.READY,
-    #         AIInterviewSession.Status.CREATED,
-    #     }:
-    #         session.mark_live()
-    #         # After marking live, remaining time is full duration again
-    #         # (this is the first join).
-    #         remaining = session.remaining_seconds()
-    #     else:
-    #         # Already LIVE; this /join/ is a resume. Do not touch started_at.
-    #         remaining = session.remaining_seconds()
-
-    #     # LiveKit config.
-    #     livekit_url = getattr(settings, "LIVEKIT_URL", "")
-    #     livekit_api_key = getattr(settings, "LIVEKIT_API_KEY", "")
-    #     livekit_api_secret = getattr(settings, "LIVEKIT_API_SECRET", "")
-
-    #     if not (livekit_url and livekit_api_key and livekit_api_secret):
-    #         raise RuntimeError("LiveKit configuration is missing on the server.")
-
-    #     identity = f"user-{user.id}"
-    #     display_name = getattr(user, "full_name", None) or getattr(
-    #         user, "username", str(user.id)
-    #     )
-
-    #     token_builder = (
-    #         lk_api.AccessToken(livekit_api_key, livekit_api_secret)
-    #         .with_identity(identity)
-    #         .with_name(display_name)
-    #         .with_grants(
-    #             lk_api.VideoGrants(
-    #                 room_join=True,
-    #                 room=session.livekit_room_name,
-    #                 can_publish=True,
-    #                 can_subscribe=True,
-    #             )
-    #         )
-    #     )
-    #     livekit_token = token_builder.to_jwt()
-
-    #     return {
-    #         "session_id": session.id,
-    #         "role": {
-    #             "name": session.role.name,
-    #             "slug": session.role.slug,
-    #             "category": session.role.category,
-    #         },
-    #         "round_type": session.round_type,
-    #         "difficulty": session.difficulty,
-    #         "duration_minutes": session.duration_minutes,
-    #         "status": session.status,  # usually LIVE here
-    #         "started_at": session.started_at,
-    #         "ended_at": session.ended_at,
-    #         "remaining_seconds": remaining,
-    #         "livekit_room_name": session.livekit_room_name,
-    #         "livekit_token": livekit_token,
-    #         "livekit_server_url": livekit_url,
-    #     }
-
-
-
-
-
 
     @staticmethod
     def build_join_payload(session: AIInterviewSession, user) -> dict:
@@ -254,6 +164,12 @@ class AIInterviewSessionService:
             # Already LIVE: this join is a resume. Do not touch started_at.
             remaining = session.remaining_seconds()
 
+        avatar_session = None
+        try:
+            avatar_session = TavusAvatarSessionService.ensure_avatar_session(session)
+        except ValueError:
+            avatar_session = None
+
         livekit_url = getattr(settings, "LIVEKIT_URL", "").rstrip("/")
         livekit_api_key = getattr(settings, "LIVEKIT_API_KEY", "")
         livekit_api_secret = getattr(settings, "LIVEKIT_API_SECRET", "")
@@ -272,6 +188,9 @@ class AIInterviewSessionService:
             # You can add max_questions here later if you want the backend
             # to control it:
             # "max_questions": 5,
+            "avatar_session": TavusAvatarSessionService.build_agent_metadata(
+                avatar_session
+            ),
         }
         metadata_str = json.dumps(metadata_dict)
 
@@ -327,6 +246,9 @@ class AIInterviewSessionService:
             "livekit_room_name": session.livekit_room_name,
             "livekit_token": livekit_token,
             "livekit_server_url": livekit_url,
+            "avatar_session": TavusAvatarSessionService.build_public_payload(
+                avatar_session
+            ),
         }
 
     # ---- End / cancel APIs ----
@@ -369,6 +291,8 @@ class AIInterviewSessionService:
                 raise ValueError(
                     f"Interview cannot be ended from status: {session.status}"
                 )
+
+        TavusAvatarSessionService.stop_avatar_session(session)
 
         if session.status == AIInterviewSession.Status.COMPLETED:
             generate_final_report.delay(session.id)        

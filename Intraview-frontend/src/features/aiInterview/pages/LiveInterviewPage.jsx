@@ -1536,6 +1536,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  createAiInterviewAvatarSession,
+  stopAiInterviewAvatarSession,
+} from "../api/aiInterviewSessionApi";
 
 import {
   joinAiInterviewSessionThunk,
@@ -1573,6 +1577,9 @@ export default function LiveInterviewPage() {
   const [uiState, setUiState] = useState(UI_STATES.LOADING);
   const [connectionError, setConnectionError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [avatarSession, setAvatarSession] = useState(null);
+  const [avatarError, setAvatarError] = useState(null);
+  const avatarStopRequestedRef = useRef(false);
 
   // Prevent duplicate auto-end calls from timer
   const hasAutoEndedRef = useRef(false);
@@ -1650,6 +1657,9 @@ export default function LiveInterviewPage() {
 
       // For READY or LIVE — go to lobby.
       // LIVE sessions use remaining_seconds so a rejoin continues where it left off.
+      setAvatarSession(join.data?.avatar_session ?? null);
+      setAvatarError(null);
+      avatarStopRequestedRef.current = false;
       setUiState(UI_STATES.LOBBY);
     }
   }, [join.status, join.data]);
@@ -1689,7 +1699,21 @@ export default function LiveInterviewPage() {
 
     setConnectionError(null);
     setIsConnected(false);
+    setAvatarError(null);
     setUiState(UI_STATES.CONNECTING);
+
+    if (join.data?.session_id) {
+      void createAiInterviewAvatarSession(join.data.session_id)
+        .then((response) => {
+          setAvatarSession(response.data);
+        })
+        .catch((error) => {
+          setAvatarError(
+            error?.response?.data?.detail ||
+              "Tavus avatar could not be started. Continuing with voice only."
+          );
+        });
+    }
   };
 
   const handleRoomConnected = () => {
@@ -1718,6 +1742,10 @@ export default function LiveInterviewPage() {
     if (!join.data?.session_id) return;
 
     try {
+      if (!avatarStopRequestedRef.current) {
+        avatarStopRequestedRef.current = true;
+        await stopAiInterviewAvatarSession(join.data.session_id).catch(() => {});
+      }
       await dispatch(
         endAiInterviewSessionThunk({
           sessionId: join.data.session_id,
@@ -1730,6 +1758,22 @@ export default function LiveInterviewPage() {
       );
     }
   };
+
+  useEffect(() => {
+    if (uiState !== UI_STATES.COMPLETED || !join.data?.session_id) return;
+    if (avatarStopRequestedRef.current) return;
+
+    avatarStopRequestedRef.current = true;
+    void stopAiInterviewAvatarSession(join.data.session_id).catch(() => {});
+  }, [uiState, join.data]);
+
+  useEffect(() => {
+    return () => {
+      if (!join.data?.session_id || avatarStopRequestedRef.current) return;
+      avatarStopRequestedRef.current = true;
+      void stopAiInterviewAvatarSession(join.data.session_id).catch(() => {});
+    };
+  }, [join.data]);
 
   // ── Derived session info for child views ─────────────────────────────────
 
@@ -1800,6 +1844,8 @@ export default function LiveInterviewPage() {
               onRoomConnected={handleRoomConnected}
               onRoomDisconnected={handleRoomDisconnected}
               isEnding={end.status === "ending"}
+              avatarSession={avatarSession}
+              avatarError={avatarError}
             />
           )}
 

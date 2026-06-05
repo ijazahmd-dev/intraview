@@ -77,6 +77,7 @@ class InterviewRuntime:
         self.session: Optional[AgentSession] = None
         self.timeout_task: Optional[asyncio.Task] = None
         self.heartbeat_task: Optional[asyncio.Task] = None
+        self.avatar_bridge = None
 
         # Track when interview started (for duration enforcement)
         self._start_time_monotonic: Optional[float] = None
@@ -2321,6 +2322,20 @@ class InterviewRuntime:
         assert self.tm is not None
 
         interviewer_agent = _build_interview_agent(self.cfg)
+        room_output_options = None
+        if self.avatar_bridge is not None:
+            try:
+                await self.avatar_bridge.start(
+                    agent_session=self.session,
+                    room=self.room,
+                )
+                room_output_options = (
+                    self.avatar_bridge.build_room_output_options()
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to start Tavus avatar. Continuing with audio-only interviewer."
+                )
 
         # Start voice pipeline
         await self.session.start(
@@ -2333,6 +2348,7 @@ class InterviewRuntime:
                     ),
                 ),
             ),
+            room_output_options=room_output_options,
         )
 
         # Intro
@@ -2850,6 +2866,12 @@ class InterviewRuntime:
                     logger.exception(
                         "Backend close failed"
                     )
+
+            if self.avatar_bridge is not None:
+                try:
+                    await self.avatar_bridge.shutdown()
+                except Exception:
+                    logger.exception("Tavus avatar shutdown failed")
 
             logger.info(
                 "Runtime shutdown completed: session_id=%s",

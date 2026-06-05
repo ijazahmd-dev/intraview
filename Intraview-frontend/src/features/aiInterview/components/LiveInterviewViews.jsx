@@ -167,48 +167,84 @@ function LiveInterviewInner({
   formattedTimeLeft,
   onEnd,
   isEnding,
+  avatarSession,
+  avatarError,
 }) {
   const { currentQuestion, transcript, questionHistory } = useAgentTranscript();
 
   return (
-    <div className="flex flex-col gap-4 w-full">
-      {/* Top bar: role + timer + end button */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] text-gray-400 uppercase tracking-wide">
-            Live AI Interview
-          </p>
-          <p className="text-sm font-semibold text-gray-50">
-            {sessionInfo.roleName} · {sessionInfo.roundType}
-          </p>
+    <div className="flex h-full flex-col gap-4">
+      <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] text-slate-400 uppercase tracking-[0.24em]">
+              Live AI Interview
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-50">
+              {sessionInfo.roleName} · {sessionInfo.roundType}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {formattedTimeLeft && (
+              <div className="rounded-full border border-teal-500/20 bg-teal-500/10 px-3 py-1.5 text-[11px] font-semibold text-teal-200">
+                Time left: {formattedTimeLeft}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onEnd}
+              disabled={isEnding}
+              className={`rounded-xl px-3 py-2 text-[11px] font-semibold text-white ${
+                isEnding
+                  ? "cursor-not-allowed bg-red-400 opacity-70"
+                  : "bg-red-500/90 hover:bg-red-500"
+              }`}
+            >
+              {isEnding ? "Ending..." : "End Interview"}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {formattedTimeLeft && (
-            <div className="px-3 py-1.5 rounded-full bg-gray-800 border border-gray-700 text-[11px] font-semibold text-teal-300">
-              Time left: {formattedTimeLeft}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onEnd}
-            disabled={isEnding}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white ${
-              isEnding
-                ? "bg-red-400 cursor-not-allowed opacity-70"
-                : "bg-red-500/90 hover:bg-red-500"
-            }`}
-          >
-            {isEnding ? "Ending..." : "End Interview"}
-          </button>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Interviewer Mode
+            </p>
+            <p className="mt-2 text-sm text-slate-100">
+              {avatarSession?.enabled
+                ? "Tavus avatar connected through LiveKit."
+                : "Voice-only fallback is active."}
+            </p>
+            {avatarError ? (
+              <p className="mt-2 text-xs leading-relaxed text-amber-300">
+                {avatarError}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                Your existing Gemini, Deepgram, and Cartesia interview flow remains unchanged.
+              </p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Session Status
+            </p>
+            <p className="mt-2 text-sm text-slate-100">
+              {sessionInfo.difficulty} · {sessionInfo.status}
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+              Candidate audio and transcript capture continue on the same LiveKit room.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* AgentTranscriptPanel handles current question + transcript + history */}
-      {/* <AgentTranscriptPanel
-        currentQuestion={currentQuestion}
-        transcript={transcript}
-        questionHistory={questionHistory}
-      /> */}
+      <div className="min-h-0 flex-1">
+        <AgentTranscriptPanel
+          currentQuestion={currentQuestion}
+          transcript={transcript}
+          questionHistory={questionHistory}
+        />
+      </div>
     </div>
   );
 }
@@ -234,27 +270,29 @@ export function LiveInterviewView({
   onRoomConnected,
   onRoomDisconnected,
   isEnding = false,
+  avatarSession,
+  avatarError,
 }) {
   const shouldConnect = uiState === "CONNECTING" || uiState === "LIVE";
 
   return (
-    <div className="bg-gray-900/70 rounded-xl border border-gray-800 p-4 sm:p-5 flex flex-col">
+    <div className="rounded-[32px] border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
       <LiveKitVideoPanel
         serverUrl={livekitServerUrl}
         token={livekitToken}
         connect={shouldConnect}
         onConnected={onRoomConnected}
         onDisconnected={onRoomDisconnected}
+        avatarSession={avatarSession}
+        avatarError={avatarError}
       >
-        {/*
-          LiveInterviewInner is inside LiveKitRoom context,
-          so useAgentTranscript (useDataChannel) works correctly here.
-        */}
         <LiveInterviewInner
           sessionInfo={sessionInfo}
           formattedTimeLeft={formattedTimeLeft}
           onEnd={onEnd}
           isEnding={isEnding}
+          avatarSession={avatarSession}
+          avatarError={avatarError}
         />
       </LiveKitVideoPanel>
     </div>

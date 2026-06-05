@@ -9,6 +9,7 @@ from livekit.agents import AgentServer, JobContext, JobProcess, cli
 from livekit.plugins import silero
 
 from runtime import InterviewRuntime
+from tavus_avatar import TavusAvatarBridge
 
 logger = logging.getLogger("agent")
 
@@ -42,6 +43,9 @@ async def my_agent(ctx: JobContext):
         )
 
         runtime = InterviewRuntime(ctx)
+        runtime.avatar_bridge = TavusAvatarBridge.from_job_metadata(
+            ctx.job.metadata
+        )
 
         await runtime.run()
 

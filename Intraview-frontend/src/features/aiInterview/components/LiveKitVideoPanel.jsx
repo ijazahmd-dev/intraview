@@ -193,93 +193,42 @@ import {
   ControlBar,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { useAgentParticipant } from "../hooks/useAgentParticipant";
+import { InterviewerAvatar } from "./InterviewerAvatar";
+import { useInterviewerParticipant } from "../hooks/useInterviewerParticipant";
 
 /**
  * Inner grid — renders agent pinned large on top, candidate small below.
  * Falls back to a flat layout if the agent has not joined yet.
  */
-function VideoGrid() {
-  const { agentTracks, candidateTracks, isAgentPresent } =
-    useAgentParticipant();
-
-  // Flat fallback — agent not connected yet
-  if (!isAgentPresent) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        {candidateTracks.map((track) => (
-          <div
-            key={track.participant.identity}
-            className="w-full max-w-md aspect-video rounded-xl overflow-hidden border border-gray-700"
-          >
-            <ParticipantTile trackRef={track} />
-          </div>
-        ))}
-        {candidateTracks.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
-            <div className="w-12 h-12 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center">
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-              </svg>
-            </div>
-            <p className="text-11px">Waiting for participants…</p>
-          </div>
-        )}
-      </div>
-    );
-  }
+function VideoGrid({ avatarSession, avatarError }) {
+  const { candidateTracks } = useInterviewerParticipant(avatarSession);
 
   return (
-    <div className="flex flex-col gap-2 w-full h-full">
-      {/* Agent tile — pinned large */}
-      <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-teal-700/40 relative">
-        {agentTracks.length > 0 ? (
-          <ParticipantTile trackRef={agentTracks[0]} />
-        ) : (
-          <div className="w-full h-full bg-gray-800 flex flex-col items-center justify-center gap-2">
-            <div className="w-12 h-12 rounded-full bg-teal-900/60 border border-teal-700/40 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-teal-400"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4l3 3" />
-              </svg>
-            </div>
-            <p className="text-11px text-teal-400">AI Interviewer</p>
-            <p className="text-10px text-gray-500">Audio only</p>
-          </div>
-        )}
-        {/* Agent label badge */}
-        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-gray-900/80 border border-teal-700/40 text-10px text-teal-300 font-semibold">
-          AI Interviewer
-        </div>
+    <div className="grid h-full min-h-[560px] grid-rows-[1fr_auto] gap-4">
+      <div className="min-h-0">
+        <InterviewerAvatar
+          avatarSession={avatarSession}
+          avatarError={avatarError}
+        />
       </div>
 
-      {/* Candidate tile — smaller below */}
-      <div className="h-24 flex gap-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {candidateTracks.map((track) => (
           <div
             key={track.participant.identity}
-            className="flex-1 rounded-xl overflow-hidden border border-gray-700 relative"
+            className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950"
           >
             <ParticipantTile trackRef={track} />
-            <div className="absolute bottom-1 left-1.5 px-1.5 py-0.5 rounded-full bg-gray-900/80 text-10px text-gray-300 font-semibold">
+            <div className="absolute left-3 bottom-3 rounded-full bg-slate-950/80 px-2.5 py-1 text-[11px] font-semibold text-slate-200 backdrop-blur">
               You
             </div>
           </div>
         ))}
+        {candidateTracks.length === 0 && (
+          <div className="flex min-h-32 items-center justify-center rounded-3xl border border-slate-800 bg-slate-950 px-4 text-center text-xs text-slate-500">
+            Waiting for your camera feed…
+          </div>
+        )}
       </div>
     </div>
   );
@@ -300,6 +249,8 @@ export function LiveKitVideoPanel({
   connect,
   onConnected,
   onDisconnected,
+  avatarSession,
+  avatarError,
   children,
 }) {
   if (!serverUrl || !token) {
@@ -323,14 +274,16 @@ export function LiveKitVideoPanel({
       onConnected={onConnected}
       onDisconnected={onDisconnected}
     >
-      <div className="flex flex-col h-full">
-        {/* Video tiles */}
-        <div className="flex-1 min-h-0">
-          <VideoGrid />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_380px]">
+        <div className="min-h-0">
+          <VideoGrid
+            avatarSession={avatarSession}
+            avatarError={avatarError}
+          />
         </div>
 
-        {/* Minimal control bar — mic + camera only */}
-        <div className="mt-2">
+        <div className="flex min-h-0 flex-col gap-4">
+          {children}
           <ControlBar
             variation="minimal"
             controls={{
@@ -348,11 +301,6 @@ export function LiveKitVideoPanel({
       {/* Room-wide audio playback */}
       <RoomAudioRenderer />
 
-      {/*
-        Children rendered inside LiveKitRoom context so hooks like
-        useAgentTranscript (useDataChannel) have room context access.
-      */}
-      {children}
     </LiveKitRoom>
   );
 }

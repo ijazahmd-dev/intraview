@@ -34,6 +34,14 @@ export const endAiInterviewSession = (sessionId, payload) => {
   return API.post(`/api/ai-interview/session/${sessionId}/end/`, payload);
 };
 
+export const createAiInterviewAvatarSession = (sessionId) => {
+  return API.post(`/api/ai-interview/session/${sessionId}/avatar/`);
+};
+
+export const stopAiInterviewAvatarSession = (sessionId) => {
+  return API.post(`/api/ai-interview/session/${sessionId}/avatar/stop/`);
+};
+
 
 
 /**
