@@ -1271,17 +1271,6 @@ class InterviewRuntime:
                 #
                 elif new_state == "listening":
 
-                    #
-                    # Ignore false listening transitions
-                    # while generation is active.
-                    #
-                    if (
-                        self._generation_in_progress
-                        and self._pending_generation_type
-                    ):
-                        return
-                    
-
                     if (
                         self._candidate_is_speaking
                     ):
@@ -1289,13 +1278,37 @@ class InterviewRuntime:
                             "Candidate stopped speaking."
                         )
 
+                    # Always clear the speaking flag.
+                    #
+                    # CRITICAL: Do NOT guard this with generation_in_progress.
+                    #
+                    # With Tavus, the agent sets _generation_in_progress=True
+                    # *before* the playback_finished event arrives. If the
+                    # candidate speaks and stops while this flag is up, the
+                    # old guard would drop the entire "listening" event,
+                    # leaving _candidate_is_speaking permanently True and
+                    # permanently blocking the transcript commit loop.
+                    #
                     self._candidate_is_speaking = (
                         False
                     )
 
-                    self._last_speech_end_at = (
-                        time.monotonic()
-                    )
+                    # Only advance the speech-end grace window when
+                    # generation is NOT in progress.
+                    #
+                    # During TTS playback we don't want a false
+                    # "recently stopped speaking" window to open,
+                    # because any VAD bleed-through from the speaker
+                    # fires its own "listening" events.
+                    #
+                    if not (
+                        self._generation_in_progress
+                        and self._pending_generation_type
+                    ):
+                        self._last_speech_end_at = (
+                            time.monotonic()
+                        )
+
 
             except Exception:
                 logger.exception(

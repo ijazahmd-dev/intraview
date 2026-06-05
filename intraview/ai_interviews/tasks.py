@@ -217,10 +217,7 @@ def evaluate_turn(self, turn_id: int) -> None:
         if session.status == AIInterviewSession.Status.COMPLETED:
             unfinished_count = AIInterviewEvaluation.objects.filter(
                 turn__session=session,
-                status__in=[
-                    AIInterviewEvaluation.Status.PENDING,
-                    AIInterviewEvaluation.Status.PROCESSING,
-                ],
+                status=AIInterviewEvaluation.Status.PENDING,
             ).count()
 
             if unfinished_count == 0:
@@ -281,10 +278,7 @@ def evaluate_turn(self, turn_id: int) -> None:
         if session.status == AIInterviewSession.Status.COMPLETED:
             unfinished_count = AIInterviewEvaluation.objects.filter(
                 turn__session=session,
-                status__in=[
-                    AIInterviewEvaluation.Status.PENDING,
-                    AIInterviewEvaluation.Status.PROCESSING,
-                ],
+                status=AIInterviewEvaluation.Status.PENDING,
             ).count()
 
             if unfinished_count == 0:
@@ -354,10 +348,7 @@ def evaluate_turn(self, turn_id: int) -> None:
     if session.status == AIInterviewSession.Status.COMPLETED:
         unfinished_count = AIInterviewEvaluation.objects.filter(
             turn__session=session,
-            status__in=[
-                AIInterviewEvaluation.Status.PENDING,
-                AIInterviewEvaluation.Status.PROCESSING,
-            ],
+            status=AIInterviewEvaluation.Status.PENDING,
         ).count()
 
         if unfinished_count == 0:
@@ -512,10 +503,7 @@ def generate_final_report(self, session_id: int) -> None:
     # ------------------------------------------------------------------
     unfinished_count = AIInterviewEvaluation.objects.filter(
         turn__session=session,
-        status__in=[
-            AIInterviewEvaluation.Status.PENDING,
-            AIInterviewEvaluation.Status.PROCESSING,
-        ],
+        status=AIInterviewEvaluation.Status.PENDING,
     ).count()
 
     if unfinished_count > 0 and self.request.retries < 1:
