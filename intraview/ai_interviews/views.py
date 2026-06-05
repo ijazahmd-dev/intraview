@@ -11,9 +11,28 @@ from rest_framework import status, permissions
 from django.utils import timezone
 from datetime import timedelta
 
-from .models import AIInterviewSession, InterviewRuntimeState, AIInterviewFinalReport, AIInterviewTurn
-from ai_interviews.serializers import RoleSerializer, RoleDetailSerializer, AIInterviewSessionStartSerializer, AIInterviewSessionJoinResponseSerializer, AIInterviewSessionSerializer, AgentTurnCreateSerializer, InterviewRuntimeStateSerializer, InterviewRuntimeStateUpdateSerializer, AIInterviewFinalReportSerializer, AIInterviewTurnEvaluationDetailSerializer, AIInterviewTurnWithEvaluationSerializer
+from .models import (
+    AIInterviewSession,
+    InterviewRuntimeState,
+    AIInterviewFinalReport,
+    AIInterviewTurn,
+)
+from ai_interviews.serializers import (
+    RoleSerializer,
+    RoleDetailSerializer,
+    AIInterviewSessionStartSerializer,
+    AIInterviewSessionJoinResponseSerializer,
+    AIInterviewSessionSerializer,
+    AIInterviewAvatarSessionSerializer,
+    AgentTurnCreateSerializer,
+    InterviewRuntimeStateSerializer,
+    InterviewRuntimeStateUpdateSerializer,
+    AIInterviewFinalReportSerializer,
+    AIInterviewTurnEvaluationDetailSerializer,
+    AIInterviewTurnWithEvaluationSerializer,
+)
 from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
+from ai_interviews.service.tavus_avatar_service import TavusAvatarSessionService
 from .tasks import evaluate_turn, generate_final_report
 
 # Adjust this import to where your auth class lives:
@@ -218,6 +237,50 @@ class AIInterviewSessionEndAPIView(APIView):
             AIInterviewSessionSerializer(session).data,
             status=status.HTTP_200_OK,
         )
+
+
+class AIInterviewAvatarSessionCreateAPIView(APIView):
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            avatar_session = TavusAvatarSessionService.ensure_avatar_session(session)
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        serializer = AIInterviewAvatarSessionSerializer(avatar_session)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AIInterviewAvatarSessionStopAPIView(APIView):
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        avatar_session = TavusAvatarSessionService.stop_avatar_session(session)
+        if avatar_session is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = AIInterviewAvatarSessionSerializer(avatar_session)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 

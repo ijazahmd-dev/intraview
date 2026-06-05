@@ -209,7 +209,12 @@ class AIInterviewSession(models.Model):
             self.save(update_fields=["status", "started_at", "updated_at"])
 
     def mark_completed(self):
-        if self.status == self.Status.LIVE:
+        # Accept READY in addition to LIVE: the agent may complete the
+        # interview before the session has been explicitly transitioned
+        # to LIVE (e.g. on very fast sessions or reconnect scenarios).
+        # Previously this silently no-oped for READY, leaving the session
+        # stuck and preventing report generation.
+        if self.status in {self.Status.LIVE, self.Status.READY}:
             self.status = self.Status.COMPLETED
             self.ended_at = timezone.now()
             self.save(update_fields=["status", "ended_at", "updated_at"])
@@ -302,15 +307,95 @@ class AIInterviewSession(models.Model):
             return True
 
         return False
-    
 
 
+class AIInterviewAvatarSession(models.Model):
+    class Provider(models.TextChoices):
+        TAVUS = "tavus", "Tavus"
 
+    class Status(models.TextChoices):
+        READY = "READY", "Ready"
+        ACTIVE = "ACTIVE", "Active"
+        ENDED = "ENDED", "Ended"
+        FAILED = "FAILED", "Failed"
 
+    session = models.OneToOneField(
+        AIInterviewSession,
+        on_delete=models.CASCADE,
+        related_name="avatar_session",
+    )
+    provider = models.CharField(
+        max_length=24,
+        choices=Provider.choices,
+        default=Provider.TAVUS,
+    )
+    enabled = models.BooleanField(default=True)
+    replica_id = models.CharField(max_length=64)
+    persona_id = models.CharField(max_length=64)
+    avatar_participant_identity = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+    )
+    avatar_participant_name = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.READY,
+        db_index=True,
+    )
+    last_error = models.TextField(blank=True, default="")
+    activated_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ["-created_at"]
 
+    def __str__(self) -> str:
+        return (
+            f"AIInterviewAvatarSession #{self.id} | "
+            f"session={self.session_id} | {self.status}"
+        )
 
+    def mark_ready(self):
+        self.status = self.Status.READY
+        self.last_error = ""
+        self.ended_at = None
+        self.save(update_fields=["status", "last_error", "ended_at", "updated_at"])
 
+    def mark_active(self):
+        self.status = self.Status.ACTIVE
+        self.last_error = ""
+        self.activated_at = self.activated_at or timezone.now()
+        self.ended_at = None
+        self.save(
+            update_fields=[
+                "status",
+                "last_error",
+                "activated_at",
+                "ended_at",
+                "updated_at",
+            ]
+        )
+
+    def mark_ended(self):
+        self.status = self.Status.ENDED
+        self.ended_at = timezone.now()
+        self.save(update_fields=["status", "ended_at", "updated_at"])
+
+    def mark_failed(self, error_message: str):
+        self.status = self.Status.FAILED
+        self.last_error = error_message[:2000]
+        self.ended_at = timezone.now()
+        self.save(
+            update_fields=["status", "last_error", "ended_at", "updated_at"]
+        )
 
 
 class InterviewRuntimeState(models.Model):

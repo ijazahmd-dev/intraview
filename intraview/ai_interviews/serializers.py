@@ -2,7 +2,15 @@
 
 from rest_framework import serializers
 
-from .models import Role, AIInterviewSession, AIInterviewTurn, AIInterviewEvaluation, AIInterviewFinalReport, InterviewRuntimeState
+from .models import (
+    Role,
+    AIInterviewSession,
+    AIInterviewAvatarSession,
+    AIInterviewTurn,
+    AIInterviewEvaluation,
+    AIInterviewFinalReport,
+    InterviewRuntimeState,
+)
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -113,6 +121,28 @@ class AIInterviewSessionJoinResponseSerializer(serializers.Serializer):
     livekit_room_name = serializers.CharField()
     livekit_token = serializers.CharField()
     livekit_server_url = serializers.CharField()
+    avatar_session = serializers.DictField(
+        required=False,
+        allow_null=True,
+    )
+
+
+class AIInterviewAvatarSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AIInterviewAvatarSession
+        fields = [
+            "id",
+            "provider",
+            "enabled",
+            "status",
+            "avatar_participant_identity",
+            "avatar_participant_name",
+            "last_error",
+            "activated_at",
+            "ended_at",
+            "created_at",
+            "updated_at",
+        ]
 
 
 

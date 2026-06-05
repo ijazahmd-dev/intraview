@@ -148,6 +148,27 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+TAVUS_API_KEY = os.getenv("TAVUS_API_KEY", "")
+TAVUS_AVATAR_ENABLED = _env_bool("TAVUS_AVATAR_ENABLED", default=False)
+TAVUS_REPLICA_ID = os.getenv("TAVUS_REPLICA_ID", "").strip()
+TAVUS_PERSONA_ID = os.getenv("TAVUS_PERSONA_ID", "").strip()
+TAVUS_AVATAR_PARTICIPANT_IDENTITY = os.getenv(
+    "TAVUS_AVATAR_PARTICIPANT_IDENTITY",
+    "tavus-avatar-agent",
+).strip()
+TAVUS_AVATAR_PARTICIPANT_NAME = os.getenv(
+    "TAVUS_AVATAR_PARTICIPANT_NAME",
+    "AI Interviewer",
+).strip()
+
+
 
 
 ROOT_URLCONF = 'intraview.urls'
