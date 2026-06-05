@@ -36,6 +36,11 @@ app.conf.beat_schedule = {
         "task": "feedbacks.tasks.send_feedback_reminders",
         "schedule": crontab(minute="0", hour="*"),
     },
+    # Recover final reports that got stuck in PROCESSING (worker crash recovery).
+    "recover-stuck-final-reports": {
+        "task": "ai_interviews.tasks.recover_stuck_reports",
+        "schedule": 600.0,  # Every 10 minutes
+    },
 }
 
 

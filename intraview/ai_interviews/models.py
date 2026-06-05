@@ -209,7 +209,12 @@ class AIInterviewSession(models.Model):
             self.save(update_fields=["status", "started_at", "updated_at"])
 
     def mark_completed(self):
-        if self.status == self.Status.LIVE:
+        # Accept READY in addition to LIVE: the agent may complete the
+        # interview before the session has been explicitly transitioned
+        # to LIVE (e.g. on very fast sessions or reconnect scenarios).
+        # Previously this silently no-oped for READY, leaving the session
+        # stuck and preventing report generation.
+        if self.status in {self.Status.LIVE, self.Status.READY}:
             self.status = self.Status.COMPLETED
             self.ended_at = timezone.now()
             self.save(update_fields=["status", "ended_at", "updated_at"])

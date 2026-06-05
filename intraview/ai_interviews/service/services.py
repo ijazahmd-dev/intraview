@@ -294,10 +294,28 @@ class AIInterviewSessionService:
 
         TavusAvatarSessionService.stop_avatar_session(session)
 
+        # ---------------------------------------------------
+        # Trigger report immediately only if all evaluations
+        # are already terminal.
+        #
+        # Prevents edge case:
+        # all turns evaluated BEFORE user ends interview.
+        # ---------------------------------------------------
         if session.status == AIInterviewSession.Status.COMPLETED:
-            generate_final_report.delay(session.id)        
+            unfinished_count = AIInterviewEvaluation.objects.filter(
+                turn__session=session,
+                status__in=[
+                    AIInterviewEvaluation.Status.PENDING,
+                    AIInterviewEvaluation.Status.PROCESSING,
+                ],
+            ).count()
 
-        return session
+            if unfinished_count == 0:
+                generate_final_report.delay(session.id)
+
+        return session    
+
+       
     
 
 

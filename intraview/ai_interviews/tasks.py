@@ -184,14 +184,24 @@ def evaluate_turn(self, turn_id: int) -> None:
         return
 
     if not turn.answer_text or not turn.answer_text.strip():
-        # Nothing to evaluate; mark FAILED but do not retry.
         evaluation.status = AIInterviewEvaluation.Status.FAILED
-        evaluation.suggestions = ["Empty answer; no evaluation generated."]
+        evaluation.suggestions = [
+            "Empty answer; no evaluation generated."
+        ]
         evaluation.raw_response = {
             "reason": "EMPTY_ANSWER",
             "retryable": False,
         }
-        evaluation.save(update_fields=["status", "suggestions", "raw_response", "updated_at"])
+
+        evaluation.save(
+            update_fields=[
+                "status",
+                "suggestions",
+                "raw_response",
+                "updated_at",
+            ]
+        )
+
         logger.info(
             "evaluate_turn: empty answer for turn %s, marking FAILED",
             turn_id,
@@ -201,6 +211,21 @@ def evaluate_turn(self, turn_id: int) -> None:
                 "task_id": self.request.id,
             },
         )
+
+        session = turn.session
+
+        if session.status == AIInterviewSession.Status.COMPLETED:
+            unfinished_count = AIInterviewEvaluation.objects.filter(
+                turn__session=session,
+                status__in=[
+                    AIInterviewEvaluation.Status.PENDING,
+                    AIInterviewEvaluation.Status.PROCESSING,
+                ],
+            ).count()
+
+            if unfinished_count == 0:
+                generate_final_report.delay(session.id)
+
         return
 
     payload = _build_evaluation_input(turn)
@@ -229,6 +254,7 @@ def evaluate_turn(self, turn_id: int) -> None:
                 "task_id": self.request.id,
             },
         )
+
         evaluation.status = AIInterviewEvaluation.Status.FAILED
         evaluation.suggestions = ["Evaluation unavailable."]
         evaluation.raw_response = {
@@ -236,9 +262,39 @@ def evaluate_turn(self, turn_id: int) -> None:
             "retryable": False,
             "error": str(exc),
         }
+
         evaluation.save(
-            update_fields=["status", "suggestions", "raw_response", "updated_at"]
+            update_fields=[
+                "status",
+                "suggestions",
+                "raw_response",
+                "updated_at",
+            ]
         )
+
+        # ------------------------------------------
+        # If session completed, check whether all
+        # evaluations are now terminal.
+        # ------------------------------------------
+        session = turn.session
+
+        if session.status == AIInterviewSession.Status.COMPLETED:
+            unfinished_count = AIInterviewEvaluation.objects.filter(
+                turn__session=session,
+                status__in=[
+                    AIInterviewEvaluation.Status.PENDING,
+                    AIInterviewEvaluation.Status.PROCESSING,
+                ],
+            ).count()
+
+            if unfinished_count == 0:
+                logger.info(
+                    "All evaluations terminal for session %s → generating report",
+                    session.id,
+                )
+
+                generate_final_report.delay(session.id)
+
         return
 
     except Exception as exc:
@@ -287,6 +343,30 @@ def evaluate_turn(self, turn_id: int) -> None:
             "score": evaluation.score,
         },
     )
+
+    # -------------------------------------------------
+    # Trigger final report if session already completed
+    # and all evaluations are now terminal.
+    # -------------------------------------------------
+
+    session = turn.session
+
+    if session.status == AIInterviewSession.Status.COMPLETED:
+        unfinished_count = AIInterviewEvaluation.objects.filter(
+            turn__session=session,
+            status__in=[
+                AIInterviewEvaluation.Status.PENDING,
+                AIInterviewEvaluation.Status.PROCESSING,
+            ],
+        ).count()
+
+        if unfinished_count == 0:
+            logger.info(
+                "All evaluations finished for session %s → generating report",
+                session.id,
+            )
+
+            generate_final_report.delay(session.id)
 
 
 
@@ -423,35 +503,112 @@ def generate_final_report(self, session_id: int) -> None:
         )
         return
 
-    report = AIInterviewReportService.ensure_final_report(session)
+    # ------------------------------------------------------------------
+    # Check for unfinished evaluations BEFORE acquiring the transaction
+    # lock. Raising self.retry() inside transaction.atomic() triggers an
+    # immediate rollback (because Retry is an exception), which can roll
+    # back the get_or_create inside ensure_final_report — confusing and
+    # unnecessary. Do the count outside the transaction boundary.
+    # ------------------------------------------------------------------
+    unfinished_count = AIInterviewEvaluation.objects.filter(
+        turn__session=session,
+        status__in=[
+            AIInterviewEvaluation.Status.PENDING,
+            AIInterviewEvaluation.Status.PROCESSING,
+        ],
+    ).count()
 
-    if report.status == AIInterviewFinalReport.Status.PROCESSING:
-        logger.info(
-            "generate_final_report: already processing for session %s",
+    if unfinished_count > 0 and self.request.retries < 1:
+        logger.warning(
+            "generate_final_report delayed: %s unfinished evaluations for session %s",
+            unfinished_count,
             session_id,
             extra={
                 "session_id": session_id,
-                "task_id": self.request.id,
+                "retry_count": self.request.retries,
             },
         )
-        return
+        raise self.retry(countdown=15)
 
-
-    if report.status == AIInterviewFinalReport.Status.SUCCESS:
-        logger.info(
-            "generate_final_report: report already SUCCESS for session %s, skipping",
+    if unfinished_count > 0:
+        logger.warning(
+            "generate_final_report proceeding with %s unfinished evaluations for session %s",
+            unfinished_count,
             session_id,
-            extra={
-                "session_id": session_id,
-                "task_id": self.request.id,
-            },
+            extra={"session_id": session_id},
         )
-        return
-    
-    report.status = AIInterviewFinalReport.Status.PROCESSING
-    report.save(update_fields=["status", "updated_at"])
+
+    with transaction.atomic():
+        report = AIInterviewReportService.ensure_final_report(session)
+
+        report = (
+            AIInterviewFinalReport.objects
+            .select_for_update()
+            .get(pk=report.pk)
+        )
+
+        if report.status == AIInterviewFinalReport.Status.PROCESSING:
+            logger.info(
+                "generate_final_report: already processing for session %s",
+                session_id,
+                extra={
+                    "session_id": session_id,
+                    "task_id": self.request.id,
+                },
+            )
+            return
+
+        if report.status == AIInterviewFinalReport.Status.SUCCESS:
+            logger.info(
+                "generate_final_report: report already SUCCESS for session %s, skipping",
+                session_id,
+                extra={
+                    "session_id": session_id,
+                    "task_id": self.request.id,
+                },
+            )
+            return
+
+        report.status = AIInterviewFinalReport.Status.PROCESSING
+        report.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ]
+        )
 
     payload = _build_final_report_input(session)
+
+    # Guard: if the session had zero turns (e.g. user ended immediately)
+    # produce a graceful SUCCESS report so the candidate sees something
+    # meaningful rather than a confusing FAILED status.
+    if not payload["interview_data"]:
+        logger.warning(
+            "generate_final_report: no turns found for session %s, generating graceful report",
+            session_id,
+            extra={"session_id": session_id, "task_id": self.request.id},
+        )
+        report.overall_score = None
+        report.summary = "No interview responses were recorded."
+        report.strengths = []
+        report.areas_for_improvement = ["Complete at least one interview question."]
+        report.recommendations = ["Retry the mock interview."]
+        report.raw_response = {"reason": "NO_TURNS"}
+        report.status = AIInterviewFinalReport.Status.SUCCESS
+        report.save(
+            update_fields=[
+                "overall_score",
+                "summary",
+                "strengths",
+                "areas_for_improvement",
+                "recommendations",
+                "raw_response",
+                "status",
+                "updated_at",
+            ]
+        )
+        return
+
     logger.info(
         "generate_final_report: generating report for session %s",
         session_id,
@@ -475,6 +632,11 @@ def generate_final_report(self, session_id: int) -> None:
                 "retry_count": self.request.retries,
             },
         )
+        # Reset report status to PENDING so the retry attempt can
+        # re-enter the generation path instead of hitting the
+        # PROCESSING guard and silently exiting.
+        report.status = AIInterviewFinalReport.Status.PENDING
+        report.save(update_fields=["status", "updated_at"])
         raise self.retry(exc=exc)
     
     except GeminiPermanentError as exc:
@@ -523,3 +685,74 @@ def generate_final_report(self, session_id: int) -> None:
             "task_id": self.request.id,
         },
     )
+
+
+
+
+
+@shared_task
+def recover_stuck_reports() -> None:
+    """
+    Watchdog task (Celery Beat, every 10 minutes).
+
+    Finds AIInterviewFinalReport records that have been stuck in
+    PROCESSING for more than 10 minutes — a sign that the Celery
+    worker that was handling them crashed mid-generation.
+
+    Resets them to PENDING and re-queues generate_final_report so
+    they are retried automatically.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+
+    cutoff = timezone.now() - timedelta(minutes=10)
+
+    stuck = AIInterviewFinalReport.objects.filter(
+        status=AIInterviewFinalReport.Status.PROCESSING,
+        updated_at__lt=cutoff,
+    ).select_related("session")
+
+    recovered = 0
+    for report in stuck:
+        session = report.session
+
+        # Only re-queue for sessions that are actually COMPLETED.
+        # A PROCESSING report for a non-completed session is
+        # unexpected — log and skip instead of silently re-queuing.
+        if session.status != AIInterviewSession.Status.COMPLETED:
+            logger.warning(
+                "recover_stuck_reports: report %s is PROCESSING but "
+                "session %s has unexpected status %s — skipping",
+                report.pk,
+                session.id,
+                session.status,
+            )
+            continue
+
+        # Re-fetch the report row to guard against the race where a
+        # successful retry completed between our queryset fetch and
+        # now. This avoids a duplicate enqueue of an already-done report.
+        report.refresh_from_db(fields=["status"])
+        if report.status == AIInterviewFinalReport.Status.SUCCESS:
+            logger.info(
+                "recover_stuck_reports: report %s already SUCCESS, skipping",
+                report.pk,
+            )
+            continue
+
+        logger.warning(
+            "recover_stuck_reports: resetting stuck report %s "
+            "for session %s and re-queuing",
+            report.pk,
+            session.id,
+        )
+        report.status = AIInterviewFinalReport.Status.PENDING
+        report.save(update_fields=["status", "updated_at"])
+        generate_final_report.delay(session.id)
+        recovered += 1
+
+    if recovered:
+        logger.info(
+            "recover_stuck_reports: recovered %s stuck report(s)",
+            recovered,
+        )
