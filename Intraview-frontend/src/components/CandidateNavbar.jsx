@@ -986,6 +986,8 @@ export default function CandidateNavbar() {
   const dispatch = useDispatch();
 
   const user = useSelector((s) => s.auth?.user ?? null);
+  const profileUser = useSelector((s) => s.profile?.user ?? null);
+  const candidateProfile = useSelector((s) => s.profile?.candidateProfile ?? null);
 
   // Tokens config: Candidate uses s.candidateWallet?.summary?.tokens_balance. (If it's token_balance from API, let's try token_balance first, then fallback to s.wallet)
   const tokenBalance = useSelector((s) =>
@@ -1054,13 +1056,20 @@ export default function CandidateNavbar() {
     navigate(item.path);
   };
 
-  const firstName = user?.first_name || user?.firstName || "";
-  const lastName = user?.last_name || user?.lastName || "";
+  let firstName = profileUser?.firstName || user?.first_name || user?.firstName || "";
+  let lastName = profileUser?.lastName || user?.last_name || user?.lastName || "";
+
+  if (!firstName && !lastName && candidateProfile?.full_name) {
+    const parts = candidateProfile.full_name.split(" ");
+    firstName = parts[0];
+    lastName = parts.slice(1).join(" ");
+  }
+
   const fullName = `${firstName} ${lastName}`.trim() || "Candidate";
   const userInitials = initials(firstName, lastName);
 
   // Support profilePicture (ProfileSlice mapping) or profile_picture / profile_picture_url (Auth Payload mapping)
-  const avatarSrc = user?.profilePicture || user?.profile_picture_url || user?.profile_picture || null;
+  const avatarSrc = profileUser?.profilePicture || user?.profilePicture || user?.profile_picture_url || user?.profile_picture || null;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
