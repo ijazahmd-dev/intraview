@@ -230,7 +230,7 @@ export function ConnectingView({ sessionInfo }) {
 // ══════════════════════════════════════════════════════════════
 // LIVE INTERVIEW INNER (right panel content only)
 // ══════════════════════════════════════════════════════════════
-function LiveInterviewInner({ sessionInfo }) {
+function LiveInterviewInner({ sessionInfo, sessionId }) {
   const { currentQuestion, agentTranscript } = useAgentTranscript();
 
   return (
@@ -263,7 +263,7 @@ function LiveInterviewInner({ sessionInfo }) {
             · {sessionInfo.roundType}
           </span>
         </p>
-        <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{
             fontFamily: "var(--ff-tech)", fontSize: 8.5, fontWeight: 700,
             color: "var(--iv-text-3)", letterSpacing: "0.07em",
@@ -274,6 +274,17 @@ function LiveInterviewInner({ sessionInfo }) {
           }}>
             {sessionInfo.difficulty}
           </span>
+          {sessionId && (
+            <span style={{
+              fontFamily: "var(--ff-tech)", fontSize: 8.5, fontWeight: 700,
+              color: "rgba(20,184,166,0.80)", letterSpacing: "0.07em",
+              background: "rgba(20,184,166,0.08)",
+              border: "1px solid rgba(20,184,166,0.20)",
+              borderRadius: 5, padding: "2px 7px",
+            }}>
+              SESSION #{(sessionId + "").slice(0, 8).toUpperCase()}
+            </span>
+          )}
         </div>
       </div>
 
@@ -320,10 +331,9 @@ export function LiveInterviewView({
         avatarError={avatarError}
         onEnd={onEnd}
         isEnding={isEnding}
-        sessionId={sessionId}
         formattedTimeLeft={formattedTimeLeft}
       >
-        <LiveInterviewInner sessionInfo={sessionInfo} />
+        <LiveInterviewInner sessionInfo={sessionInfo} sessionId={sessionId} />
       </LiveKitVideoPanel>
     </div>
   );

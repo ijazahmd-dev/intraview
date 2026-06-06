@@ -61,7 +61,7 @@ function SpeakingBadge({ participant }) {
   );
 }
 
-export function InterviewerAvatar({ avatarSession, avatarError }) {
+export function InterviewerAvatar({ avatarSession, avatarError, formattedTimeLeft }) {
   const { interviewerParticipant, interviewerTrack } = useInterviewerParticipant(avatarSession);
   const [showFallback, setShowFallback] = useState(Boolean(avatarError));
   const timerRef = useRef(null);
@@ -109,25 +109,33 @@ export function InterviewerAvatar({ avatarSession, avatarError }) {
         {/* Bottom-left: speaking-aware badge (hook is safely inside child) */}
         <SpeakingBadge participant={interviewerParticipant} />
 
-        {/* Top-right: LIVE chip */}
+        {/* Top-right: combined LIVE + Timer pill */}
         <div style={{
           position: "absolute", right: 14, top: 14,
           background: "rgba(5,9,15,0.72)",
           backdropFilter: "blur(10px)",
           border: "1px solid rgba(34,197,94,0.35)",
-          borderRadius: 7, padding: "3px 9px",
+          borderRadius: 8, padding: "5px 11px",
           fontFamily: "var(--ff-tech)",
-          fontSize: 9, fontWeight: 800,
-          color: "#22c55e", letterSpacing: "0.18em",
-          display: "flex", alignItems: "center", gap: 5,
+          fontSize: 9.5, fontWeight: 700,
+          color: "#22c55e", letterSpacing: "0.14em",
+          display: "flex", alignItems: "center", gap: 7,
         }}>
-          <span style={{
-            width: 5, height: 5, borderRadius: "50%",
-            background: "#22c55e",
-            boxShadow: "0 0 6px #22c55e",
-            animation: "iv-blink-live 1.5s ease infinite",
-          }} />
-          LIVE
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{
+              width: 5, height: 5, borderRadius: "50%",
+              background: "#22c55e",
+              boxShadow: "0 0 6px #22c55e",
+              animation: "iv-blink-live 1.5s ease infinite",
+            }} />
+            LIVE
+          </span>
+          {formattedTimeLeft && (
+            <>
+              <span style={{ color: "rgba(34,197,94,0.4)", fontWeight: 400 }}>|</span>
+              <span style={{ color: "rgba(230,240,255,0.88)", letterSpacing: "0.07em" }}>{formattedTimeLeft}</span>
+            </>
+          )}
         </div>
       </div>
     );

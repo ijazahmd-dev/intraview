@@ -143,7 +143,7 @@ export function AgentTranscriptPanel({ currentQuestion, agentTranscript }) {
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
-              gap: 10,
+              gap: 16,
               paddingRight: 4,
               minHeight: 0,
             }}
@@ -177,7 +177,7 @@ export function AgentTranscriptPanel({ currentQuestion, agentTranscript }) {
                     )}
                   </div>
                   <div style={{
-                    padding: "8px 11px",
+                    padding: "11px 14px",
                     borderRadius: isActive ? "4px 12px 12px 12px" : "4px 10px 10px 10px",
                     background: isActive
                       ? "rgba(20,184,166,0.09)"

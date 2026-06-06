@@ -57,29 +57,43 @@ function CamIcon({ off }) {
 // ── Draggable PiP candidate camera ───────────────────────────
 function CandidatePip({ track }) {
   const containerRef = useRef(null);
-  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, origX: 0, origY: 0, minX: 0, maxX: 0, minY: 0, maxY: 0 });
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+
+  // PiP dimensions
+  const PIP_W = 188, PIP_H = 112;
+  // Anchor: right:16, bottom:80
+  const ANCHOR_R = 16, ANCHOR_B = 80;
 
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    dragRef.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: pos.x,
-      origY: pos.y,
-    };
+    if (!el || !el.parentElement) return;
+    const parentRect = el.parentElement.getBoundingClientRect();
+    // Max offset to stay inside parent
+    const minX = -(parentRect.width - PIP_W - ANCHOR_R);
+    const maxX = ANCHOR_R;
+    const minY = -(parentRect.height - PIP_H - ANCHOR_B);
+    const maxY = ANCHOR_B;
+    dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, minX, maxX, minY, maxY };
+    setIsDragging(true);
     const onMove = (ev) => {
       if (!dragRef.current.dragging) return;
-      const dx = ev.clientX - dragRef.current.startX;
-      const dy = ev.clientY - dragRef.current.startY;
-      setPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
+      let nx = dragRef.current.origX + (ev.clientX - dragRef.current.startX);
+      let ny = dragRef.current.origY + (ev.clientY - dragRef.current.startY);
+      nx = Math.max(dragRef.current.minX, Math.min(dragRef.current.maxX, nx));
+      ny = Math.max(dragRef.current.minY, Math.min(dragRef.current.maxY, ny));
+      // Snap to edges (20px threshold)
+      if (Math.abs(nx - dragRef.current.minX) < 20) nx = dragRef.current.minX;
+      if (Math.abs(nx - dragRef.current.maxX) < 20) nx = dragRef.current.maxX;
+      if (Math.abs(ny - dragRef.current.minY) < 20) ny = dragRef.current.minY;
+      if (Math.abs(ny - dragRef.current.maxY) < 20) ny = dragRef.current.maxY;
+      setPos({ x: nx, y: ny });
     };
     const onUp = () => {
       dragRef.current.dragging = false;
+      setIsDragging(false);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -93,22 +107,23 @@ function CandidatePip({ track }) {
       onMouseDown={onMouseDown}
       style={{
         position: "absolute",
-        bottom: 80,
-        right: 16,
+        bottom: ANCHOR_B,
+        right: ANCHOR_R,
         transform: `translate(${pos.x}px, ${pos.y}px)`,
-        width: 220, height: 132,
-        borderRadius: 14,
+        width: PIP_W, height: PIP_H,
+        borderRadius: 16,
         overflow: "hidden",
-        border: "1.5px solid rgba(255,255,255,0.13)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.30)",
-        background: "#060b14",
-        cursor: "grab",
+        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: isDragging
+          ? "0 16px 48px rgba(0,0,0,0.75), 0 0 20px rgba(20,184,166,0.12) inset"
+          : "0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset",
+        background: "rgba(6,11,20,0.85)",
+        backdropFilter: "blur(16px)",
+        cursor: isDragging ? "grabbing" : "grab",
         zIndex: 20,
         userSelect: "none",
-        transition: "box-shadow 0.2s",
+        transition: isDragging ? "none" : "box-shadow 0.25s",
       }}
-      onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 12px 40px rgba(0,0,0,0.70), 0 2px 8px rgba(0,0,0,0.30)"}
-      onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.30)"}
     >
       {track ? (
         <ParticipantTile
@@ -128,27 +143,23 @@ function CandidatePip({ track }) {
         </div>
       )}
 
-      {/* YOU label */}
-      <div style={{
-        position: "absolute", left: 8, bottom: 7,
-        background: "rgba(5,9,15,0.80)",
-        backdropFilter: "blur(8px)",
-        borderRadius: 99,
-        padding: "2px 8px",
-        fontFamily: "var(--ff-tech)",
-        fontSize: 9, fontWeight: 600, color: "#7a9ab5",
-        letterSpacing: "0.08em",
-        pointerEvents: "none",
-      }}>
-        YOU
-      </div>
+      {/* YOU label — only shown when track is live to avoid doubling with LiveKit name */}
+      {!track && (
+        <div style={{
+          position: "absolute", left: 8, bottom: 7,
+          background: "rgba(5,9,15,0.80)",
+          backdropFilter: "blur(8px)",
+          borderRadius: 99, padding: "2px 8px",
+          fontFamily: "var(--ff-tech)",
+          fontSize: 9, fontWeight: 600, color: "#7a9ab5", letterSpacing: "0.08em",
+          pointerEvents: "none",
+        }}>
+          YOU
+        </div>
+      )}
 
-      {/* Drag indicator */}
-      <div style={{
-        position: "absolute", right: 8, top: 7,
-        opacity: 0.4,
-        pointerEvents: "none",
-      }}>
+      {/* Drag grip indicator */}
+      <div style={{ position: "absolute", right: 8, top: 7, opacity: 0.4, pointerEvents: "none" }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="#7a9ab5">
           <circle cx="9" cy="5" r="2" /><circle cx="15" cy="5" r="2" />
           <circle cx="9" cy="12" r="2" /><circle cx="15" cy="12" r="2" />
@@ -160,7 +171,7 @@ function CandidatePip({ track }) {
 }
 
 // ── Premium Controls Bar ─────────────────────────────────────
-function ControlsBar({ onEnd, isEnding, sessionId, formattedTimeLeft }) {
+function ControlsBar({ onEnd, isEnding }) {
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
 
   const toggleMic = () => localParticipant?.setMicrophoneEnabled(!isMicrophoneEnabled);
@@ -179,29 +190,7 @@ function ControlsBar({ onEnd, isEnding, sessionId, formattedTimeLeft }) {
       padding: "0 20px",
       zIndex: 15,
     }}>
-      {/* Session ID — left */}
-      <div style={{
-        position: "absolute", left: 18,
-        display: "flex", alignItems: "center", gap: 5,
-      }}>
-        <span style={{
-          fontFamily: "var(--ff-tech)", fontSize: 9.5, fontWeight: 600,
-          color: "rgba(61,82,105,0.8)", letterSpacing: "0.06em",
-        }}>
-          {sessionId ? `SESSION #${sessionId.slice(0, 6).toUpperCase()}` : "AI INTERVIEW"}
-        </span>
-        {formattedTimeLeft && (
-          <>
-            <span style={{ color: "rgba(61,82,105,0.4)", fontSize: 9 }}>·</span>
-            <span style={{
-              fontFamily: "var(--ff-tech)", fontSize: 9.5, fontWeight: 700,
-              color: "rgba(20,184,166,0.75)", letterSpacing: "0.06em",
-            }}>
-              {formattedTimeLeft}
-            </span>
-          </>
-        )}
-      </div>
+      <div style={{ position: "absolute", left: 18 }} />
 
       {/* Center buttons */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -256,35 +245,32 @@ function ControlsBar({ onEnd, isEnding, sessionId, formattedTimeLeft }) {
           <CamIcon off={!isCameraEnabled} />
         </button>
 
-        {/* End interview */}
+        {/* End interview — softer red, cleaner size */}
         <button
           onClick={onEnd}
           disabled={isEnding}
           title="End interview"
           style={{
-            height: 48, padding: "0 22px",
-            borderRadius: 99,
-            border: "none",
-            background: isEnding
-              ? "rgba(180,30,30,0.55)"
-              : "rgba(220,38,38,0.90)",
+            height: 44, padding: "0 20px", marginLeft: 6,
+            borderRadius: 99, border: "none",
+            background: isEnding ? "rgba(160,24,24,0.45)" : "rgba(210,32,32,0.72)",
             color: "#fff",
             display: "flex", alignItems: "center", gap: 7,
             cursor: isEnding ? "not-allowed" : "pointer",
-            transition: "all 0.18s",
-            fontFamily: "var(--ff-tech)", fontSize: 11, fontWeight: 700,
-            letterSpacing: "0.07em",
-            boxShadow: isEnding ? "none" : "0 4px 16px rgba(220,38,38,0.35)",
+            transition: "background 0.18s",
+            fontFamily: "var(--ff-tech)", fontSize: 10.5, fontWeight: 700,
+            letterSpacing: "0.08em",
+            boxShadow: isEnding ? "none" : "0 3px 14px rgba(200,30,30,0.28)",
             opacity: isEnding ? 0.6 : 1,
           }}
-          onMouseEnter={(e) => { if (!isEnding) e.currentTarget.style.background = "rgba(239,68,68,1)"; }}
-          onMouseLeave={(e) => { if (!isEnding) e.currentTarget.style.background = "rgba(220,38,38,0.90)"; }}
+          onMouseEnter={(e) => { if (!isEnding) e.currentTarget.style.background = "rgba(239,55,55,0.90)"; }}
+          onMouseLeave={(e) => { if (!isEnding) e.currentTarget.style.background = "rgba(210,32,32,0.72)"; }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v2.12a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.77 8.86a19.79 19.79 0 0 1-3.07-8.64A2 2 0 0 1 3.68 0h2.12a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L6.68 7.91" />
             <line x1="23" y1="1" x2="1" y2="23" />
           </svg>
-          {isEnding ? "ENDING…" : "END INTERVIEW"}
+          {isEnding ? "ENDING…" : "END"}
         </button>
       </div>
     </div>
@@ -311,19 +297,14 @@ function VideoArea({ avatarSession, avatarError, onEnd, isEnding, sessionId, for
         <InterviewerAvatar
           avatarSession={avatarSession}
           avatarError={avatarError}
+          formattedTimeLeft={formattedTimeLeft}
         />
       </div>
 
       {/* Candidate floating PiP */}
       <CandidatePip track={candidateTrack} />
 
-      {/* Controls overlay */}
-      <ControlsBar
-        onEnd={onEnd}
-        isEnding={isEnding}
-        sessionId={sessionId}
-        formattedTimeLeft={formattedTimeLeft}
-      />
+      <ControlsBar onEnd={onEnd} isEnding={isEnding} />
     </div>
   );
 }

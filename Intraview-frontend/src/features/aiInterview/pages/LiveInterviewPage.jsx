@@ -49,7 +49,7 @@ function BackBar({ onBack, uiState }) {
       backdropFilter: "blur(16px)",
       flexShrink: 0,
     }}>
-      <button
+      {/* <button
         onClick={onBack}
         style={{
           display: "flex", alignItems: "center", gap: 7,
@@ -65,10 +65,10 @@ function BackBar({ onBack, uiState }) {
       >
         <ArrowLeft size={14} />
         Back to roles
-      </button>
+      </button> */}
 
       {/* Branding */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+      {/* <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <div style={{
           width: 22, height: 22, borderRadius: 6,
           background: "linear-gradient(135deg, #14b8a6, #0d9488)",
@@ -78,7 +78,7 @@ function BackBar({ onBack, uiState }) {
         <span style={{ fontFamily: "var(--ff-tech)", fontSize: 12.5, fontWeight: 700, color: "var(--iv-text)" }}>
           IntraView
         </span>
-      </div>
+      </div> */}
 
       {/* Status indicator */}
       <div style={{
