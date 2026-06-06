@@ -29,7 +29,7 @@ export function useAgentParticipant() {
       if (p.identity?.startsWith("agent:")) return true;
       try {
         const meta = JSON.parse(p.metadata ?? "{}");
-        return meta?.name === "AI Interviewer";
+        return meta?.name === "";
       } catch {
         return false;
       }

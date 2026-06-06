@@ -69,6 +69,9 @@ export function useAgentTranscript() {
   // Full transcript = all messages in order
   const transcript = messages;
 
+  // Agent-only transcript — only interviewer questions, no candidate answers
+  const agentTranscript = messages.filter((m) => m.role === "agent");
+
   // Question history = all agent questions except the current one
   const questionHistory = messages.filter(
     (m) => m.role === "agent" && m.type === "question" && m.id !== currentQuestion?.id
@@ -79,5 +82,5 @@ export function useAgentTranscript() {
     seenRef.current = new Set();
   };
 
-  return { messages, currentQuestion, transcript, questionHistory, resetTranscript };
+  return { messages, currentQuestion, transcript, agentTranscript, questionHistory, resetTranscript };
 }
