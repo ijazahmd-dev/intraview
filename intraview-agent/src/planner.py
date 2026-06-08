@@ -17,6 +17,8 @@ class InterviewConfig:
     max_questions: int
     # Optional total duration in seconds (authoritative value comes from backend)
     duration_seconds: Optional[int] = None
+    role_name: str | None = None
+    candidate_name: str | None = None
 
 
 class QuestionPlanner:
@@ -69,7 +71,7 @@ class QuestionPlanner:
 
         return textwrap.dedent(
             f"""\
-            You are conducting a practice interview for the role "{self.cfg.role_slug}".
+            You are conducting a practice interview for the role "{self.cfg.role_name or self.cfg.role_slug}".
             Round type: {self.cfg.round_type}. Difficulty: {self.cfg.difficulty}.
 
             You are now about to ask interview question {num} of {total}.

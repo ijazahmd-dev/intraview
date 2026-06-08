@@ -204,12 +204,32 @@ class AIInterviewSessionService:
 
         # Metadata that will be forwarded to your LiveKit agent as job.metadata.
         # LiveKit passes this as a JSON string.[web:225][web:238]
+        # Identity for the LiveKit participant
+        identity = f"user-{user.id}"
+        display_name = (
+            getattr(user, "full_name", None)
+            or (
+                " ".join(
+                    part
+                    for part in [
+                        getattr(user, "first_name", "") or "",
+                        getattr(user, "last_name", "") or "",
+                    ]
+                    if part
+                ).strip()
+            )
+            or getattr(user, "username", None)
+            or str(user.id)
+        )
+
         metadata_dict = {
             "session_id": session.id,
             "role_slug": session.role.slug,
+            "role_name": session.role.name,
             "round_type": session.round_type,
             "difficulty": session.difficulty,
             "duration_minutes": session.duration_minutes,
+            "candidate_name": display_name,
             # You can add max_questions here later if you want the backend
             # to control it:
             # "max_questions": 5,
@@ -218,14 +238,6 @@ class AIInterviewSessionService:
             ),
         }
         metadata_str = json.dumps(metadata_dict)
-
-        # Identity for the LiveKit participant
-        identity = f"user-{user.id}"
-        display_name = (
-            getattr(user, "full_name", None)
-            or getattr(user, "username", None)
-            or str(user.id)
-        )
 
         video_grants = lkapi.VideoGrants(
             room_join=True,

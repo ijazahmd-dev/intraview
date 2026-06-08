@@ -14,6 +14,7 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     inference,
+    llm,
     room_io,
     ConversationItemAddedEvent,
     UserStateChangedEvent,
@@ -123,6 +124,16 @@ class InterviewRuntime:
         # when the room is already connected via session.start().
         self._interview_done: asyncio.Event = asyncio.Event()
 
+        # Spoken lifecycle guards.
+        # Keep start/end messages human and one-time only.
+        self._greeting_spoken: bool = False
+        self._closing_started: bool = False
+
+        # Best-effort snapshot of durable runtime state loaded from backend.
+        # Helps avoid replaying greeting/closing during reconnect scenarios.
+        self._loaded_runtime_state_name: str = "INITIALIZING"
+        self._loaded_waiting_for_answer: bool = False
+
         self._minimum_answer_words = 3
         self._minimum_answer_chars = 12
 
@@ -219,8 +230,10 @@ class InterviewRuntime:
             raise RuntimeError(f"session_id missing or invalid in metadata: {meta!r}")
 
         role_slug = str(meta.get("role_slug") or "unknown-role")
+        role_name = str(meta.get("role_name") or "").strip() or None
         round_type = str(meta.get("round_type") or "BEHAVIORAL").upper()
         difficulty = str(meta.get("difficulty") or "INTERMEDIATE").upper()
+        candidate_name = str(meta.get("candidate_name") or "").strip() or None
 
         defaults = get_interview_defaults()
 
@@ -255,7 +268,82 @@ class InterviewRuntime:
             difficulty=difficulty,
             max_questions=max_questions,
             duration_seconds=duration_seconds,
+            role_name=role_name,
+            candidate_name=candidate_name,
         )
+
+    def _track_background_task(self, task: asyncio.Task):
+        self._background_tasks.add(task)
+
+        def _cleanup_task(t: asyncio.Task):
+            self._background_tasks.discard(t)
+
+        task.add_done_callback(_cleanup_task)
+
+    def _role_display_name(self) -> str:
+        assert self.cfg is not None
+
+        role_name = (self.cfg.role_name or "").strip()
+        if role_name:
+            return role_name
+
+        role_slug = (self.cfg.role_slug or "").strip()
+        if not role_slug:
+            return "selected"
+
+        return role_slug.replace("-", " ").replace("_", " ").title()
+
+    def _candidate_display_name(self) -> Optional[str]:
+        assert self.cfg is not None
+
+        candidate_name = (self.cfg.candidate_name or "").strip()
+        if candidate_name:
+            return candidate_name
+
+        for participant in self.room.remote_participants.values():
+            display_name = (getattr(participant, "name", "") or "").strip()
+            if display_name:
+                return display_name
+
+        return None
+
+    def _build_greeting_text(self) -> str:
+        role_name = self._role_display_name()
+        candidate_name = self._candidate_display_name()
+        greeting_prefix = (
+            f"Hello {candidate_name}, welcome to your AI interview session "
+            if candidate_name
+            else "Hello, welcome to your AI interview session "
+        )
+
+        return (
+            f"{greeting_prefix}for the {role_name} role. "
+            "I will guide you through a few questions to understand your experience, "
+            "communication, and problem-solving approach. "
+            "Take a moment to settle in, and when you are ready, we will begin."
+        )
+
+    def _build_closing_text(self) -> str:
+        return (
+            "That concludes the interview. Thank you for taking the time to participate today. "
+            "Your responses will now be processed and evaluated. "
+            "We appreciate your effort, and we wish you the very best in your journey. "
+            "Have a great day."
+        )
+
+    def _should_greet_on_start(self) -> bool:
+        assert self.tm is not None
+
+        if self._greeting_spoken:
+            return False
+
+        if self.tm.current_turn_index_0based() != 0:
+            return False
+
+        if self._loaded_waiting_for_answer:
+            return False
+
+        return self._loaded_runtime_state_name in {"", "INITIALIZING"}
 
     async def _send_data(self, payload: dict):
         """
@@ -311,6 +399,233 @@ class InterviewRuntime:
         except Exception:
             # Log but do not crash runtime on sync failure.
             logger.exception("Failed to sync runtime state to backend")
+
+    async def _safe_say(
+        self,
+        *,
+        text: str,
+        allow_interruptions: bool = False,
+    ):
+        """
+        Speak a deterministic scripted message without adding it to chat context.
+
+        Used for greeting and closing so they:
+        - start quickly
+        - do not depend on LLM generation latency
+        - do not confuse question/answer tracking
+        """
+
+        assert self.session is not None
+
+        if not self._runtime_alive:
+            logger.warning("Skipping scripted speech because runtime is no longer alive.")
+            return
+
+        if self.runtime_guard:
+            await self.runtime_guard.ensure_runtime_valid()
+
+        try:
+            handle = self.session.say(
+                text=text,
+                allow_interruptions=allow_interruptions,
+                add_to_chat_ctx=False,
+            )
+            await asyncio.wait_for(
+                handle.wait_for_playout(),
+                timeout=45.0,
+            )
+        except asyncio.TimeoutError:
+            logger.exception("Scripted speech timed out.")
+        except Exception:
+            logger.exception("Scripted speech failed.")
+
+    async def _generate_question_text(
+        self,
+        *,
+        instructions: str,
+        fallback_text: str,
+    ) -> str:
+        """
+        Generate question phrasing as plain text without enqueueing speech.
+
+        This is used for the first question so we can pre-generate it during
+        the greeting without allowing the speech pipeline to start early.
+        """
+
+        if not self._runtime_alive:
+            return fallback_text
+
+        if self.runtime_guard:
+            await self.runtime_guard.ensure_runtime_valid()
+
+        chat_ctx = llm.ChatContext.empty()
+        chat_ctx.add_message(
+            role="user",
+            content=instructions,
+        )
+
+        try:
+            async with inference.LLM(model="google/gemini-2.5-flash") as question_llm:
+                response = await asyncio.wait_for(
+                    question_llm.chat(
+                        chat_ctx=chat_ctx,
+                    ).collect(),
+                    timeout=ASSISTANT_GENERATION_TIMEOUT_SECONDS,
+                )
+        except asyncio.TimeoutError:
+            logger.exception("Question text pre-generation timed out.")
+            return fallback_text
+        except Exception:
+            logger.exception("Question text pre-generation failed.")
+            return fallback_text
+
+        text = (response.text or "").strip()
+        if not text:
+            return fallback_text
+
+        normalized = re.sub(r"\s+", " ", text).strip()
+        return normalized or fallback_text
+
+    async def _speak_question_text(
+        self,
+        *,
+        question_text: str,
+        total_q: int,
+    ):
+        """
+        Speak a prepared question and only then open the answer window.
+        """
+
+        assert self.tm is not None
+
+        try:
+            self.state_machine.transition(InterviewState.ASKING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to ASKING from %s",
+                self.state_machine.value.name,
+            )
+
+        await self._send_data(
+            {
+                "type": "question",
+                "index": self.tm.current_turn_index_1based(),
+                "text": question_text,
+                "total": total_q,
+            }
+        )
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
+        await self._safe_say(
+            text=question_text,
+            allow_interruptions=False,
+        )
+
+        try:
+            self.state_machine.transition(InterviewState.LISTENING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to LISTENING from %s",
+                self.state_machine.value.name,
+            )
+
+        self._reset_transcript_buffer()
+        self.tm.mark_question_asked(question_text=question_text)
+
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
+    async def _conclude_interview(
+        self,
+        *,
+        total_q: int,
+        reason: str,
+    ):
+        """
+        Deliver the one-time professional closing and mark session completed.
+        """
+
+        assert self.backend is not None
+        assert self.cfg is not None
+        assert self.tm is not None
+
+        if self._closing_started:
+            return
+
+        self._closing_started = True
+        self.tm.state.done = True
+
+        try:
+            self.state_machine.transition(InterviewState.ENDING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to ENDING from %s",
+                self.state_machine.value.name,
+            )
+
+        closing_text = self._build_closing_text()
+
+        await self._send_data(
+            {
+                "type": "closing",
+                "text": closing_text,
+                "reason": reason,
+            }
+        )
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": total_q,
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
+        try:
+            await self._safe_say(
+                text=closing_text,
+                allow_interruptions=False,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Closing speech failed; completing session anyway.")
+
+        try:
+            self.state_machine.transition(InterviewState.COMPLETED)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to COMPLETED from %s",
+                self.state_machine.value.name,
+            )
+
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": total_q,
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+        await self.backend.notify_interview_completed(self.cfg.session_id)
+        self._interview_done.set()
 
 
 
@@ -576,6 +891,14 @@ class InterviewRuntime:
                 "Resuming interview from backend runtime state: current_turn_index=%s",
                 idx,
             )
+
+        state_name = str(data.get("current_state") or "").strip().upper()
+        if state_name:
+            self._loaded_runtime_state_name = state_name
+
+        self._loaded_waiting_for_answer = bool(
+            data.get("waiting_for_answer", False)
+        )
 
 
 
@@ -2159,25 +2482,10 @@ class InterviewRuntime:
                         generation_type="QUESTION",
                     )
                 else:
-                    try:
-                        self.state_machine.transition(InterviewState.ENDING)
-                        self.state_machine.transition(InterviewState.COMPLETED)
-                    except ValueError:
-                        pass
-                    self.tm.state.done = True
-                    await self._send_data(
-                        {
-                            "type": "state",
-                            "state": self.state_machine.value.name,
-                            "current_index": self.tm.current_turn_index_1based(),
-                            "max_questions": total_q,
-                        }
+                    await self._conclude_interview(
+                        total_q=total_q,
+                        reason="no_more_questions",
                     )
-                    await self._sync_runtime_state()
-                    await self.backend.notify_interview_completed(
-                        self.cfg.session_id
-                    )
-                    self._interview_done.set()
                 return
 
         # Merge base metadata with follow-up extras.
@@ -2304,27 +2612,10 @@ class InterviewRuntime:
             )
 
         else:
-            # All base questions done.
-            try:
-                self.state_machine.transition(InterviewState.ENDING)
-                self.state_machine.transition(InterviewState.COMPLETED)
-            except ValueError:
-                logger.warning(
-                    "Illegal state transition during completion from %s",
-                    self.state_machine.value.name,
-                )
-            self.tm.state.done = True
-            await self._send_data(
-                {
-                    "type": "state",
-                    "state": self.state_machine.value.name,
-                    "current_index": self.tm.current_turn_index_1based(),
-                    "max_questions": total_q,
-                }
+            await self._conclude_interview(
+                total_q=total_q,
+                reason="all_questions_completed",
             )
-            await self._sync_runtime_state()
-            await self.backend.notify_interview_completed(self.cfg.session_id)
-            self._interview_done.set() 
 
     # ---------- session start & first question ----------
 
@@ -2364,37 +2655,12 @@ class InterviewRuntime:
             room_output_options=room_output_options,
         )
 
-        # Intro
-        self.state_machine.transition(InterviewState.INTRO)
-        await self._send_data(
-            {
-                "type": "intro",
-                "text": "Hi, I am your AI interviewer. I will ask you a few practice interview questions.",
-            }
-        )
-        await self._send_data(
-            {
-                "type": "state",
-                "state": self.state_machine.value.name,
-                "current_index": self.tm.current_turn_index_1based(),
-                "max_questions": self.planner.total_questions(),
-            }
-        )
-        await self._sync_runtime_state()
-
         # Ask first question (or resume from current index if we adopted runtime state)
         if self.tm.current_turn_index_0based() >= self.planner.total_questions():
-            # Nothing to ask – treat as completed.
-            self.state_machine.transition(InterviewState.COMPLETED)
-            await self._send_data(
-                {
-                    "type": "state",
-                    "state": self.state_machine.value.name,
-                    "current_index": self.tm.current_turn_index_1based(),
-                    "max_questions": self.planner.total_questions(),
-                }
+            await self._conclude_interview(
+                total_q=self.planner.total_questions(),
+                reason="no_questions_available",
             )
-            await self._sync_runtime_state()
             return
 
         idx = self.tm.current_turn_index_0based()
@@ -2404,6 +2670,65 @@ class InterviewRuntime:
             base_q=base_q,
             last_answer=None,
         )
+
+        if self._should_greet_on_start():
+            greeting_text = self._build_greeting_text()
+            self._greeting_spoken = True
+
+            self.state_machine.transition(InterviewState.INTRO)
+            await self._send_data(
+                {
+                    "type": "intro",
+                    "text": greeting_text,
+                }
+            )
+            await self._send_data(
+                {
+                    "type": "state",
+                    "state": self.state_machine.value.name,
+                    "current_index": self.tm.current_turn_index_1based(),
+                    "max_questions": self.planner.total_questions(),
+                }
+            )
+            await self._sync_runtime_state()
+
+            question_task = asyncio.create_task(
+                self._generate_question_text(
+                    instructions=instr,
+                    fallback_text=base_q.text,
+                )
+            )
+            self._track_background_task(question_task)
+
+            await self._safe_say(
+                text=greeting_text,
+                allow_interruptions=False,
+            )
+
+            question_text = base_q.text
+            try:
+                question_text = await asyncio.wait_for(
+                    question_task,
+                    timeout=max(
+                        1.0,
+                        ASSISTANT_GENERATION_TIMEOUT_SECONDS - 1.0,
+                    ),
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timed out waiting for first question pre-generation; using fallback text."
+                )
+            except Exception:
+                logger.exception(
+                    "First question pre-generation failed after greeting; using fallback text."
+                )
+
+            await self._speak_question_text(
+                question_text=question_text,
+                total_q=self.planner.total_questions(),
+            )
+
+            return
 
         # We are now in ASKING state while LLM generates/speaks the question.
         try:
@@ -2538,23 +2863,6 @@ class InterviewRuntime:
                             "Interview duration reached for session %s; ending.",
                             self.cfg.session_id,
                         )
-                        try:
-                            self.state_machine.transition(InterviewState.ENDING)
-                            self.state_machine.transition(InterviewState.COMPLETED)
-                        except ValueError:
-                            logger.warning(
-                                "Illegal state transition during duration ending from %s",
-                                self.state_machine.value.name,
-                            )
-                        self.tm.state.done = True
-                        await self._send_data(
-                            {
-                                "type": "state",
-                                "state": self.state_machine.value.name,
-                                "current_index": self.tm.current_turn_index_1based(),
-                                "max_questions": total_q,
-                            }
-                        )
                         await self._send_data(
                             {
                                 "type": "info",
@@ -2562,9 +2870,10 @@ class InterviewRuntime:
                                 "message": "The interview duration has ended.",
                             }
                         )
-                        await self._sync_runtime_state()
-                        await self.backend.notify_interview_completed(self.cfg.session_id)
-                        self._interview_done.set()  
+                        await self._conclude_interview(
+                            total_q=total_q,
+                            reason="duration_reached",
+                        )
                         break
 
                 if not self.tm.state.waiting_for_answer:
@@ -2901,7 +3210,7 @@ def _build_interview_agent(cfg: InterviewConfig):
         f"""\
         You are a professional AI interviewer conducting a practice interview.
 
-        Role: {cfg.role_slug}
+        Role: {cfg.role_name or cfg.role_slug}
         Round type: {cfg.round_type}
         Difficulty: {cfg.difficulty}
 
