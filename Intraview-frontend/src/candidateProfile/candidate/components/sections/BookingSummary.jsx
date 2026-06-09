@@ -228,11 +228,11 @@ const BookingSummary = () => {
 
   useEffect(() => { dispatch(fetchOverviewStats()); }, [dispatch]);
 
-  const totalSessions = overviewData?.total_sessions ?? overviewData?.total_interviews ?? null;
-  const completedSessions = overviewData?.completed_sessions ?? overviewData?.interviews_completed ?? null;
-  const avgScore = overviewData?.average_score ?? overviewData?.avg_score ?? null;
-  const peerSessions = overviewData?.peer_sessions ?? overviewData?.total_peer_sessions ?? null;
-  const aiSessions = overviewData?.ai_sessions ?? overviewData?.total_ai_sessions ?? null;
+  const totalSessions = overviewData?.total_sessions_attended ?? null;
+  const completedSessions = overviewData?.total_sessions_attended ?? null;
+  const avgScore = overviewData?.average_overall_score ?? null;
+  const peerSessions = overviewData?.peer_sessions_count ?? null;
+  const aiSessions = overviewData?.ai_sessions_count ?? null;
 
   const stats = [
     { label: 'Total', value: totalSessions, icon: Calendar, bg: C.tealLight, iconColor: C.teal },
