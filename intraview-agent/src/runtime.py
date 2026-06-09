@@ -634,6 +634,24 @@ class InterviewRuntime:
         )
         await self._sync_runtime_state()
         await self.backend.notify_interview_completed(self.cfg.session_id)
+
+        # Signal the frontend to begin the auto-end flow.
+        #
+        # This fires AFTER:
+        # - closing speech has fully played
+        # - backend session has been marked COMPLETED
+        # - final report generation has been queued
+        #
+        # The frontend listens for this event, waits a short
+        # professional delay (3s), then calls the end-session endpoint
+        # to cleanly close the room and redirect the candidate.
+        await self._send_data(
+            {
+                "type": "interview_complete",
+                "reason": reason,
+            }
+        )
+
         self._interview_done.set()
 
 

@@ -2,7 +2,7 @@
 // Headerless full-screen interview page.
 // height: 100vh, overflow: hidden — no page scrolling ever.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -16,7 +16,7 @@ import {
 import { useInterviewTimer } from "../hooks/useInterviewTimer";
 import {
   LoadingView, ErrorView, LobbyView,
-  ConnectingView, LiveInterviewView, CompletedView,
+  ConnectingView, LiveInterviewView, CompletedView, CompletingView,
 } from "../components/LiveInterviewViews";
 import { AI_INTERVIEW_STYLES } from "../components/shared-styles";
 import { ArrowLeft } from "lucide-react";
@@ -27,6 +27,7 @@ const UI_STATES = {
   LOBBY: "LOBBY",
   CONNECTING: "CONNECTING",
   LIVE: "LIVE",
+  COMPLETING: "COMPLETING",  // post-closing, 3-second transition delay
   COMPLETED: "COMPLETED",
 };
 
@@ -36,6 +37,7 @@ function BackBar({ onBack, uiState }) {
     LOADING: "#7a9ab5",
     ERROR: "#ef4444",
     LOBBY: "#3b82f6",
+    COMPLETING: "#f59e0b",
     COMPLETED: "#22c55e",
   }[uiState] || "#7a9ab5";
 
@@ -107,6 +109,11 @@ export default function LiveInterviewPage() {
   const { join, end } = useSelector((s) => s.aiInterviewSession);
 
   const [uiState, setUiState] = useState(UI_STATES.LOADING);
+  const uiStateRef = useRef(UI_STATES.LOADING); // always current — safe to read in event callbacks
+  const setUiStateSynced = (next) => {
+    uiStateRef.current = next;
+    setUiState(next);
+  };
   const [connectionError, setConnectionError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [avatarSession, setAvatarSession] = useState(null);
@@ -137,31 +144,71 @@ export default function LiveInterviewPage() {
     },
   });
 
+  // ── Auto-end: fires after agent emits interview_complete event ──────────
+  //
+  // The agent emits this AFTER:
+  //   1. Closing speech has fully played
+  //   2. Backend has been marked COMPLETED
+  //   3. Final report generation has been queued
+  //
+  // We wait 3 seconds so the candidate has a moment to absorb the
+  // end of the interview before the room closes — feels professional.
+  //
+  const handleInterviewComplete = useCallback(async () => {
+    if (hasAutoEndedRef.current) return;  // idempotency guard
+    hasAutoEndedRef.current = true;
+
+    // Show transition screen while we wait
+    setUiStateSynced(UI_STATES.COMPLETING);
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    if (!join.data?.session_id) {
+      setIsConnected(false);
+      setUiState(UI_STATES.COMPLETED);
+      return;
+    }
+
+    try {
+      // Stop avatar first so it doesn't keep talking
+      if (!avatarStopRequestedRef.current) {
+        avatarStopRequestedRef.current = true;
+        await stopAiInterviewAvatarSession(join.data.session_id).catch(() => {});
+      }
+      await dispatch(endAiInterviewSessionThunk({ sessionId: join.data.session_id, reason: "COMPLETED" })).unwrap();
+    } catch {
+      // Graceful fallback — still show completed state
+      setIsConnected(false);
+      setUiState(UI_STATES.COMPLETED);
+    }
+  }, [join.data, dispatch]);
+
+
   useEffect(() => {
     if (!sessionId) return;
     dispatch(joinAiInterviewSessionThunk(sessionId));
   }, [sessionId, dispatch]);
 
   useEffect(() => {
-    if (join.status === "joining") { setUiState(UI_STATES.LOADING); return; }
-    if (join.status === "error") { setUiState(UI_STATES.ERROR); return; }
+    if (join.status === "joining") { setUiStateSynced(UI_STATES.LOADING); return; }
+    if (join.status === "error") { setUiStateSynced(UI_STATES.ERROR); return; }
     if (join.status === "ready") {
       const bs = join.data?.status;
       hasAutoEndedRef.current = false;
-      if (bs === "COMPLETED") { setUiState(UI_STATES.COMPLETED); return; }
+      if (bs === "COMPLETED") { setUiStateSynced(UI_STATES.COMPLETED); return; }
       if (bs === "CANCELLED" || bs === "FAILED") {
         setConnectionError(`This interview session is ${bs.toLowerCase()}.`);
-        setUiState(UI_STATES.ERROR); return;
+        setUiStateSynced(UI_STATES.ERROR); return;
       }
       setAvatarSession(join.data?.avatar_session ?? null);
       setAvatarError(null);
       avatarStopRequestedRef.current = false;
-      setUiState(UI_STATES.LOBBY);
+      setUiStateSynced(UI_STATES.LOBBY);
     }
   }, [join.status, join.data]);
 
   useEffect(() => {
-    if (end.status === "success") { setIsConnected(false); setUiState(UI_STATES.COMPLETED); }
+    if (end.status === "success") { setIsConnected(false); setUiStateSynced(UI_STATES.COMPLETED); }
     else if (end.status === "error") { setConnectionError(end.error || "Failed to end interview."); }
   }, [end.status, end.error]);
 
@@ -198,12 +245,17 @@ export default function LiveInterviewPage() {
     }
   };
 
-  const handleRoomConnected = () => { setIsConnected(true); setUiState(UI_STATES.LIVE); };
+  const handleRoomConnected = () => { setIsConnected(true); setUiStateSynced(UI_STATES.LIVE); };
   const handleRoomDisconnected = () => {
     setIsConnected(false);
-    if (uiState === UI_STATES.COMPLETED) return;
+    // Do not treat a disconnect as an error during the auto-end flow.
+    // COMPLETING = 3-second transition delay before endSession API call.
+    // COMPLETED  = session already ended normally.
+    // Both cases disconnect the LiveKit room intentionally.
+    const current = uiStateRef.current;
+    if (current === UI_STATES.COMPLETED || current === UI_STATES.COMPLETING) return;
     setConnectionError("Connection to the interview room was lost. Please refresh only if the backend still allows resuming this session.");
-    setUiState(UI_STATES.ERROR);
+    setUiStateSynced(UI_STATES.ERROR);
   };
 
   const handleEndInterview = async () => {
@@ -234,7 +286,11 @@ export default function LiveInterviewPage() {
     };
   }, [join.data]);
 
-  const isLiveOrConnecting = uiState === UI_STATES.LIVE || uiState === UI_STATES.CONNECTING;
+  const isLiveOrConnecting = (
+    uiState === UI_STATES.LIVE ||
+    uiState === UI_STATES.CONNECTING ||
+    uiState === UI_STATES.COMPLETING  // keep room mounted during 3s transition
+  );
 
   return (
     <div
@@ -341,11 +397,31 @@ export default function LiveInterviewPage() {
               uiState={uiState}
               onRoomConnected={handleRoomConnected}
               onRoomDisconnected={handleRoomDisconnected}
-              isEnding={end.status === "ending"}
+              isEnding={end.status === "ending" || uiState === UI_STATES.COMPLETING}
               avatarSession={avatarSession}
               avatarError={avatarError}
               sessionId={sessionId}
+              onInterviewComplete={handleInterviewComplete}
             />
+          )}
+
+          {/* COMPLETING overlay — shown over the live room during 3s delay */}
+          {uiState === UI_STATES.COMPLETING && (
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(5,9,15,0.85)",
+              backdropFilter: "blur(18px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 40,
+              animation: "iv-fade-in 0.4s ease both",
+            }}>
+              <div className="iv-center-card" style={{ padding: "36px 28px", maxWidth: 400 }}>
+                <CompletingView />
+              </div>
+            </div>
           )}
         </div>
       )}

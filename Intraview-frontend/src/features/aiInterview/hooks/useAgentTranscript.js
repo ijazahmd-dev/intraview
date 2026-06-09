@@ -7,16 +7,23 @@ import { useDataChannel } from "@livekit/components-react";
  * Listens to the LiveKit data channel for agent-sent JSON messages.
  *
  * Agent message shapes (_send_data in runtime.py):
- *   { type: "intro",    text: string }
- *   { type: "question", index: number, text: string, total: number }
- *   { type: "answer",   index: number, question: string, answer: string, is_followup: boolean }
- *   { type: "closing",  text: string, reason: string }
- *   { type: "state",    state: string, current_index: number, max_questions: number }
- *   { type: "info",     reason: string, message: string }
+ *   { type: "intro",              text: string }
+ *   { type: "question",          index: number, text: string, total: number }
+ *   { type: "answer",            index: number, question: string, answer: string, is_followup: boolean }
+ *   { type: "closing",           text: string, reason: string }
+ *   { type: "state",             state: string, current_index: number, max_questions: number }
+ *   { type: "info",              reason: string, message: string }
+ *   { type: "interview_complete", reason: string }   ← fires after closing speech + backend notified
  */
-export function useAgentTranscript() {
+export function useAgentTranscript({ onInterviewComplete } = {}) {
   const seenRef = useRef(new Set());
   const [messages, setMessages] = useState([]);
+  const [isInterviewComplete, setIsInterviewComplete] = useState(false);
+  const completeHandledRef = useRef(false);
+
+  // Keep callback ref fresh without triggering re-renders
+  const onInterviewCompleteRef = useRef(onInterviewComplete);
+  onInterviewCompleteRef.current = onInterviewComplete;
 
   useDataChannel((msg) => {
     try {
@@ -24,6 +31,17 @@ export function useAgentTranscript() {
       const parsed = JSON.parse(raw);
 
       if (!parsed || !parsed.type) return;
+
+      // ── interview_complete — fires once after closing speech + backend notified ──
+      if (parsed.type === "interview_complete") {
+        if (!completeHandledRef.current) {
+          completeHandledRef.current = true;
+          setIsInterviewComplete(true);
+          // Invoke parent callback (e.g. LiveInterviewPage auto-end trigger)
+          onInterviewCompleteRef.current?.();
+        }
+        return;
+      }
 
       // We only care about interviewer/candidate utterance events.
       if (
@@ -94,6 +112,8 @@ export function useAgentTranscript() {
   const resetTranscript = () => {
     setMessages([]);
     seenRef.current = new Set();
+    completeHandledRef.current = false;
+    setIsInterviewComplete(false);
   };
 
   return {
@@ -103,6 +123,7 @@ export function useAgentTranscript() {
     interviewerTranscript,
     agentTranscript,
     questionHistory,
+    isInterviewComplete,
     resetTranscript,
   };
 }

@@ -8,7 +8,7 @@ import { useAgentTranscript } from "../hooks/useAgentTranscript";
 import { AgentTranscriptPanel } from "./AgentTranscriptPanel";
 import {
   AlertTriangle, CheckCircle2, ArrowRight,
-  Clock, Layers, Zap, ChevronRight,
+  Clock, Layers, Zap, ChevronRight, Loader2,
 } from "lucide-react";
 
 // ── Shared info row ──────────────────────────────────────────
@@ -230,8 +230,8 @@ export function ConnectingView({ sessionInfo }) {
 // ══════════════════════════════════════════════════════════════
 // LIVE INTERVIEW INNER (right panel content only)
 // ══════════════════════════════════════════════════════════════
-function LiveInterviewInner({ sessionInfo, sessionId }) {
-  const { currentQuestion, agentTranscript } = useAgentTranscript();
+function LiveInterviewInner({ sessionInfo, sessionId, onInterviewComplete }) {
+  const { currentQuestion, agentTranscript } = useAgentTranscript({ onInterviewComplete });
 
   return (
     <div style={{
@@ -316,6 +316,7 @@ export function LiveInterviewView({
   avatarSession,
   avatarError,
   sessionId,
+  onInterviewComplete,
 }) {
   const shouldConnect = uiState === "CONNECTING" || uiState === "LIVE";
 
@@ -333,8 +334,86 @@ export function LiveInterviewView({
         isEnding={isEnding}
         formattedTimeLeft={formattedTimeLeft}
       >
-        <LiveInterviewInner sessionInfo={sessionInfo} sessionId={sessionId} />
+        <LiveInterviewInner sessionInfo={sessionInfo} sessionId={sessionId} onInterviewComplete={onInterviewComplete} />
       </LiveKitVideoPanel>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPLETING VIEW  (shown during the 3s auto-end delay)
+// ══════════════════════════════════════════════════════════════
+export function CompletingView() {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "56px 24px", textAlign: "center",
+      animation: "iv-fade-up 0.4s ease both",
+    }}>
+      {/* Animated spinner ring */}
+      <div style={{ position: "relative", width: 80, height: 80, marginBottom: 28 }}>
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "2px solid rgba(20,184,166,0.12)",
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "50%",
+          border: "2px solid transparent",
+          borderTopColor: "var(--iv-teal)",
+          animation: "iv-spin 1s linear infinite",
+        }} />
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%",
+            background: "rgba(20,184,166,0.10)",
+            border: "1px solid rgba(20,184,166,0.25)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <CheckCircle2 size={15} color="var(--iv-teal)" strokeWidth={2} />
+          </div>
+        </div>
+      </div>
+
+      {/* Badge */}
+      <div style={{
+        display: "inline-flex", alignItems: "center", gap: 7,
+        background: "rgba(20,184,166,0.07)",
+        border: "1px solid rgba(20,184,166,0.20)",
+        borderRadius: 99, padding: "5px 14px", marginBottom: 16,
+      }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: "var(--iv-teal)",
+          animation: "iv-pulse-ring 1.8s ease-out infinite",
+        }} />
+        <span style={{
+          fontFamily: "var(--ff-tech)", fontSize: 10, fontWeight: 700,
+          color: "var(--iv-teal)", letterSpacing: "0.12em",
+        }}>
+          INTERVIEW COMPLETE
+        </span>
+      </div>
+
+      <p style={{
+        fontSize: 15, fontWeight: 600, color: "var(--iv-text)",
+        margin: "0 0 8px",
+      }}>
+        Preparing your feedback…
+      </p>
+      <p style={{
+        fontSize: 12.5, color: "var(--iv-text-3)",
+        lineHeight: 1.65, maxWidth: 300, margin: 0,
+      }}>
+        Your evaluation report is being generated. You'll be redirected shortly.
+      </p>
+
+      <style>{`
+        @keyframes iv-spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
