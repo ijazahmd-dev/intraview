@@ -169,6 +169,15 @@ class AIInterviewSession(models.Model):
         help_text="Planned interview duration (e.g. 5, 15, 30).",
     )
 
+    generated_questions = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Structured interview questions prepared at session creation. "
+            "Each item stores text/topic/followup_allowed for the live agent."
+        ),
+    )
+
     status = models.CharField(
         max_length=20,
         choices=Status.choices,

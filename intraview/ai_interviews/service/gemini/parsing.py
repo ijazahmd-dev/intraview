@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List
 
 from .client import GeminiPermanentError
@@ -71,6 +72,15 @@ def _ensure_string_list(value: Any) -> List[str]:
     return [str(value).strip()]
 
 
+def _topic_slug(value: Any, fallback: str) -> str:
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return fallback
+
+    slug = re.sub(r"[^a-z0-9]+", "_", raw).strip("_")
+    return slug or fallback
+
+
 def normalize_evaluation_result(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     score = parsed.get("score")
     try:
@@ -114,6 +124,61 @@ def normalize_final_report_result(parsed: Dict[str, Any], raw_text: str) -> Dict
         "strengths": _ensure_string_list(parsed.get("strengths")),
         "areas_for_improvement": _ensure_string_list(parsed.get("areas_for_improvement")),
         "recommendations": _ensure_string_list(parsed.get("recommendations")),
+        "raw": {
+            "parsed": parsed,
+            "text": raw_text,
+        },
+    }
+
+
+def normalize_question_generation_result(
+    parsed: Dict[str, Any],
+    raw_text: str,
+    *,
+    desired_count: int,
+) -> Dict[str, Any]:
+    questions = parsed.get("questions")
+    if not isinstance(questions, list):
+        raise GeminiPermanentError("Gemini question payload must contain a questions list.")
+
+    normalized: List[Dict[str, Any]] = []
+    seen_texts: set[str] = set()
+
+    for index, item in enumerate(questions, start=1):
+        if not isinstance(item, dict):
+            continue
+
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+
+        dedupe_key = re.sub(r"\s+", " ", text).strip().lower()
+        if dedupe_key in seen_texts:
+            continue
+        seen_texts.add(dedupe_key)
+
+        normalized.append(
+            {
+                "text": text,
+                "topic": _topic_slug(
+                    item.get("topic"),
+                    fallback=f"question_{index}",
+                ),
+                "followup_allowed": bool(item.get("followup_allowed", True)),
+            }
+        )
+
+    if not normalized:
+        raise GeminiPermanentError("Gemini returned no usable interview questions.")
+
+    minimum_required = min(2, desired_count)
+    if len(normalized) < minimum_required:
+        raise GeminiPermanentError(
+            f"Gemini returned too few usable questions ({len(normalized)})."
+        )
+
+    return {
+        "questions": normalized[:desired_count],
         "raw": {
             "parsed": parsed,
             "text": raw_text,

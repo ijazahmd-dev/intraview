@@ -4,14 +4,54 @@
 # intraview_agent/questions.py
 
 from dataclasses import dataclass
-from typing import List
+import re
+from typing import Any, List
 
 
 @dataclass
 class Question:
     text: str
     topic: str
-    followup: bool = False
+    followup_allowed: bool = False
+
+    @property
+    def followup(self) -> bool:
+        return self.followup_allowed
+
+
+def normalize_stored_questions(raw_questions: Any) -> List[Question]:
+    """
+    Convert backend-stored JSON questions into the runtime Question shape.
+
+    Returns an empty list when payload is absent or unusable so the planner
+    can safely fall back to the fixed local question bank.
+    """
+
+    if not isinstance(raw_questions, list):
+        return []
+
+    normalized: List[Question] = []
+
+    for index, item in enumerate(raw_questions, start=1):
+        if not isinstance(item, dict):
+            continue
+
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+
+        topic = str(item.get("topic") or "").strip().lower()
+        topic = re.sub(r"[^a-z0-9]+", "_", topic).strip("_") or f"question_{index}"
+
+        normalized.append(
+            Question(
+                text=text,
+                topic=topic,
+                followup_allowed=bool(item.get("followup_allowed", True)),
+            )
+        )
+
+    return normalized
 
 
 

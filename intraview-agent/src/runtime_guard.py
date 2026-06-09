@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Optional
 
-from backend_client import BackendClient
+from backend_client import BackendClient, BackendOwnershipConflict
 from constants import (
     MAX_HEARTBEAT_FAILURES,
 )
@@ -199,6 +199,17 @@ class RuntimeGuard:
 
                     raise
 
+                except BackendOwnershipConflict as exc:
+                    logger.warning(
+                        "Runtime ownership conflict during heartbeat: session_id=%s runtime_id=%s detail=%s",
+                        self.session_id,
+                        self.runtime_id,
+                        exc,
+                    )
+                    raise RuntimeOwnershipLost(
+                        f"Runtime ownership lost for session {self.session_id}"
+                    ) from exc
+
                 except Exception:
 
                     self._heartbeat_failures += 1
@@ -296,6 +307,12 @@ class RuntimeGuard:
                 await self._heartbeat_task
             except asyncio.CancelledError:
                 pass
+            except RuntimeOwnershipLost:
+                logger.info(
+                    "Heartbeat loop had already lost ownership during shutdown: session_id=%s runtime_id=%s",
+                    self.session_id,
+                    self.runtime_id,
+                )
 
         try:
             await self.backend.release_runtime_ownership(

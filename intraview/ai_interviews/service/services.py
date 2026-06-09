@@ -1,5 +1,6 @@
 # ai_interviews/services.py
 
+import logging
 from typing import Optional
 
 from ai_interviews.models import (
@@ -11,6 +12,16 @@ from ai_interviews.models import (
 )
 from ai_interviews.repositories import RoleRepository, AIInterviewSessionRepository
 from ai_interviews.tasks import generate_final_report
+from ai_interviews.service.gemini.client import (
+    GeminiConfigurationError,
+    GeminiPermanentError,
+    GeminiTransientError,
+)
+from ai_interviews.service.gemini.question_generation import (
+    estimate_interview_question_count,
+    generate_interview_questions,
+)
+from ai_interviews.service.question_fallback import build_fixed_question_fallback
 from ai_interviews.service.tavus_avatar_service import TavusAvatarSessionService
 from django.utils.crypto import get_random_string
 
@@ -18,6 +29,8 @@ from django.conf import settings
 from django.db import transaction
 import json
 from livekit import api as lkapi
+
+logger = logging.getLogger(__name__)
 
 class RoleService:
     @staticmethod
@@ -127,7 +140,102 @@ class AIInterviewSessionService:
             user=user, keep_session_id=session.id
         )
 
+        desired_question_count = estimate_interview_question_count(
+            round_type=round_type,
+            duration_minutes=duration_minutes,
+        )
+        questions, source = AIInterviewSessionService._prepare_session_questions(
+            role=role,
+            round_type=round_type,
+            difficulty=difficulty,
+            duration_minutes=duration_minutes,
+            desired_question_count=desired_question_count,
+        )
+
+        session.generated_questions = questions
+        session.save(update_fields=["generated_questions", "updated_at"])
+
+        logger.info(
+            "AI interview questions prepared: session_id=%s source=%s count=%s role=%s round_type=%s difficulty=%s duration=%s",
+            session.id,
+            source,
+            len(questions),
+            role.slug,
+            round_type,
+            difficulty,
+            duration_minutes,
+        )
+
         return session
+
+    @staticmethod
+    def _prepare_session_questions(
+        *,
+        role: Role,
+        round_type: str,
+        difficulty: str,
+        duration_minutes: int,
+        desired_question_count: int,
+    ) -> tuple[list[dict], str]:
+        payload = {
+            "role_name": role.name,
+            "role_slug": role.slug,
+            "role_description": (role.description or "").strip(),
+            "expected_skills": role.skills or [],
+            "round_type": round_type,
+            "difficulty": difficulty,
+            "duration_minutes": duration_minutes,
+            "desired_question_count": desired_question_count,
+        }
+
+        logger.info(
+            "Starting Gemini question generation: role=%s round_type=%s difficulty=%s duration=%s desired_count=%s",
+            role.slug,
+            round_type,
+            difficulty,
+            duration_minutes,
+            desired_question_count,
+        )
+
+        try:
+            result = generate_interview_questions(payload)
+            questions = result["questions"]
+            logger.info(
+                "Gemini question generation succeeded: role=%s count=%s",
+                role.slug,
+                len(questions),
+            )
+            return questions, "generated"
+        except (
+            GeminiTransientError,
+            GeminiPermanentError,
+            GeminiConfigurationError,
+        ) as exc:
+            logger.warning(
+                "Gemini question generation failed; falling back to fixed questions: role=%s error=%s",
+                role.slug,
+                exc,
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error during Gemini question generation; falling back to fixed questions: role=%s",
+                role.slug,
+            )
+
+        fallback_questions = build_fixed_question_fallback(
+            role_name=role.name,
+            role_slug=role.slug,
+            round_type=round_type,
+            difficulty=difficulty,
+            desired_count=desired_question_count,
+            skills=role.skills or [],
+        )
+        logger.info(
+            "Using fallback fixed questions: role=%s count=%s",
+            role.slug,
+            len(fallback_questions),
+        )
+        return fallback_questions, "fallback_fixed"
 
 
     @staticmethod
@@ -230,6 +338,7 @@ class AIInterviewSessionService:
             "difficulty": session.difficulty,
             "duration_minutes": session.duration_minutes,
             "candidate_name": display_name,
+            "questions": session.generated_questions or [],
             # You can add max_questions here later if you want the backend
             # to control it:
             # "max_questions": 5,
@@ -237,6 +346,8 @@ class AIInterviewSessionService:
                 avatar_session
             ),
         }
+        if session.generated_questions:
+            metadata_dict["max_questions"] = len(session.generated_questions)
         metadata_str = json.dumps(metadata_dict)
 
         video_grants = lkapi.VideoGrants(

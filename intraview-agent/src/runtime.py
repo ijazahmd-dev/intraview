@@ -5,6 +5,7 @@
 import asyncio
 import json
 import logging
+import os
 import re         
 import time
 from typing import Optional, Set
@@ -22,7 +23,7 @@ from livekit.agents import (
 from livekit.plugins import ai_coustics, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from backend_client import BackendClient
+from backend_client import BackendClient, BackendOwnershipConflict
 from runtime_guard import RuntimeGuard, RuntimeOwnershipLost
 from config import get_interview_defaults
 from constants import (
@@ -38,6 +39,7 @@ from constants import (
     
 )
 from planner import InterviewConfig, QuestionPlanner
+from questions import normalize_stored_questions
 from state import InterviewState, StateMachine
 from turn_manager import TurnManager
 
@@ -234,6 +236,7 @@ class InterviewRuntime:
         round_type = str(meta.get("round_type") or "BEHAVIORAL").upper()
         difficulty = str(meta.get("difficulty") or "INTERMEDIATE").upper()
         candidate_name = str(meta.get("candidate_name") or "").strip() or None
+        stored_questions = normalize_stored_questions(meta.get("questions"))
 
         defaults = get_interview_defaults()
 
@@ -270,6 +273,7 @@ class InterviewRuntime:
             duration_seconds=duration_seconds,
             role_name=role_name,
             candidate_name=candidate_name,
+            questions=stored_questions or None,
         )
 
     def _track_background_task(self, task: asyncio.Task):
@@ -390,6 +394,11 @@ class InterviewRuntime:
             await asyncio.wait_for(
                 self.backend.update_runtime_state(self.cfg.session_id, payload),
                 timeout=5.0,
+            )
+        except BackendOwnershipConflict:
+            logger.warning(
+                "Runtime state sync rejected because ownership was lost: session_id=%s",
+                self.cfg.session_id,
             )
         except asyncio.TimeoutError:
             logger.warning(
@@ -782,6 +791,12 @@ class InterviewRuntime:
         # Acquire ownership BEFORE interview starts.
         await self.runtime_guard.start()
         self.planner = QuestionPlanner(self.cfg)
+        logger.info(
+            "Question planner ready: session_id=%s source=%s count=%s",
+            self.cfg.session_id,
+            self.planner.question_source,
+            self.planner.total_questions(),
+        )
 
         total_q = self.planner.total_questions()
         if total_q == 0:
@@ -1245,56 +1260,81 @@ class InterviewRuntime:
             if (
                 self._candidate_recently_stopped_speaking()
             ):
-                logger.info(
-                    "Waiting for speech stabilization."
-                )
+                #
+                # Candidate recently stopped but is still inside
+                # the speech-end grace window.
+                #
+                # FIX: Instead of rescheduling a full new
+                # TRANSCRIPT_STABILIZATION_SECONDS sleep (which
+                # would stack the two timers back-to-back), we
+                # calculate only the remaining grace time and wait
+                # that long before retrying the commit.
+                #
+                # Before this fix the worst-case was:
+                #   stabilization sleep  (1.0s)
+                # + full new stab sleep  (1.0s)   ← stacked
+                # = 2.0s of avoidable extra wait
+                #
+                # After this fix the extra wait is at most the
+                # remaining grace window (~0–1.5s), so the two
+                # windows effectively overlap instead of stack.
+                #
 
-                #
-                # CRITICAL:
-                #
-                # We cannot simply return here.
-                #
-                # Why?
-                #
-                # schedule_transcript_commit()
-                # already completed.
-                #
-                # If we return now:
-                #
-                # transcript commit dies forever
-                # ↓
-                # timeout loop eventually skips
-                # ↓
-                # answer becomes empty
-                #
-                # Production fix:
-                #
-                # re-schedule another short commit
-                # attempt after stabilization window.
-                #
+                remaining_grace = 0.0
+                if self._last_speech_end_at > 0:
+                    elapsed_since_stop = (
+                        time.monotonic() - self._last_speech_end_at
+                    )
+                    remaining_grace = max(
+                        0.0,
+                        SPEECH_END_GRACE_SECONDS - elapsed_since_stop,
+                    )
+
+                logger.info(
+                    "Waiting for speech stabilization: "
+                    "remaining_grace=%.2fs",
+                    remaining_grace,
+                )
 
                 if (
                     self._runtime_alive
                     and self.tm.has_pending_question()
                 ):
+                    # Small buffer so we don't spin immediately.
+                    retry_delay = max(0.1, remaining_grace)
+
+                    async def _retry_commit_after_grace(
+                        delay: float = retry_delay,
+                    ):
+                        try:
+                            await asyncio.sleep(delay)
+                            if (
+                                self._runtime_alive
+                                and self.tm.has_pending_question()
+                            ):
+                                await self._commit_stabilized_transcript(
+                                    total_q=total_q
+                                )
+                        except asyncio.CancelledError:
+                            return
+                        except Exception:
+                            logger.exception(
+                                "Grace-window retry commit failed"
+                            )
 
                     task = asyncio.create_task(
-                        self._schedule_transcript_commit(
-                            total_q=total_q
-                        )
+                        _retry_commit_after_grace()
                     )
 
                     self._transcript_stabilization_task = task
                     self._background_tasks.add(task)
 
                     def _cleanup_task(
-                        t: asyncio.Task
+                        t: asyncio.Task,
                     ):
                         self._background_tasks.discard(t)
 
-                    task.add_done_callback(
-                        _cleanup_task
-                    )
+                    task.add_done_callback(_cleanup_task)
 
                 return
 
@@ -2493,6 +2533,10 @@ class InterviewRuntime:
             "round_type": self.cfg.round_type,
             "difficulty": self.cfg.difficulty,
             "role_slug": self.cfg.role_slug,
+            "question_topic": self.planner.base_question_for_turn(
+                self.tm.current_turn_index_0based()
+            ).topic,
+            "question_source": self.planner.question_source,
         }
 
         try:
@@ -2642,15 +2686,27 @@ class InterviewRuntime:
                 )
 
         # Start voice pipeline
+        enable_ai_coustics = (
+            os.getenv("AI_INTERVIEW_ENABLE_AI_COUSTICS", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+
+        audio_input_options = room_io.AudioInputOptions()
+        if enable_ai_coustics:
+            logger.info("AI Coustics enhancement enabled for this interview session.")
+            audio_input_options = room_io.AudioInputOptions(
+                noise_cancellation=ai_coustics.audio_enhancement(
+                    model=ai_coustics.EnhancerModel.QUAIL_VF_L
+                ),
+            )
+        else:
+            logger.info("AI Coustics enhancement disabled; using default microphone input.")
+
         await self.session.start(
             agent=interviewer_agent,
             room=self.room,
             room_options=room_io.RoomOptions(
-                audio_input=room_io.AudioInputOptions(
-                    noise_cancellation=ai_coustics.audio_enhancement(
-                        model=ai_coustics.EnhancerModel.QUAIL_VF_L
-                    ),
-                ),
+                audio_input=audio_input_options,
             ),
             room_output_options=room_output_options,
         )

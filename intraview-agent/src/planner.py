@@ -19,6 +19,7 @@ class InterviewConfig:
     duration_seconds: Optional[int] = None
     role_name: str | None = None
     candidate_name: str | None = None
+    questions: Optional[List[Question]] = None
 
 
 class QuestionPlanner:
@@ -31,10 +32,15 @@ class QuestionPlanner:
 
     def __init__(self, cfg: InterviewConfig):
         self.cfg = cfg
-        base_questions: List[Question] = get_fixed_question_set(
-            cfg.role_slug, cfg.round_type, cfg.difficulty
-        )
-        self.questions: List[Question] = base_questions[: cfg.max_questions]
+        if cfg.questions:
+            self.questions = list(cfg.questions)
+            self.question_source = "stored"
+        else:
+            base_questions: List[Question] = get_fixed_question_set(
+                cfg.role_slug, cfg.round_type, cfg.difficulty
+            )
+            self.questions = base_questions[: cfg.max_questions]
+            self.question_source = "fixed"
 
     def total_questions(self) -> int:
         return len(self.questions)

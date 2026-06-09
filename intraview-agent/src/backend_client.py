@@ -17,6 +17,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class BackendOwnershipConflict(RuntimeError):
+    """
+    Backend rejected the request because this runtime no longer owns the session.
+    """
+    pass
+
+
 @dataclass
 class BackendClient:
     """
@@ -71,6 +78,8 @@ class BackendClient:
             headers=self._auth_headers(),
         )
 
+        if resp.status_code == 409:
+            raise BackendOwnershipConflict(resp.text)
         resp.raise_for_status()
         return resp.json()
 
@@ -103,6 +112,8 @@ class BackendClient:
             headers=self._auth_headers(),
         )
 
+        if resp.status_code == 409:
+            raise BackendOwnershipConflict(resp.text)
         resp.raise_for_status()
         return resp.json()
 
@@ -251,6 +262,8 @@ class BackendClient:
         if resp.status_code == 404:
             logger.warning("update_runtime_state: endpoint not found for session %s", session_id)
             return
+        if resp.status_code == 409:
+            raise BackendOwnershipConflict(resp.text)
         if resp.status_code >= 400:
             resp.raise_for_status()
 

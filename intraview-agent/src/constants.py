@@ -93,7 +93,11 @@ TURN_FINALIZATION_TIMEOUT_SECONDS: float = 15.0
 # - STT provider emits final chunks
 # - no new transcript arrives for this duration
 # => runtime commits transcript
-TRANSCRIPT_STABILIZATION_SECONDS: float = 3.0
+#
+# Tuned to 1.0s: Deepgram Nova-3 emits final transcript
+# chunks within ~300ms of the last word, so 3.0s was
+# pure dead wait time with no safety benefit.
+TRANSCRIPT_STABILIZATION_SECONDS: float = 1.0
 
 # How long after candidate stops speaking before runtime
 # considers them truly finished.
@@ -102,7 +106,11 @@ TRANSCRIPT_STABILIZATION_SECONDS: float = 3.0
 # - transcript similarity timing serves dedup
 # - speech grace timing serves answer completeness
 # - candidates naturally pause 2-4s mid-thought
-SPEECH_END_GRACE_SECONDS: float = 4.0
+#
+# Tuned to 1.5s: sufficient for a natural breath pause in
+# a structured interview answer without causing the
+# 4-second dead silence users were experiencing.
+SPEECH_END_GRACE_SECONDS: float = 1.5
 
 # Minimum transcript size before runtime considers
 # the answer meaningful enough to commit.

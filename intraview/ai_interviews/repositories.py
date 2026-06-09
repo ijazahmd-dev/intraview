@@ -85,27 +85,13 @@ class AIInterviewSessionRepository:
         duration_minutes: int,
     ) -> AIInterviewSession:
         """
-        Creates a new AI interview session. For now we mark it as READY immediately,
-        since the frontend performs the pre-checks before calling this.
+        Creates a new AI interview session.
+
+        We intentionally create a fresh row for each new interview request so:
+        - the selected config is preserved per session
+        - generated questions can be stored deterministically for that session
+        - the service layer can cancel older active sessions after creation
         """
-
-        existing_session = (
-            AIInterviewSession.objects.filter(
-                user=user,
-                status__in=[
-                    AIInterviewSession.Status.READY,
-                    AIInterviewSession.Status.LIVE,
-                ],
-            )
-            .order_by("-created_at")
-            .first()
-        )
-
-        if existing_session and not existing_session.is_expired:
-            return existing_session
-
-
-
         session = AIInterviewSession.objects.create(
             user=user,
             role=role,
