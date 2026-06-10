@@ -10,9 +10,10 @@ class StripeInterviewerSubscriptionService:
     def create_checkout_session(*, interviewer, plan, success_url, cancel_url, payment_order_id=None):
 
         metadata = {
+            "purchase_type": "interviewer_subscription",
             "interviewer_id": str(interviewer.id),
             "plan_id": str(plan.id),
-            "subscription_type": "INTERVIEWER",
+            "subscription_type": "INTERVIEWER",  # kept for backward compatibility
         }
 
         if payment_order_id:  

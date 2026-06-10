@@ -11,6 +11,7 @@ class StripeSubscriptionService:
     def create_checkout_session(*, user, plan, success_url, cancel_url, payment_order_id=None):
 
         metadata = {
+            "purchase_type": "user_subscription",
             "user_id": str(user.id),
             "plan_id": str(plan.id),
         }

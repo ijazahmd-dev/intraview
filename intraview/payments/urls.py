@@ -10,19 +10,24 @@ urlpatterns = [
     path('invoice/<str:internal_order_id>/', views.PaymentInvoiceDownloadAPIView.as_view(), name='payment-invoice-download'),
 
     path("token-purchase/", views.CreateTokenPurchaseAPIView.as_view(), name="create-token-purchase"),
+    # ──────────────────────────────────────────────────────────────────────────
+    # Single unified Stripe webhook — all event types routed internally
+    # stripe listen --forward-to localhost:8000/api/payments/webhook/stripe/
+    # ──────────────────────────────────────────────────────────────────────────
     path("webhook/stripe/", views.StripeWebhookView.as_view(), name="stripe-webhook"),
 
+
+####################################################################  Candidate Subscription APIs ############################################################
+
+
     path("subscriptions/checkout/",views.CreateSubscriptionCheckoutAPIView.as_view(),name="subscription-checkout",),
-    path("subscriptions/webhook/stripe/",views.StripeSubscriptionWebhookView.as_view(),name="stripe-subscription-webhook",),
-
-
 
 
 ####################################################################  Interviewer APIs ############################################################
 
 
     path("interviewer/subscription/checkout/",views.CreateInterviewerSubscriptionCheckoutAPIView.as_view(),name="interviewer-subscription-checkout",),
-    path("interviewer-subscriptions/webhook/stripe/",views.StripeInterviewerSubscriptionWebhookView.as_view(),name="stripe-interviewer-subscription-webhook",),
+    # NOTE: interviewer-subscriptions/webhook/stripe/ removed — handled by the unified endpoint above
 
 
 
@@ -39,7 +44,3 @@ urlpatterns = [
     path("admin/payments/orders/export-csv/",views_admin.AdminPaymentOrderExportCSVAPIView.as_view(),name="admin-payment-order-export-csv",),
 ]
 
-
-
-
-# stripe listen --forward-to localhost:8000/api/payments/interviewer-subscriptions/webhook/stripe/

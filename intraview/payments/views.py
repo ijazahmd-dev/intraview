@@ -28,6 +28,7 @@ from .serializers import CreatePaymentSerializer, SubscriptionCheckoutSerializer
 from .services.stripe_token_bundle_service import StripeService
 from .services.stripe_subscription import StripeSubscriptionService
 from .services.stripe_interviewer_subscription import StripeInterviewerSubscriptionService
+from .services.stripe_webhook_router import StripeWebhookRouter
 from authentication.authentication import CookieJWTAuthentication
 from subscriptions.services.subscription_service import SubscriptionService
 from subscriptions.services.token_grant_service import SubscriptionTokenGrantService
@@ -252,9 +253,15 @@ class CreateTokenPurchaseAPIView(APIView):
 @method_decorator(csrf_exempt, name="dispatch")
 class StripeWebhookView(View):
     """
-    Stripe webhook endpoint.
-    Confirms payment and credits tokens.
-    Server-to-server only.
+    Single, centralized Stripe webhook endpoint.
+
+    Receives ALL Stripe events for token purchases, user subscriptions,
+    and interviewer subscriptions. Delegates routing to StripeWebhookRouter
+    which inspects event type and checkout session metadata to call the
+    correct business-logic handler.
+
+    Only ONE stripe listen command is needed:
+        stripe listen --forward-to localhost:8000/api/payments/webhook/stripe/
     """
 
     authentication_classes = []
@@ -264,7 +271,7 @@ class StripeWebhookView(View):
         payload = request.body.decode("utf-8")
         sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
 
-        # 1️⃣ Verify Stripe signature
+        # 1️⃣ Verify Stripe signature (security gate — must come first)
         try:
             event = stripe.Webhook.construct_event(
                 payload=payload,
@@ -272,77 +279,19 @@ class StripeWebhookView(View):
                 secret=settings.STRIPE_WEBHOOK_SECRET,
             )
         except ValueError as e:
-            logger.warning("Invalid Stripe webhook payload: %s", e)
+            logger.warning("Stripe webhook: invalid payload | %s", e)
             return HttpResponse(status=400)
         except stripe.error.SignatureVerificationError as e:
-            logger.warning("Invalid Stripe webhook signature: %s", e)
+            logger.warning("Stripe webhook: invalid signature | %s", e)
             return HttpResponse(status=400)
         except Exception as e:
-            logger.error("Unexpected webhook error: %s", e)
+            logger.error("Stripe webhook: unexpected verification error | %s", e)
             return HttpResponse(status=400)
 
-        # 2️⃣ Handle checkout completion
-        if event["type"] == "checkout.session.completed":
-            session = event["data"]["object"]
-            stripe_session_id = session.get("id")
+        # 2️⃣ Route event to the correct business-logic handler
+        http_status = StripeWebhookRouter(event).route_event()
+        return HttpResponse(status=http_status)
 
-            if not stripe_session_id:
-                logger.warning("Stripe webhook missing session ID")
-                return HttpResponse(status=400)
-
-            try:
-                with transaction.atomic():
-                    payment_order = (
-                        PaymentOrder.objects
-                        .select_for_update()
-                        .get(stripe_checkout_session_id=stripe_session_id)
-                    )
-
-                    # Idempotency check
-                    if not payment_order.can_process_webhook():
-                        logger.info(
-                            "Webhook already processed for PaymentOrder %s",
-                            payment_order.id,
-                        )
-                        return HttpResponse(status=200)
-
-                    # 3️⃣ Mark payment as PAID
-                    payment_order.status = PaymentStatus.SUCCEEDED
-                    payment_order.save(update_fields=["status", "updated_at"])
-
-                    # 4️⃣ Credit tokens
-                    wallet = TokenService.get_or_create_wallet(payment_order.user)
-
-                    TokenService.credit_tokens(
-                        wallet=wallet,
-                        amount=payment_order.token_pack.tokens,
-                        transaction_type=TokenTransactionType.TOKEN_PURCHASE,
-                        reference_id=f"payment_{payment_order.id}",
-                        note=f"Stripe checkout session {stripe_session_id}",
-                    )
-
-                    logger.info(
-                        "✅ PaymentOrder %s PAID → Credited %s tokens to user %s",
-                        payment_order.id,
-                        payment_order.token_pack.tokens,
-                        payment_order.user.id,
-                    )
-
-            except PaymentOrder.DoesNotExist:
-                logger.error(
-                    "PaymentOrder not found for Stripe session %s",
-                    stripe_session_id,
-                )
-                return HttpResponse(status=404)
-            except Exception as e:
-                logger.error("Webhook transaction failed: %s", e)
-                return HttpResponse(status=500)
-
-        # Stripe requires 200 OK for handled events
-        return HttpResponse(status=200)
-    
-    
-                        
 
 
 
@@ -435,213 +384,12 @@ class CreateSubscriptionCheckoutAPIView(APIView):
 
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class StripeSubscriptionWebhookView(View):
-    """
-    Stripe webhook for subscription lifecycle.
-    Stripe is the source of truth.
-    """
-
-    def post(self, request):
-        payload = request.body.decode("utf-8")
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
-
-        try:
-            event = stripe.Webhook.construct_event(
-                payload=payload,
-                sig_header=sig_header,
-                secret=settings.STRIPE_WEBHOOK_SECRET,
-            )
-        except ValueError:
-            logger.warning("Stripe webhook: invalid payload")
-            return HttpResponse(status=400)
-        except stripe.error.SignatureVerificationError:
-            logger.warning("Stripe webhook: invalid signature")
-            return HttpResponse(status=400)
-
-        event_type = event.get("type")
-        obj = event["data"]["object"]
-
-        # ======================================================
-        # 1) CHECKOUT SUCCESS (First subscription payment)
-        # ======================================================
-        if event_type == "checkout.session.completed":
-            session = obj
-            metadata = session.get("metadata", {})
-
-            try:
-                user_id = int(metadata["user_id"])
-                plan_id = int(metadata["plan_id"])
-                payment_order_id = metadata.get("payment_order_id")
-            except (KeyError, ValueError):
-                logger.error("Webhook missing metadata: %s", metadata)
-                return HttpResponse(status=400)
-
-            stripe_subscription_id = session.get("subscription") or session.get("id")
-
-            logger.info(
-                "Stripe webhook received | type=%s | user=%s | plan=%s | order=%s | sub=%s",
-                event_type,
-                user_id,
-                plan_id,
-                payment_order_id,
-                stripe_subscription_id,
-            )
-
-            try:
-                with transaction.atomic():
-                    user = User.objects.select_for_update().get(id=user_id)
-                    plan = SubscriptionPlan.objects.get(id=plan_id)
-
-                    # ✅ Activate subscription
-                    subscription = SubscriptionService.activate_subscription(
-                        user_id=user_id,
-                        plan_id=plan_id,
-                        stripe_subscription_id=str(stripe_subscription_id),
-                    )
-
-                    # ✅ Update payment order if exists
-                    if payment_order_id:
-                        payment_order = SubscriptionPaymentOrder.objects.select_for_update().get(
-                            internal_order_id=payment_order_id,
-                            user=user,
-                        )
-
-                        payment_order.status = PaymentStatus.SUCCEEDED
-                        payment_order.stripe_checkout_session_id = session.get("id")
-                        payment_order.stripe_subscription_id = str(stripe_subscription_id)
-                        payment_order.subscription = subscription
-
-                        now = timezone.now()
-                        payment_order.period_start = now
-                        payment_order.period_end = now + timedelta(days=plan.billing_cycle_days)
-
-                        payment_order.save(update_fields=[
-                            "status",
-                            "stripe_checkout_session_id",
-                            "stripe_subscription_id",
-                            "subscription",
-                            "period_start",
-                            "period_end",
-                            "updated_at",
-                        ])
-
-                    # ✅ Grant monthly free tokens
-                    SubscriptionTokenGrantService.grant_monthly_tokens(
-                        subscription=subscription
-                    )
-
-            except User.DoesNotExist:
-                logger.error("Stripe webhook: user not found | user_id=%s", user_id)
-                return HttpResponse(status=404)
-            except SubscriptionPlan.DoesNotExist:
-                logger.error("Stripe webhook: plan not found | plan_id=%s", plan_id)
-                return HttpResponse(status=404)
-            except SubscriptionPaymentOrder.DoesNotExist:
-                # Don't fail checkout just because tracking record missing
-                logger.warning(
-                    "Stripe webhook: payment order not found | order_id=%s (Continuing anyway)",
-                    payment_order_id,
-                )
-                return HttpResponse(status=200)
-            except Exception:
-                logger.exception("Stripe subscription webhook failed (checkout.session.completed)")
-                return HttpResponse(status=500)
-
-        # ======================================================
-        # 2) RENEWAL PAYMENT SUCCESS (Every month)
-        # ======================================================
-        elif event_type == "invoice.payment_succeeded":
-            invoice = obj
-
-            stripe_subscription_id = invoice.get("subscription")
-            stripe_invoice_id = invoice.get("id")
-
-            if not stripe_subscription_id or not stripe_invoice_id:
-                return HttpResponse(status=200)
-
-            # ✅ Idempotency: if already created, do nothing
-            if SubscriptionPaymentOrder.objects.filter(stripe_invoice_id=stripe_invoice_id).exists():
-                return HttpResponse(status=200)
-
-            try:
-                subscription = UserSubscription.objects.select_related("plan", "user").get(
-                    stripe_subscription_id=stripe_subscription_id
-                )
-
-                plan = subscription.plan
-
-                period_start_ts = invoice.get("period_start")
-                period_end_ts = invoice.get("period_end")
-
-                period_start = (
-                    timezone.make_aware(datetime.fromtimestamp(period_start_ts))
-                    if period_start_ts else None
-                )
-                period_end = (
-                    timezone.make_aware(datetime.fromtimestamp(period_end_ts))
-                    if period_end_ts else None
-                )
-
-                SubscriptionPaymentOrder.objects.create(
-                    user=subscription.user,
-                    subscription=subscription,
-                    plan=plan,
-                    amount_inr=plan.price_inr,
-                    currency="INR",
-                    status=PaymentStatus.SUCCEEDED,
-
-                    stripe_invoice_id=stripe_invoice_id,
-                    stripe_subscription_id=stripe_subscription_id,
-
-                    internal_order_id=f"SUB-REN-{subscription.user.id}-{int(time.time())}",
-                    period_start=period_start,
-                    period_end=period_end,
-                )
-
-                # ✅ Grant monthly free tokens again on renewal
-                SubscriptionTokenGrantService.grant_monthly_tokens(
-                    subscription=subscription
-                )
-
-                logger.info("✅ Subscription renewal processed | sub=%s", stripe_subscription_id)
-
-            except UserSubscription.DoesNotExist:
-                logger.warning("Invoice for unknown subscription: %s", stripe_subscription_id)
-
-            except Exception:
-                logger.exception("Stripe webhook failed (invoice.payment_succeeded)")
-                return HttpResponse(status=500)
-
-        # ======================================================
-        # 3) SUBSCRIPTION CANCELLED
-        # ======================================================
-        elif event_type == "customer.subscription.deleted":
-            subscription_obj = obj
-            stripe_subscription_id = subscription_obj.get("id")
-
-            if not stripe_subscription_id:
-                return HttpResponse(status=200)
-
-            try:
-                sub = UserSubscription.objects.get(stripe_subscription_id=stripe_subscription_id)
-                sub.status = SubscriptionStatus.CANCELLED
-                sub.save(update_fields=["status", "updated_at"])
-                logger.info("✅ Subscription cancelled | sub=%s", stripe_subscription_id)
-
-            except UserSubscription.DoesNotExist:
-                logger.warning("Cancellation for unknown subscription: %s", stripe_subscription_id)
-
-            except Exception:
-                logger.exception("Stripe webhook failed (customer.subscription.deleted)")
-                return HttpResponse(status=500)
-
-        # ✅ Always return 200 so Stripe doesn't retry repeatedly for unknown events
-        return HttpResponse(status=200)
-
-
-
-
+# ──────────────────────────────────────────────────────────────────────────────
+# NOTE: StripeSubscriptionWebhookView and StripeInterviewerSubscriptionWebhookView
+# have been removed. All webhook handling is now done by StripeWebhookView above,
+# which delegates to StripeWebhookRouter in payments/services/stripe_webhook_router.py.
+# The old URL routes for these views have also been removed from urls.py.
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 
@@ -728,165 +476,6 @@ class CreateInterviewerSubscriptionCheckoutAPIView(APIView):
 
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class StripeInterviewerSubscriptionWebhookView(View):
-    """
-    Handles Stripe webhook events for INTERVIEWER subscriptions only.
-    """
-
-    def post(self, request):
-        payload = request.body.decode("utf-8")
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
-
-        try:
-            event = stripe.Webhook.construct_event(
-                payload=payload,
-                sig_header=sig_header,
-                secret=settings.STRIPE_WEBHOOK_SECRET,
-            )
-        except ValueError:
-            logger.warning("Interviewer webhook: invalid payload")
-            return HttpResponse(status=400)
-        except stripe.error.SignatureVerificationError:
-            logger.warning("Interviewer webhook: invalid signature")
-            return HttpResponse(status=400)
-
-        event_type = event["type"]
-        obj = event["data"]["object"]
-        metadata = obj.get("metadata", {}) or {}
-
-        # ✅ Only handle interviewer subscription events
-        if metadata.get("subscription_type") != "INTERVIEWER":
-            return HttpResponse(status=200)
-
-        # ---------------------------------------------------------
-        # ✅ 1) Checkout Completed → Activate subscription + mark paid
-        # ---------------------------------------------------------
-        if event_type == "checkout.session.completed":
-            try:
-                interviewer_id = int(metadata["interviewer_id"])
-                plan_id = int(metadata["plan_id"])
-                payment_order_id = metadata.get("payment_order_id")
-
-                stripe_subscription_id = obj.get("subscription") or obj.get("id")
-                stripe_checkout_session_id = obj.get("id")
-
-            except (KeyError, ValueError):
-                logger.error("Interviewer webhook missing metadata: %s", metadata)
-                return HttpResponse(status=400)
-
-            try:
-                with transaction.atomic():
-                    interviewer = User.objects.select_for_update().get(id=interviewer_id)
-                    plan = InterviewerSubscriptionPlan.objects.get(id=plan_id)
-
-                    # ✅ Activate interviewer subscription
-                    subscription = InterviewerSubscriptionService.activate_subscription(
-                        interviewer_id=interviewer_id,
-                        plan_id=plan_id,
-                        stripe_subscription_id=str(stripe_subscription_id),
-                    )
-
-                    # ✅ Update InterviewerPaymentOrder
-                    if payment_order_id:
-                        payment_order = InterviewerPaymentOrder.objects.select_for_update().get(
-                            internal_order_id=payment_order_id,
-                            user=interviewer,
-                        )
-
-                        payment_order.status = PaymentStatus.SUCCEEDED
-                        payment_order.stripe_checkout_session_id = stripe_checkout_session_id
-                        payment_order.stripe_subscription_id = str(stripe_subscription_id)
-                        payment_order.subscription = subscription
-                        payment_order.period_start = timezone.now()
-                        payment_order.period_end = timezone.now() + timedelta(days=plan.billing_cycle_days)
-                        payment_order.save()
-
-                logger.info(
-                    "✅ Interviewer subscription activated | interviewer=%s | plan=%s | order=%s | sub=%s",
-                    interviewer_id,
-                    plan_id,
-                    payment_order_id,
-                    stripe_subscription_id,
-                )
-
-                return HttpResponse(status=200)
-
-            except InterviewerPaymentOrder.DoesNotExist:
-                logger.error("InterviewerPaymentOrder not found | order_id=%s", payment_order_id)
-                return HttpResponse(status=404)
-
-            except Exception:
-                logger.exception("Interviewer checkout.session.completed failed")
-                return HttpResponse(status=500)
-
-        # ---------------------------------------------------------
-        # ✅ 2) Renewal invoice payment succeeded → create new order row
-        # ---------------------------------------------------------
-        elif event_type == "invoice.payment_succeeded":
-            try:
-                stripe_subscription_id = obj.get("subscription")
-                stripe_invoice_id = obj.get("id")
-
-                if not stripe_subscription_id:
-                    return HttpResponse(status=200)
-
-                subscription = InterviewerSubscription.objects.select_related(
-                    "interviewer",
-                    "plan",
-                ).get(stripe_subscription_id=stripe_subscription_id)
-
-                # ✅ Create a NEW payment order record for renewal (audit trail)
-                InterviewerPaymentOrder.objects.create(
-                    user=subscription.interviewer,
-                    subscription=subscription,
-                    plan=subscription.plan,
-                    amount_inr=subscription.plan.price_inr,
-                    currency="INR",
-                    status=PaymentStatus.SUCCEEDED,
-                    stripe_invoice_id=stripe_invoice_id,
-                    stripe_subscription_id=stripe_subscription_id,
-                    internal_order_id=f"INT-REN-{subscription.interviewer.id}-{int(timezone.now().timestamp())}",
-                    period_start=timezone.now(),
-                    period_end=timezone.now() + timedelta(days=subscription.plan.billing_cycle_days),
-                )
-
-                logger.info(
-                    "✅ Interviewer renewal recorded | sub=%s | invoice=%s",
-                    stripe_subscription_id,
-                    stripe_invoice_id,
-                )
-
-            except InterviewerSubscription.DoesNotExist:
-                logger.warning("Interviewer renewal invoice for unknown subscription: %s", stripe_subscription_id)
-
-            except Exception:
-                logger.exception("Interviewer invoice.payment_succeeded failed")
-                return HttpResponse(status=500)
-
-        # ---------------------------------------------------------
-        # ✅ 3) Subscription cancelled on Stripe → mark cancelled locally
-        # ---------------------------------------------------------
-        elif event_type == "customer.subscription.deleted":
-            try:
-                stripe_subscription_id = obj.get("id")
-                if not stripe_subscription_id:
-                    return HttpResponse(status=200)
-
-                sub = InterviewerSubscription.objects.get(stripe_subscription_id=stripe_subscription_id)
-                sub.status = InterviewerSubscriptionStatus.CANCELLED
-                sub.save(update_fields=["status"])
-
-                logger.info("✅ Interviewer subscription cancelled | sub=%s", stripe_subscription_id)
-
-            except InterviewerSubscription.DoesNotExist:
-                logger.warning("Cancellation received for unknown interviewer subscription: %s", stripe_subscription_id)
-
-            except Exception:
-                logger.exception("Interviewer subscription cancel handler failed")
-                return HttpResponse(status=500)
-
-        return HttpResponse(status=200)
 
 
 

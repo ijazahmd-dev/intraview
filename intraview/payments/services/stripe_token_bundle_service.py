@@ -23,6 +23,7 @@ class StripeService:
                 "quantity": 1,
             }],
             metadata={
+                "purchase_type": "token_bundle",
                 "payment_order_id": str(payment_order.id),
                 "internal_order_id": payment_order.internal_order_id,
             },
