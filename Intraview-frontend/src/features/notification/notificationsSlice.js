@@ -8,9 +8,18 @@ import {
 
 export const loadUnreadCount = createAsyncThunk(
   "notifications/loadUnreadCount",
-  async () => {
-    const data = await fetchUnreadCount();
-    return data.count;
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await fetchUnreadCount();
+      return data.count;
+    } catch (err) {
+      // 403 means the user is not authenticated (e.g. cookie expired).
+      // Treat this silently as 0 rather than an error to avoid noise.
+      if (err?.response?.status === 403 || err?.response?.status === 401) {
+        return 0;
+      }
+      return rejectWithValue(err?.message || "Failed to load unread count");
+    }
   }
 );
 
@@ -63,6 +72,10 @@ const notificationsSlice = createSlice({
   reducers: {
     setDropdownOpen(state, action) {
       state.dropdownOpen = action.payload;
+    },
+    // Synchronous action for WebSocket-pushed count updates
+    setUnreadCount(state, action) {
+      state.unreadCount = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -120,5 +133,5 @@ const notificationsSlice = createSlice({
   },
 });
 
-export const { setDropdownOpen } = notificationsSlice.actions;
+export const { setDropdownOpen, setUnreadCount } = notificationsSlice.actions;
 export default notificationsSlice.reducer;

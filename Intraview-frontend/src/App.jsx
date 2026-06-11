@@ -35,6 +35,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchUser } from "./authentication/authSlice";
 import { fetchAdmin } from "./authentication/adminAuthSlice";
 import { fetchInterviewer } from "./authentication/interviewerAuthSlice";
+import { useNotificationSocket } from "./features/notification/useNotificationSocket";
+
 import AdminInterviewerVerificationsPage from "./interviewerProfile/admin/pages/AdminInterviewerVerificationsPage";
 import InterviewerVerificationPage from "./interviewerProfile/interviewer/pages/InterviewerVerificationPage";
 import UserSubscriptionsPage from "./subscriptions/user/pages/UserSubscriptionsPage";
@@ -103,7 +105,9 @@ function AppInner() {
   const authBootstrapped = useSelector((state) => state.auth.bootstrapped);
   const adminBootstrapped = useSelector((state) => state.adminAuth.bootstrapped);
 
-
+  // Global real-time notification count via WebSocket.
+  // Runs once at app root — maintains the connection across all pages.
+  useNotificationSocket();
 
   useEffect(() => {
     dispatch(fetchUser());

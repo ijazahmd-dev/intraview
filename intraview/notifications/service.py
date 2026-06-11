@@ -622,10 +622,22 @@ class NotificationService:
         # Bulk insert logs first so we always have audit even if Novu fails
         NotificationLog.objects.bulk_create(logs)
 
+        # ── Real-time WebSocket push ─────────────────────────────────────────
+        # Push the updated unread count to each unique recipient's open
+        # WebSocket connections. Wrapped in try/except so a channel layer
+        # failure (e.g. Redis down) never breaks notification creation.
+        try:
+            from .realtime import NotificationCountPublisher  # local import avoids circular
+            unique_recipient_ids = {log.recipient_id for log in logs}
+            for recipient_id in unique_recipient_ids:
+                NotificationCountPublisher.push_count(recipient_id)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "NotificationService: WS push failed after bulk_create"
+            )
 
-        # from notifications.tasks import send_notification_via_novu
-        # for log in logs:
-        #     send_notification_via_novu.delay(log.id)
+
 
 
 

@@ -12,19 +12,11 @@ export default function NotificationBell({ variant = "circular" }) {
   const unreadCount = useSelector((state) => state.notifications.unreadCount);
   const dropdownOpen = useSelector((state) => state.notifications.dropdownOpen);
 
-  // Initial load of unread count
+  // Initial REST fetch on mount — ensures count is correct even if WS
+  // hasn't connected yet. Real-time updates come via useNotificationSocket
+  // mounted globally in App.jsx.
   useEffect(() => {
     dispatch(loadUnreadCount());
-  }, [dispatch]);
-
-  // Poll unread count every 30s when tab is visible
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        dispatch(loadUnreadCount());
-      }
-    }, 30000);
-    return () => clearInterval(id);
   }, [dispatch]);
 
   const toggleDropdown = () => {

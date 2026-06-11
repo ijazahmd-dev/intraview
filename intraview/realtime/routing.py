@@ -1,8 +1,10 @@
-from django.urls import path, re_path
-from .consumers import  TestConsumer
+from django.urls import re_path
+from .consumers import NotificationCountConsumer, TestConsumer
 
 websocket_urlpatterns = [
-    # path("ws/interview/<int:booking_id>/", InterviewConsumer.as_asgi()),
-    re_path(r'ws/test/$', TestConsumer.as_asgi()),
+    # Real-time notification unread count — user-specific, authenticated
+    re_path(r"^ws/notifications/$", NotificationCountConsumer.as_asgi()),
 
+    # Development echo consumer
+    re_path(r"^ws/test/$", TestConsumer.as_asgi()),
 ]
