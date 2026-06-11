@@ -777,10 +777,22 @@ const SessionCard = ({ booking, onClick, isPast }) => {
   const rescheduleNote = booking.reschedule_note || '';
 
   useEffect(() => {
-    const startTime = new Date(booking.start_datetime);
+    // Build ISO datetime — prefer pre-combined start_datetime from API,
+    // fall back to constructing from separate date + start_time fields.
+    const buildDate = (datetimeStr, dateStr, timeStr) => {
+      if (datetimeStr) return new Date(datetimeStr);
+      if (dateStr && timeStr) return new Date(`${dateStr}T${timeStr}`);
+      return null;
+    };
+
+    const startTime = buildDate(booking.start_datetime, booking.date, booking.start_time);
     const endTime = booking.end_datetime
       ? new Date(booking.end_datetime)
-      : new Date(startTime.getTime() + 30 * 60 * 1000);
+      : startTime
+      ? new Date(startTime.getTime() + 30 * 60 * 1000)
+      : null;
+
+    if (!startTime || isNaN(startTime.getTime())) return; // can't compute, skip
 
     const update = () => {
       const now = new Date();
@@ -799,7 +811,7 @@ const SessionCard = ({ booking, onClick, isPast }) => {
     const iv = setInterval(update, 1000);
     update();
     return () => clearInterval(iv);
-  }, [booking.start_datetime, booking.end_datetime]);
+  }, [booking.start_datetime, booking.end_datetime, booking.date, booking.start_time]);
 
   const fmt12 = (t) => {
     if (!t) return '—';
@@ -819,15 +831,29 @@ const SessionCard = ({ booking, onClick, isPast }) => {
     } catch { return ds; }
   };
 
-  const isUpcoming = new Date(booking.start_datetime) > new Date();
+  const isUpcoming = (() => {
+    if (booking.start_datetime) return new Date(booking.start_datetime) > new Date();
+    if (booking.date && booking.start_time) return new Date(`${booking.date}T${booking.start_time}`) > new Date();
+    return false;
+  })();
   const canReschedule = booking.status === 'CONFIRMED' && isUpcoming && !hasPendingReschedule;
 
   const handleJoin = (e) => {
     e.stopPropagation();
-    if (timeLeft === 'Ended') { toast.info('This session has already ended'); return; }
-    const mins = (new Date(booking.start_datetime) - new Date()) / 60000;
-    if (isLive || mins <= 15) navigate(`/interview/room/${booking.id}`);
-    else toast.info(`Session starts in ${timeLeft}`);
+    if (timeLeft === 'Ended') { toast.info('This session has already ended.'); return; }
+    // Allow joining when live OR within 15 minutes of start
+    const buildDate = (datetimeStr, dateStr, timeStr) => {
+      if (datetimeStr) return new Date(datetimeStr);
+      if (dateStr && timeStr) return new Date(`${dateStr}T${timeStr}`);
+      return null;
+    };
+    const startTime = buildDate(booking.start_datetime, booking.date, booking.start_time);
+    const mins = startTime ? (startTime - new Date()) / 60000 : Infinity;
+    if (isLive || mins <= 15) {
+      navigate(`/interview/room/${booking.id}`);
+    } else {
+      toast.info(`Session starts in ${timeLeft}. You can join 15 minutes before start.`);
+    }
   };
 
   const handleReschedule = (e) => {

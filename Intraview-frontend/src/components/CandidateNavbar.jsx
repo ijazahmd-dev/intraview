@@ -943,8 +943,9 @@ import {
   Menu, X, Home, Search, Bot, CalendarCheck, TrendingUp,
   Wallet, Tag, ArrowUpRight,
 } from "lucide-react";
-import { loadUnreadCount } from "../features/notification/notificationsSlice";
+import { loadUnreadCount, loadNotifications } from "../features/notification/notificationsSlice";
 import { fetchWalletSummary } from "../wallets/candidateWalletSlice";
+import NotificationDropdown from "../features/notification/user/components/NotificationDropdown";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -1000,6 +1001,14 @@ export default function CandidateNavbar() {
 
   const isAuth = !!user;
 
+  const [scrolled, setScrolled] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const profileRef = useRef(null);
+  const notifRef = useRef(null);
+
   // Load necessary user data on mount
   useEffect(() => {
     if (isAuth) {
@@ -1008,13 +1017,13 @@ export default function CandidateNavbar() {
     }
   }, [isAuth, dispatch]);
 
-  const [scrolled, setScrolled] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Load notifications list whenever the bell dropdown opens
+  useEffect(() => {
+    if (notifOpen && isAuth) {
+      dispatch(loadNotifications({ page: 1, pageSize: 10, unreadOnly: false }));
+    }
+  }, [notifOpen, isAuth, dispatch]);
 
-  const profileRef = useRef(null);
-  const notifRef = useRef(null);
 
   // Scroll detection
   useEffect(() => {
@@ -1138,30 +1147,17 @@ export default function CandidateNavbar() {
                   </button>
 
                   {notifOpen && (
-                    <div className="iv-drop" role="dialog" aria-label="Notifications">
-                      <div className="iv-drop-head">
-                        <span>Notifications</span>
-                        {unreadCount > 0 && (
-                          <span className="iv-count-pill">{unreadCount} new</span>
-                        )}
-                      </div>
-                      {unreadCount === 0 ? (
-                        <div className="iv-drop-empty">
-                          <Bell size={24} strokeWidth={1.2} aria-hidden="true" />
-                          <p>All caught up</p>
-                          <span>No new notifications</span>
-                        </div>
-                      ) : (
-                        <div className="iv-drop-body">
-                          <Link
-                            className="iv-view-all"
-                            to="/notifications"
-                            onClick={() => setNotifOpen(false)}
-                          >
-                            View all notifications →
-                          </Link>
-                        </div>
-                      )}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 10px)",
+                        right: 0,
+                        zIndex: 1001,
+                      }}
+                      role="dialog"
+                      aria-label="Notifications"
+                    >
+                      <NotificationDropdown onClose={() => setNotifOpen(false)} />
                     </div>
                   )}
                 </div>

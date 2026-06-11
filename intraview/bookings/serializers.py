@@ -252,16 +252,20 @@ class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
     date = serializers.DateField(source="availability.date")
     start_time = serializers.TimeField(source="availability.start_time")
     end_time = serializers.TimeField(source="availability.end_time")
-    
+    start_datetime = serializers.SerializerMethodField()
+    end_datetime = serializers.SerializerMethodField()
 
     class Meta:
         model = InterviewBooking
         fields = [
             "id",
+            "status",
             "interviewer_name",
             "date",
             "start_time",
             "end_time",
+            "start_datetime",
+            "end_datetime",
             "token_cost",
             # session config
             "interview_type",
@@ -270,6 +274,24 @@ class CandidateUpcomingInterviewSerializer(serializers.ModelSerializer):
             "candidate_notes",
             "selected_specialties",
         ]
+
+    def get_start_datetime(self, obj):
+        try:
+            dt = django_timezone.make_aware(
+                datetime.combine(obj.availability.date, obj.availability.start_time)
+            )
+            return dt.isoformat()
+        except Exception:
+            return None
+
+    def get_end_datetime(self, obj):
+        try:
+            dt = django_timezone.make_aware(
+                datetime.combine(obj.availability.date, obj.availability.end_time)
+            )
+            return dt.isoformat()
+        except Exception:
+            return None
 
 
 

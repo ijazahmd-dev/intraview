@@ -109,29 +109,22 @@ const notificationsSlice = createSlice({
         state.error = action.error.message;
       })
 
-      // markOneRead
+      // markOneRead — immediately remove from items list so it disappears instantly
       .addCase(markOneRead.fulfilled, (state, action) => {
         const updated = action.payload;
-        const idx = state.items.findIndex((n) => n.id === updated.id);
-        if (idx !== -1) {
-          state.items[idx] = updated;
-        }
-        if (state.unreadCount > 0 && updated.is_read) {
+        state.items = state.items.filter((n) => n.id !== updated.id);
+        if (state.unreadCount > 0) {
           state.unreadCount -= 1;
         }
       })
 
-      // markAllRead
+      // markAllRead — immediately clear items list and zero the count
       .addCase(markAllReadThunk.fulfilled, (state) => {
-        state.items = state.items.map((n) => ({
-          ...n,
-          is_read: true,
-          read_at: n.read_at || new Date().toISOString(),
-        }));
+        state.items = [];
         state.unreadCount = 0;
       });
   },
 });
 
-export const { setDropdownOpen, setUnreadCount } = notificationsSlice.actions;
+export const { setDropdownOpen, setUnreadCount, removeItem } = notificationsSlice.actions;
 export default notificationsSlice.reducer;
