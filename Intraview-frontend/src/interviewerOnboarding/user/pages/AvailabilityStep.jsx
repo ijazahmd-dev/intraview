@@ -17,7 +17,7 @@ export default function AvailabilityStep() {
   const [form, setForm] = useState({
     date: "",
     start_time: "",
-    end_time: "",
+    duration_minutes: 30,
     timezone: "Asia/Kolkata",
     is_recurring: false,
     recurrence_type: "WEEKLY",
@@ -137,14 +137,18 @@ export default function AvailabilityStep() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">
-                End Time
+                Duration
               </label>
-              <input
-                type="time"
-                value={form.end_time}
-                onChange={(e) => handleChange("end_time", e.target.value)}
+              <select
+                value={form.duration_minutes}
+                onChange={(e) => handleChange("duration_minutes", Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              >
+                <option value={30}>30 minutes</option>
+                <option value={45}>45 minutes</option>
+                <option value={60}>60 minutes</option>
+                <option value={90}>90 minutes</option>
+              </select>
             </div>
             <div className="flex items-end">
               <label className="inline-flex items-center gap-2 text-xs text-slate-600">

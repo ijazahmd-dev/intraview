@@ -279,7 +279,8 @@ export default function RoleBasedInterviewPage() {
     if (!featured || featured.length === 0) {
       dispatch(fetchFeaturedRoles());
     }
-  }, [dispatch, featured]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
 
   // Debounced search
   useEffect(() => {

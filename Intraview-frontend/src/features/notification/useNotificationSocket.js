@@ -31,7 +31,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { setUnreadCount } from "./notificationsSlice";
 import API from "../../utils/axiosClient";
 
-const WS_BASE_URL = "ws://localhost:8000";
+const WS_BASE_URL =
+  import.meta.env.VITE_WS_BASE_URL ||
+  (
+    window.location.protocol === "https:"
+      ? "wss://localhost:8000"
+      : "ws://localhost:8000"
+  );
 const WS_PATH = "/ws/notifications/";
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 1500;  // 1.5s, 3s, 6s, 12s, 24s

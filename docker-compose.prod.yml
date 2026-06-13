@@ -1,0 +1,71 @@
+services:
+  backend:
+    build:
+      context: ./intraview
+    container_name: intraview-backend
+    command: daphne -b 0.0.0.0 -p 8000 intraview.asgi:application
+    restart: unless-stopped
+    env_file:
+      - ./intraview/.env
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery-worker:
+    build:
+      context: ./intraview
+    container_name: intraview-celery-worker
+    command: celery -A intraview worker -l info
+    restart: unless-stopped
+    env_file:
+      - ./intraview/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  celery-beat:
+    build:
+      context: ./intraview
+    container_name: intraview-celery-beat
+    command: celery -A intraview beat -l info
+    restart: unless-stopped
+    env_file:
+      - ./intraview/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:17
+    container_name: intraview-postgres
+    restart: unless-stopped
+    env_file:
+      - ./intraview/.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: intraview-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:

@@ -31,9 +31,24 @@ const AdminInterviewerSubscriptionPlansPage = () => {
     dispatch(fetchPlans({ page: 1, pageSize: 20 }));
   }, [dispatch]);
 
+  const formatError = (err) => {
+    if (!err) return 'An error occurred';
+    if (typeof err === 'string') return err;
+    if (typeof err === 'object') {
+      const keys = Object.keys(err);
+      if (keys.length > 0) {
+        const firstVal = err[keys[0]];
+        if (Array.isArray(firstVal)) return firstVal[0];
+        if (typeof firstVal === 'string') return firstVal;
+      }
+      try { return JSON.stringify(err); } catch { return 'An error occurred'; }
+    }
+    return String(err);
+  };
+
   useEffect(() => {
     if (error) {
-      toast.error(error);
+      toast.error(formatError(error));
     }
   }, [error]);
 
@@ -55,7 +70,7 @@ const AdminInterviewerSubscriptionPlansPage = () => {
         resetForm();
         dispatch(fetchPlans({ page: 1, pageSize: 20 }));
       })
-      .catch(toast.error);
+      .catch((err) => toast.error(formatError(err)));
   };
 
   const handleEditPlan = () => {
@@ -65,7 +80,7 @@ const AdminInterviewerSubscriptionPlansPage = () => {
         toast.success('Interviewer plan updated successfully!');
         setShowEditModal(false);
       })
-      .catch(toast.error);
+      .catch((err) => toast.error(formatError(err)));
   };
 
   const resetForm = () => {

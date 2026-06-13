@@ -33,9 +33,12 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "localhost,127.0.0.1"
+).split(",")
 
 
 # Application definition
@@ -127,30 +130,71 @@ AUTH_USER_MODEL = 'authentication.CustomUser'
 
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
+
+    'corsheaders.middleware.CorsMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
     'authentication.middleware.ClearExpiredJWTCookiesMiddleware',
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 
 
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173"
+)
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    FRONTEND_URL,
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
-
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
+    FRONTEND_URL,
 ]
+
+# Cookie Security (Production Ready)
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False
+
+SESSION_COOKIE_SAMESITE = (
+    "None" if not DEBUG else "Lax"
+)
+
+CSRF_COOKIE_SAMESITE = (
+    "None" if not DEBUG else "Lax"
+)
+
+# Reverse Proxy / HTTPS Settings
+SECURE_PROXY_SSL_HEADER = (
+    'HTTP_X_FORWARDED_PROTO',
+    'https',
+)
+
+USE_X_FORWARDED_HOST = True
+
+# Security Headers (Production Safe)
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+X_FRAME_OPTIONS = "DENY"
+
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -259,18 +303,15 @@ TIME_ZONE = "Asia/Kolkata"
 
 
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'dpn42vumz',
-    'API_KEY': '441922657799877', 
-    'API_SECRET': 'zgWHzRrv74xbOfb2PTJnMcPbREQ',
+    'CLOUD_NAME': os.getenv("CLOUDINARY_CLOUD_NAME"),
+    'API_KEY': os.getenv("CLOUDINARY_API_KEY"),
+    'API_SECRET': os.getenv("CLOUDINARY_API_SECRET"),
 }
 
-
-
-
 cloudinary.config(
-    cloud_name="dpn42vumz",
-    api_key="441922657799877",
-    api_secret="zgWHzRrv74xbOfb2PTJnMcPbREQ",
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True,
 )
 
@@ -357,7 +398,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
 
 
-FRONTEND_URL = "http://localhost:5173"  # or production URL
+
 DEFAULT_FROM_EMAIL = "intraview.website@gmail.com"
 
 
@@ -480,15 +521,31 @@ GEMINI_FINAL_REPORT_MODEL = os.getenv(
 
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+
+    "django.request": {
+        "handlers": ["console"],
+        "level": "ERROR",
+        "propagate": False,
     },
 }
