@@ -1,0 +1,103 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./intraview
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: intraview_database
+          POSTGRES_USER: intraview_user
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    env:
+      DJANGO_SECRET_KEY: github-ci-secret-key
+
+      DEBUG: False
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      FRONTEND_URL: http://localhost:5173
+
+      POSTGRES_DB: intraview_database
+      POSTGRES_USER: intraview_user
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://localhost:6379/1
+
+      EMAIL_HOST_USER: test@test.com
+      EMAIL_HOST_PASSWORD: test
+
+      CLOUDINARY_CLOUD_NAME: test
+      CLOUDINARY_API_KEY: test
+      CLOUDINARY_API_SECRET: test
+
+      GOOGLE_CLIENT_ID: test
+      GOOGLE_CLIENT_SECRET: test
+
+      STRIPE_SECRET_KEY: test
+      STRIPE_PUBLISHABLE_KEY: test
+      STRIPE_WEBHOOK_SECRET: test
+
+      ZEGO_APP_ID: 123456
+      ZEGO_SERVER_SECRET: test
+
+      LIVEKIT_URL: test
+      LIVEKIT_API_KEY: test
+      LIVEKIT_API_SECRET: test
+
+      GEMINI_API_KEY: test
+      BACKEND_AGENT_SHARED_SECRET: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Django checks
+        run: python manage.py check
+
+      - name: Run migrations check
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Build Docker image
+        run: docker build -t intraview-backend .
