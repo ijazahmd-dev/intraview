@@ -42,7 +42,7 @@ jobs:
       - name: Validate imports
         run: |
           uv run python -c "
-          import interviewer_agent
+          import agent
           print('Agent imports successfully')
           "
 
