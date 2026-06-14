@@ -44,6 +44,8 @@ jobs:
       ALLOWED_HOSTS: localhost,127.0.0.1
       FRONTEND_URL: http://localhost:5173
 
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/intraview_database
+
       POSTGRES_DB: intraview_database
       POSTGRES_USER: intraview_user
       POSTGRES_PASSWORD: postgres
