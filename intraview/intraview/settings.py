@@ -154,10 +154,12 @@ MIDDLEWARE = [
 
 
 
-FRONTEND_URL = os.getenv(
-    "FRONTEND_URL",
-    "http://localhost:5173"
-)
+# FRONTEND_URL = os.getenv(
+#     "FRONTEND_URL",
+#     "http://localhost:5173"
+# )
+
+FRONTEND_URL = "https://intraview-two.vercel.app"
 
 CORS_ALLOWED_ORIGINS = [
     FRONTEND_URL,
@@ -167,6 +169,23 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     FRONTEND_URL,
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
+CORS_EXPOSE_HEADERS = [
+    "Content-Type",
+    "X-CSRFToken",
 ]
 
 # Cookie Security (Production Ready)
