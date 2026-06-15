@@ -338,6 +338,12 @@ STORAGES = {
 }
 
 
+# Required for cloudinary_storage compatibility
+STATICFILES_STORAGE = (
+    "django.contrib.staticfiles.storage.StaticFilesStorage"
+)
+
+
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
