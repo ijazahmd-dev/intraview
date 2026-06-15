@@ -154,12 +154,12 @@ MIDDLEWARE = [
 
 
 
-# FRONTEND_URL = os.getenv(
-#     "FRONTEND_URL",
-#     "http://localhost:5173"
-# )
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "http://localhost:5173"
+)
 
-FRONTEND_URL = "https://intraview-two.vercel.app"
+
 
 CORS_ALLOWED_ORIGINS = [
     FRONTEND_URL,
