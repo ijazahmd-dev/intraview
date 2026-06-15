@@ -35,7 +35,7 @@ const WS_BASE_URL =
   import.meta.env.VITE_WS_BASE_URL ||
   (
     window.location.protocol === "https:"
-      ? "wss://localhost:8000"
+      ? "wss://api.intraview.ijazdev.xyz"
       : "ws://localhost:8000"
   );
 const WS_PATH = "/ws/notifications/";
