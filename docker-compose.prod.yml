@@ -8,6 +8,9 @@ services:
     restart: unless-stopped
     env_file:
       - ./intraview/.env
+
+    volumes:
+      - ./staticfiles:/app/staticfiles  
     ports:
       - "8000:8000"
     depends_on:
