@@ -202,15 +202,15 @@ class LoginView(APIView):
             key="access_token",
             value=str(access),
             httponly=True,
-            secure=False,  # True in production
-            samesite="Lax",
+            secure=not settings.DEBUG,  # True in production
+            samesite="None"
         )
         response.set_cookie(
             key="refresh_token",
             value=str(refresh),
             httponly=True,
-            secure=False,
-            samesite="Lax",
+            secure=not settings.DEBUG,
+            samesite="None"
         )
 
         return response
@@ -511,7 +511,7 @@ class GoogleLoginView(APIView):
             str(access),
             httponly=True,
             secure=secure_cookie,
-            samesite="Lax",
+            samesite="None"
         )
 
         response.set_cookie(
@@ -519,7 +519,7 @@ class GoogleLoginView(APIView):
             str(refresh),
             httponly=True,
             secure=secure_cookie,
-            samesite="Lax",
+            samesite="None"
         )
 
         return response
@@ -614,7 +614,7 @@ class InterviewerLoginView(APIView):
             str(refresh.access_token),
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Lax",
+            samesite="None"
         )
 
         response.set_cookie(
@@ -622,7 +622,7 @@ class InterviewerLoginView(APIView):
             str(refresh),
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Lax",
+            samesite="None"
         )
 
         return response

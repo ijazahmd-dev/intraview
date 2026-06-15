@@ -170,14 +170,14 @@ class AdminLoginView(APIView):
             value=str(access),
             httponly=True,
             secure=secure_flag,
-            samesite="Lax",
+            samesite="None"
         )
         response.set_cookie(
             key="admin_refresh_token",
             value=str(refresh),
             httponly=True,
             secure=secure_flag,
-            samesite="Lax",
+            samesite="None"
         )
 
         return response
