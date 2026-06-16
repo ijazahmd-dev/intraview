@@ -58,6 +58,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./intraview-agent/.env
+    environment:
+      LIVEKIT_LOG_LEVEL: debug  
     command: uv run src/agent.py start
     depends_on:
       backend:
