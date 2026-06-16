@@ -15,6 +15,9 @@ ENV PYTHONUNBUFFERED=1
 # expense of a slightly longer build.
 ENV UV_COMPILE_BYTECODE=1
 
+# Keep HF models inside /app so they survive multi-stage builds
+ENV HF_HOME=/app/.cache/huggingface
+
 # --- Build stage ---
 # Install dependencies, build native extensions, and prepare the application
 FROM base AS build
@@ -34,6 +37,8 @@ RUN apt-get update && apt-get install -y \
 # And set it as the working directory
 WORKDIR /app
 
+RUN mkdir -p /app/.cache/huggingface
+
 # Copy just the dependency files first, for more efficient layer caching
 COPY pyproject.toml uv.lock ./
 RUN mkdir -p src
@@ -52,7 +57,7 @@ COPY . .
 # Pre-download any ML models or files the agent needs
 # This ensures the container is ready to run immediately without downloading
 # dependencies at runtime, which improves startup time and reliability
-RUN uv run src/agent.py download-files
+RUN uv run -m livekit.agents download-files
 
 # --- Production stage ---
 # Build tools (gcc, g++, python3-dev) are not included in the final image
