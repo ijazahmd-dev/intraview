@@ -50,3 +50,15 @@ services:
     container_name: intraview-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
+
+  ai-agent:
+    build:
+      context: ./intraview-agent
+    container_name: intraview-agent
+    restart: unless-stopped
+    env_file:
+      - ./intraview-agent/.env
+    command: uv run src/agent.py start
+    depends_on:
+      backend:
+        condition: service_started  

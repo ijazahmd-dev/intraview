@@ -13,7 +13,7 @@ from tavus_avatar import TavusAvatarBridge
 
 logger = logging.getLogger("agent")
 
-load_dotenv(".env.local")
+load_dotenv()
 
 server = AgentServer()
 
