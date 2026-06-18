@@ -7,6 +7,7 @@ import { ToastContainer } from "react-toastify";
 
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AuthGate from "./components/AuthGate";
 import Home from "./pages/Home";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -127,6 +128,8 @@ function AppInner() {
   return (
     <>
       <ToastContainer />
+      {/* Global auth modal — catches 401 API responses on any page */}
+      <AuthGate />
       <Routes>
 
         <Route path="/" element={<Navigate to="/home" />} />

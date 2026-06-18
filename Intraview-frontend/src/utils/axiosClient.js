@@ -66,13 +66,23 @@ const onRefreshFailure = () => {
 };
 
 function redirectToLogin(role) {
-  const dest =
-    role === "admin"
-      ? "/admin/login"
-      : role === "interviewer"
-        ? "/interviewer/login"
-        : "/login";
-  window.location.href = dest;
+  // Fire a custom DOM event instead of a hard browser redirect.
+  // The global <AuthGate /> component listens for this and shows the
+  // AuthRequiredModal — keeping everything inside React Router.
+  // Interviewer/admin roles still get a hard redirect since those have
+  // separate login pages that are not part of the candidate SPA flow.
+  if (role === "admin") {
+    window.location.href = "/admin/login";
+    return;
+  }
+  if (role === "interviewer") {
+    window.location.href = "/interviewer/login";
+    return;
+  }
+  // Candidate (or unknown) role → show modal via custom event
+  window.dispatchEvent(
+    new CustomEvent("intraview:auth:required", { detail: { role } })
+  );
 }
 
 API.interceptors.response.use(
