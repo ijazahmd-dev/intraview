@@ -470,16 +470,20 @@ function LoginPage() {
 
       {/* ───────── Left panel ───────── */}
       <div className="tvs-left-panel">
-        <div className="tvs-left-panel-inner">
+        <div className="tvs-left-panel-inner" style={{ position: 'relative' }}>
 
-          <div className="tvs-logo-row">
-            <LogoIcon />
-            <span className="tvs-logo-word">TAVUS</span>
+          {/* Centered logo positioned absolutely to push it up and reduce the gap below */}
+          <div className="w-full flex justify-center" style={{ position: 'absolute', top: '20px', left: 0, zIndex: 10, pointerEvents: 'none' }}>
+            <img
+              src="https://res.cloudinary.com/dpn42vumz/image/upload/v1781793772/ChatGPT_Image_Jun_18_2026_08_08_24_PM_ivbob8.png"
+              alt="IntraView Logo"
+              style={{ height: '250px', width: 'auto', objectFit: 'contain', pointerEvents: 'auto' }}
+            />
           </div>
 
-          <div className="tvs-form-area">
-            <div className="tvs-form-card">
-              <h1 className="tvs-heading">Log in</h1>
+          <div className="tvs-form-area" style={{ paddingTop: '250px' }}>
+            <div className="tvs-form-card" style={{ position: 'relative', zIndex: 20 }}>
+              <h1 className="tvs-heading text-center">Log in</h1>
               <p className="tvs-subtext">
                 Enter your email and password below to log in
                 <br />
@@ -488,9 +492,8 @@ function LoginPage() {
 
               {/* ── Email ── */}
               <div
-                className={`tvs-field${
-                  formik.touched.email && formik.errors.email ? " tvs-field-error" : ""
-                }`}
+                className={`tvs-field${formik.touched.email && formik.errors.email ? " tvs-field-error" : ""
+                  }`}
               >
                 <input
                   type="email"
@@ -505,9 +508,8 @@ function LoginPage() {
 
               {/* ── Password ── */}
               <div
-                className={`tvs-field tvs-field-password${
-                  formik.touched.password && formik.errors.password ? " tvs-field-error" : ""
-                }`}
+                className={`tvs-field tvs-field-password${formik.touched.password && formik.errors.password ? " tvs-field-error" : ""
+                  }`}
               >
                 <input
                   type={showPassword ? "text" : "password"}
