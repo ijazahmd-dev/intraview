@@ -275,7 +275,7 @@ import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
-import { Github, Linkedin, Globe, AlertCircle } from 'lucide-react';
+import { Github, Linkedin, Globe, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -291,18 +291,45 @@ const C = {
   textLight: '#9CA3AF',
 };
 
-const validateUrls = {
-  github: (url) => !url || /^https?:\/\/(www\.)?github\.com\/[a-zA-Z0-9_-]+\/?$/.test(url),
-  linkedin: (url) => !url || /(https?:\/\/(www\.)?linkedin\.com\/(mwlite\/|m\/)?in\/[a-zA-Z0-9_.-]+\/?)/.test(url),
-  portfolio: (url) => { if (!url) return true; try { new URL(url); return url.startsWith('https://') || url.startsWith('http://'); } catch { return false; } },
-};
-
 const Label = ({ icon: Icon, children }) => (
   <label style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11.5px', fontWeight: 700, color: C.textMuted, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
     <Icon size={13} style={{ color: C.textMuted }} />
     {children}
   </label>
 );
+
+const Input = ({ status, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: props.readOnly ? C.gray : C.white,
+          fontSize: '13.5px', color: props.readOnly ? C.textMuted : C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: props.readOnly ? 'not-allowed' : 'auto',
+          transition: 'border-color 0.15s',
+          ...props.style,
+        }}
+        onFocus={e => { if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+    </div>
+  );
+};
 
 const LinksSection = () => {
   const { candidateProfile, isUpdatingProfile, handleUpdateProfile } = useProfileData();
@@ -313,43 +340,25 @@ const LinksSection = () => {
     portfolio_url: candidateProfile?.portfolio_url || '',
   };
 
-  const { formData, handleChange, handleBlur, handleSubmit, getFieldError, isSubmitting, isDirty, resetForm } =
+  const { formData, handleChange, handleBlur, handleSubmit, getFieldError, getFieldStatus, handleApiErrors, isSubmitting, isDirty, resetForm } =
     useProfileForm(initialData, async (data) => {
-      if (data.github_url && !validateUrls.github(data.github_url)) return;
-      if (data.linkedin_url && !validateUrls.linkedin(data.linkedin_url)) return;
-      if (data.portfolio_url && !validateUrls.portfolio(data.portfolio_url)) return;
       const result = await handleUpdateProfile(data);
-      if (result && !result.error) toast.success('Links saved!');
-      else if (result?.error) toast.error('Failed to save links.');
+      if (result && !result.error) {
+        toast.success('Links saved!');
+      } else if (result?.error) {
+        handleApiErrors(result.error);
+        toast.error('Failed to save links.');
+      }
     });
 
   useEffect(() => { resetForm(); }, [candidateProfile?.id]);
 
   const disabled = isSubmitting || isUpdatingProfile;
 
-  const getUrlError = (fieldName, value) => {
-    if (!value) return null;
-    if (fieldName === 'github_url' && !validateUrls.github(value)) return 'Invalid GitHub URL (e.g., https://github.com/username)';
-    if (fieldName === 'linkedin_url' && !validateUrls.linkedin(value)) return 'Invalid LinkedIn URL';
-    if (fieldName === 'portfolio_url' && !validateUrls.portfolio(value)) return 'Invalid URL (must start with https:// or http://)';
-    return null;
-  };
-
-  const githubError = getUrlError('github_url', formData.github_url);
-  const linkedinError = getUrlError('linkedin_url', formData.linkedin_url);
-  const portfolioError = getUrlError('portfolio_url', formData.portfolio_url);
-
-  const inputStyle = (hasError) => ({
-    width: '100%', boxSizing: 'border-box', padding: '10px 14px',
-    borderRadius: '12px', border: `1.5px solid ${hasError ? '#FECACA' : C.grayBorder}`,
-    background: C.white, fontSize: '13.5px', color: C.text,
-    outline: 'none', fontFamily: '"DM Sans", sans-serif', transition: 'border-color 0.15s',
-  });
-
   const fields = [
-    { name: 'github_url', icon: Github, label: 'GitHub profile', placeholder: 'https://github.com/username', hint: 'https://github.com/yourname', error: githubError },
-    { name: 'linkedin_url', icon: Linkedin, label: 'LinkedIn profile', placeholder: 'https://www.linkedin.com/in/username', hint: 'https://www.linkedin.com/in/yourname', error: linkedinError },
-    { name: 'portfolio_url', icon: Globe, label: 'Portfolio website', placeholder: 'https://yourportfolio.com', hint: 'https://yourname.com or https://projects.com', error: portfolioError },
+    { name: 'github_url', icon: Github, label: 'GitHub profile', placeholder: 'https://github.com/username', hint: 'https://github.com/yourname' },
+    { name: 'linkedin_url', icon: Linkedin, label: 'LinkedIn profile', placeholder: 'https://www.linkedin.com/in/username', hint: 'https://www.linkedin.com/in/yourname' },
+    { name: 'portfolio_url', icon: Globe, label: 'Portfolio website', placeholder: 'https://yourportfolio.com', hint: 'https://yourname.com or https://projects.com' },
   ];
 
   return (
@@ -376,17 +385,16 @@ const LinksSection = () => {
           return (
             <div key={f.name}>
               <Label icon={Icon}>{f.label}</Label>
-              <input
+              <Input
                 id={f.name} type="url" name={f.name}
                 value={formData[f.name] || ''} onChange={handleChange} onBlur={handleBlur}
                 disabled={disabled} placeholder={f.placeholder}
-                style={inputStyle(f.error)}
-                onFocus={e => (e.target.style.borderColor = f.error ? '#FECACA' : C.teal)}
+                status={getFieldStatus(f.name)}
               />
-              {f.error && (
+              {getFieldError(f.name) && (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '4px' }}>
                   <AlertCircle size={13} style={{ color: '#DC2626', marginTop: '1px', flexShrink: 0 }} />
-                  <p style={{ margin: 0, fontSize: '11px', color: '#DC2626' }}>{f.error}</p>
+                  <p style={{ margin: 0, fontSize: '11px', color: '#DC2626' }}>{getFieldError(f.name)}</p>
                 </div>
               )}
               <p style={{ margin: '4px 0 0', fontSize: '11px', color: C.textLight }}>
@@ -406,7 +414,7 @@ const LinksSection = () => {
             }}>
             Reset
           </button>
-          <button type="submit" disabled={disabled || !isDirty || githubError || linkedinError || portfolioError}
+          <button type="submit" disabled={disabled || !isDirty}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '10px 22px', borderRadius: '12px', border: 'none',

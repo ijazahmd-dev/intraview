@@ -1,20 +1,37 @@
 export const checkPasswordStrength = (password) => {
-    let score = 0;
+    if (!password) {
+        return {
+            score: 0,
+            label: "Weak",
+            checks: {
+                length: false,
+                uppercase: false,
+                lowercase: false,
+                number: false,
+                special: false,
+            }
+        };
+    }
 
-    if (!password) return { score: 0, label: "Weak" };
+    const checks = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /[0-9]/.test(password),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
 
-    // Length
-    if (password.length >= 8) score++;
-    if (password.length >= 12) score++;
+    let score = Object.values(checks).filter(Boolean).length;
 
-    // Character variety
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
+    let label = "Weak";
+    if (score >= 4 && checks.length) {
+        label = score === 5 ? "Strong" : "Good";
+    } else if (score >= 2) {
+        label = "Fair";
+    }
 
-    // Convert score → label
-    if (score <= 1) return { score, label: "Weak" };
-    if (score === 2) return { score, label: "Medium" };
-    if (score === 3) return { score, label: "Strong" };
-    return { score, label: "Very Strong" };
+    // Cap score at 4 for the bar width calculation in the component
+    const normalizedScore = score > 4 ? 4 : score;
+
+    return { score: normalizedScore, label, checks };
 };

@@ -7,6 +7,10 @@ export const signup = async (data) => {
   return await API.post("/auth/signup/", data);
 };
 
+export const checkAvailability = async (params) => {
+  return await API.get("/auth/check-availability/", { params });
+};
+
 // Verify OTP API
 export const verifyOtp = async (data) => {
   return await API.post("/auth/verify-otp/", data);

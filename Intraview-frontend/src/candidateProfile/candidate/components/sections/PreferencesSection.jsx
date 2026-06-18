@@ -277,7 +277,7 @@ import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -328,15 +328,45 @@ const ToggleCard = ({ selected, onClick, children, accent = 'teal' }) => {
     <button
       type="button" onClick={onClick}
       style={{
-        padding: '11px 16px', borderRadius: '14px',
+        padding: '12px 16px', borderRadius: '16px',
         border: `1.5px solid ${s.border}`, background: s.bg, color: s.color,
-        fontSize: '13px', fontWeight: selected ? 700 : 500,
-        cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-        fontFamily: '"DM Sans", sans-serif',
+        fontSize: '13.5px', fontWeight: selected ? 700 : 500, cursor: 'pointer',
+        transition: 'all 0.15s', fontFamily: '"DM Sans", sans-serif', textAlign: 'center'
       }}
     >
       {children}
     </button>
+  );
+};
+
+const Textarea = ({ status, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <textarea
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '12px 36px 12px 14px',
+          borderRadius: '14px', border: `1.5px solid ${borderColor}`,
+          background: C.gray, fontSize: '13.5px', color: C.text,
+          resize: 'none', outline: 'none', lineHeight: 1.6,
+          fontFamily: '"DM Sans", sans-serif', transition: 'border-color 0.15s',
+          ...props.style
+        }}
+        onFocus={e => { if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '12px', top: '14px' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '12px', top: '14px' }} />}
+    </div>
   );
 };
 
@@ -350,11 +380,15 @@ const PreferencesSection = () => {
     interviewer_notes: candidateProfile?.interviewer_notes || '',
   };
 
-  const { formData, handleChange, handleBlur, handleSubmit, handleArrayChange, setFieldValue, getFieldError, isSubmitting, isDirty, resetForm } =
+  const { formData, handleChange, handleBlur, handleSubmit, handleArrayChange, setFieldValue, getFieldError, getFieldStatus, handleApiErrors, isSubmitting, isDirty, resetForm } =
     useProfileForm(initialData, async (data) => {
       const result = await handleUpdateProfile(data);
-      if (result && !result.error) toast.success('Preferences saved!');
-      else if (result?.error) toast.error('Failed to save preferences.');
+      if (result && !result.error) {
+        toast.success('Preferences saved!');
+      } else if (result?.error) {
+        handleApiErrors(result.error);
+        toast.error('Failed to save preferences.');
+      }
     });
 
   useEffect(() => { resetForm(); }, [candidateProfile?.id]);
@@ -440,19 +474,12 @@ const PreferencesSection = () => {
         {/* Notes */}
         <div>
           <SectionLabel>Additional notes for interviewer</SectionLabel>
-          <textarea
+          <Textarea
             id="interviewer_notes" name="interviewer_notes"
             value={formData.interviewer_notes || ''} onChange={handleChange} onBlur={handleBlur}
             disabled={disabled} rows={4} maxLength={500}
             placeholder="Example: I want focus on React hooks and system design. I'm weak in database optimization..."
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '12px 14px',
-              borderRadius: '14px', border: `1.5px solid ${C.grayBorder}`,
-              background: C.gray, fontSize: '13.5px', color: C.text,
-              resize: 'none', outline: 'none', lineHeight: 1.6,
-              fontFamily: '"DM Sans", sans-serif', transition: 'border-color 0.15s',
-            }}
-            onFocus={e => (e.target.style.borderColor = C.teal)}
+            status={getFieldStatus('interviewer_notes')}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
             <p style={{ margin: 0, fontSize: '11px', color: C.textLight }}>💡 Help the interviewer prepare better questions</p>

@@ -8,11 +8,17 @@ from django.core.validators import FileExtensionValidator
 
 
 
+class CurrentStatus(models.TextChoices):
+    STUDENT = "Student", "Student"
+    WORKING_PROFESSIONAL = "Working Professional", "Working Professional"
+    FREELANCER = "Freelancer", "Freelancer"
+    JOB_SEEKER = "Job Seeker", "Job Seeker"
+    CAREER_SWITCHER = "Career Switcher", "Career Switcher"
+
 class ExperienceLevel(models.TextChoices):
-    FRESHER = "FRESHER", "Fresher"
-    JUNIOR = "JUNIOR", "Junior (0-2 years)"
-    MID = "MID", "Mid-Level (2-5 years)"
-    SENIOR = "SENIOR", "Senior (5+ years)"
+    BEGINNER = "Beginner", "Beginner"
+    INTERMEDIATE = "Intermediate", "Intermediate"
+    ADVANCED = "Advanced", "Advanced"
 
 class InterviewType(models.TextChoices):
     HR = "HR", "HR Round"
@@ -52,7 +58,7 @@ class CandidateProfile(models.Model):
 
     
 
-    current_status = models.CharField(max_length=50, blank=True)
+    current_status = models.CharField(max_length=50, choices=CurrentStatus.choices, blank=True)
     current_role = models.CharField(max_length=120, blank=True)
     target_role = models.CharField(max_length=120, blank=True)
     experience_level = models.CharField(max_length=20, choices=ExperienceLevel.choices, blank=True)

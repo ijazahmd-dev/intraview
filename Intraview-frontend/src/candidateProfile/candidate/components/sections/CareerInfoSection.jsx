@@ -528,6 +528,7 @@ import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -573,11 +574,104 @@ const Label = ({ children }) => (
   </label>
 );
 
-const baseInput = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 14px',
-  borderRadius: '12px', border: `1.5px solid ${C.grayBorder}`,
-  background: C.white, fontSize: '13.5px', color: C.text,
-  outline: 'none', fontFamily: '"DM Sans", sans-serif', transition: 'border-color 0.15s',
+const Input = ({ status, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative', flex: props.style?.flex }}>
+      <input
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: props.readOnly ? C.gray : C.white,
+          fontSize: '13.5px', color: props.readOnly ? C.textMuted : C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: props.readOnly ? 'not-allowed' : 'auto',
+          transition: 'border-color 0.15s',
+          ...props.style,
+        }}
+        onFocus={e => { if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+    </div>
+  );
+};
+
+const Select = ({ status, children, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <select
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: C.white, fontSize: '13.5px', color: C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: 'pointer', appearance: 'none', transition: 'border-color 0.15s',
+        }}
+        onFocus={e => { if (!isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      >
+        {children}
+      </select>
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '30px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '30px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
+      <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: `4px solid ${C.textMuted}` }} />
+    </div>
+  );
+};
+
+const Textarea = ({ status, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <textarea
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: props.readOnly ? C.gray : C.white,
+          fontSize: '13.5px', color: props.readOnly ? C.textMuted : C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: props.readOnly ? 'not-allowed' : 'auto',
+          transition: 'border-color 0.15s',
+          resize: 'none', lineHeight: 1.6,
+          ...props.style
+        }}
+        onFocus={e => { if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '12px', top: '14px' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '12px', top: '14px' }} />}
+    </div>
+  );
 };
 
 const FieldError = ({ msg }) => msg
@@ -623,7 +717,7 @@ const CareerInfoSection = () => {
     interviewer_notes: candidateProfile?.interviewer_notes || '',
   };
 
-  const { formData, handleChange, handleBlur, handleSubmit, handleArrayChange, setFieldValue, getFieldError, isSubmitting, isDirty, resetForm } =
+  const { formData, handleChange, handleBlur, handleSubmit, handleArrayChange, setFieldValue, getFieldError, getFieldStatus, handleApiErrors, isSubmitting, isDirty, resetForm } =
     useProfileForm(initialData, async (data) => {
       const cleaned = {
         ...data,
@@ -633,8 +727,12 @@ const CareerInfoSection = () => {
         preferred_interview_types: Array.isArray(data.preferred_interview_types) ? data.preferred_interview_types : [],
       };
       const result = await handleUpdateProfile(cleaned);
-      if (result && !result.error) toast.success('Career profile saved!');
-      else if (result?.error) toast.error('Failed to save — please check your inputs.');
+      if (result && !result.error) {
+        toast.success('Career profile saved!');
+      } else if (result?.error) {
+        handleApiErrors(result.error);
+        toast.error('Failed to save — please check your inputs.');
+      }
     });
 
   useEffect(() => { resetForm(); }, [candidateProfile?.id]);
@@ -683,11 +781,10 @@ const CareerInfoSection = () => {
         {/* Headline */}
         <div>
           <Label>Headline / Tagline</Label>
-          <input
+          <Input
             type="text" name="headline" value={formData.headline || ''} onChange={handleChange} onBlur={handleBlur}
             disabled={disabled} maxLength={150} placeholder="e.g. Aspiring ML Engineer | React Developer"
-            style={baseInput}
-            onFocus={e => (e.target.style.borderColor = C.teal)}
+            status={getFieldStatus('headline')}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
             <span style={{ fontSize: '11px', color: C.textLight }}>Shown on your profile card</span>
@@ -699,12 +796,11 @@ const CareerInfoSection = () => {
         {/* Bio */}
         <div>
           <Label>About me</Label>
-          <textarea
+          <Textarea
             name="bio" value={formData.bio || ''} onChange={handleChange} onBlur={handleBlur}
             disabled={disabled} rows={4} maxLength={1000}
             placeholder="Write a short bio about yourself..."
-            style={{ ...baseInput, resize: 'none', lineHeight: 1.6 }}
-            onFocus={e => (e.target.style.borderColor = C.teal)}
+            status={getFieldStatus('bio')}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
             <span style={{ fontSize: '11px', color: C.textLight }}>Helps interviewers understand you better</span>
@@ -717,41 +813,40 @@ const CareerInfoSection = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div>
             <Label>Current status</Label>
-            <select name="current_status" value={formData.current_status || ''} onChange={handleChange} onBlur={handleBlur} disabled={disabled}
-              style={baseInput} onFocus={e => (e.target.style.borderColor = C.teal)}>
+            <Select name="current_status" value={formData.current_status || ''} onChange={handleChange} onBlur={handleBlur} disabled={disabled} status={getFieldStatus('current_status')}>
               <option value="">Select status</option>
               <option value="Student">Student</option>
               <option value="Fresher">Fresher</option>
               <option value="Working">Working Professional</option>
               <option value="Career Switcher">Career switcher</option>
-            </select>
+            </Select>
+            <FieldError msg={getFieldError('current_status')} />
           </div>
           <div>
             <Label>Current role</Label>
-            <input type="text" name="current_role" value={formData.current_role || ''} onChange={handleChange} onBlur={handleBlur}
-              disabled={disabled} placeholder="Software Engineer, Student…" style={baseInput}
-              onFocus={e => (e.target.style.borderColor = C.teal)} />
+            <Input type="text" name="current_role" value={formData.current_role || ''} onChange={handleChange} onBlur={handleBlur}
+              disabled={disabled} placeholder="Software Engineer, Student…" status={getFieldStatus('current_role')} />
+            <FieldError msg={getFieldError('current_role')} />
           </div>
           <div>
             <Label>Target role</Label>
-            <input type="text" name="target_role" value={formData.target_role || ''} onChange={handleChange} onBlur={handleBlur}
-              disabled={disabled} placeholder="Frontend Developer, ML Engineer…" style={baseInput}
-              onFocus={e => (e.target.style.borderColor = C.teal)} />
+            <Input type="text" name="target_role" value={formData.target_role || ''} onChange={handleChange} onBlur={handleBlur}
+              disabled={disabled} placeholder="Frontend Developer, ML Engineer…" status={getFieldStatus('target_role')} />
             <FieldError msg={getFieldError('target_role')} />
           </div>
           <div>
             <Label>Experience level</Label>
-            <select name="experience_level" value={formData.experience_level || ''} onChange={handleChange} onBlur={handleBlur}
-              disabled={disabled} style={baseInput} onFocus={e => (e.target.style.borderColor = C.teal)}>
+            <Select name="experience_level" value={formData.experience_level || ''} onChange={handleChange} onBlur={handleBlur}
+              disabled={disabled} status={getFieldStatus('experience_level')}>
               <option value="">Select experience</option>
               {EXPERIENCE_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
+            </Select>
+            <FieldError msg={getFieldError('experience_level')} />
           </div>
           <div>
             <Label>Years of experience</Label>
-            <input type="number" name="years_experience" value={formData.years_experience} onChange={handleChange} onBlur={handleBlur}
-              min={0} max={100} disabled={disabled} placeholder="0" style={baseInput}
-              onFocus={e => (e.target.style.borderColor = C.teal)} />
+            <Input type="number" name="years_experience" value={formData.years_experience} onChange={handleChange} onBlur={handleBlur}
+              min={0} max={100} disabled={disabled} placeholder="0" status={getFieldStatus('years_experience')} />
             <FieldError msg={getFieldError('years_experience')} />
           </div>
         </div>
@@ -775,14 +870,13 @@ const CareerInfoSection = () => {
                 </span>
               ))
             ) : (
-              <p style={{ fontSize: '12px', color: C.textMuted }}>Add at least 3 skills you want to be interviewed on.</p>
+              <p style={{ fontSize: '12px', color: C.textMuted }}>Add at least 1 skill you want to be interviewed on.</p>
             )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <input
+            <Input
               type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} placeholder="React, Django, DSA…"
-              disabled={disabled} style={{ ...baseInput, flex: 1 }}
-              onFocus={e => (e.target.style.borderColor = C.teal)}
+              disabled={disabled} style={{ flex: 1 }}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }}
             />
             <button type="button" onClick={addSkill} disabled={disabled}
@@ -837,12 +931,11 @@ const CareerInfoSection = () => {
         {/* Notes */}
         <div>
           <Label>Notes for interviewer</Label>
-          <textarea
+          <Textarea
             name="interviewer_notes" value={formData.interviewer_notes || ''} onChange={handleChange} onBlur={handleBlur}
             disabled={disabled} rows={4}
             placeholder="Example: I want more focus on React hooks, system design basics..."
-            style={{ ...baseInput, resize: 'none', lineHeight: 1.6 }}
-            onFocus={e => (e.target.style.borderColor = C.teal)}
+            status={getFieldStatus('interviewer_notes')}
           />
           <FieldError msg={getFieldError('interviewer_notes')} />
         </div>

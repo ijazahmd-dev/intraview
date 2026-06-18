@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from .models import InterviewType
 from rest_framework.exceptions import ValidationError
+import re
+from django.utils.html import strip_tags
 
 from .models import CandidateProfile
 
@@ -144,22 +146,17 @@ class DetailedCandidateProfileSerializer(serializers.ModelSerializer):
 # 3️⃣ PROFILE UPDATE SERIALIZER
 # ============================================
 class UpdateCandidateProfileSerializer(serializers.ModelSerializer):
-
     user_first_name = serializers.CharField(
         source='user.first_name', 
         required=False,
         allow_blank=True,
-        max_length=100
     )
     user_last_name = serializers.CharField(
         source='user.last_name', 
         required=False,
         allow_blank=True,
-        max_length=100
     )
 
-    """For updating profile - stricter validation"""
-    
     class Meta:
         model = CandidateProfile
         fields = [
@@ -185,119 +182,183 @@ class UpdateCandidateProfileSerializer(serializers.ModelSerializer):
             'github_url',
             'portfolio_url',
         ]
-        read_only_fields = []
-    
-    def validate_headline(self, value):
-        if value and len(value) > 150:
-            raise ValidationError("Headline cannot exceed 150 characters")
+
+    def validate_user_first_name(self, value):
+        if not value:
+            raise ValidationError("First name is required")
+        if len(value) < 2 or len(value) > 50:
+            raise ValidationError("First name must be between 2 and 50 characters")
+        if not re.match(r'^[A-Za-z\s]+$', value):
+            raise ValidationError("First name must contain only letters and spaces")
+        return value.strip()
+
+    def validate_user_last_name(self, value):
+        if value:
+            if len(value) < 2 or len(value) > 50:
+                raise ValidationError("Last name must be between 2 and 50 characters")
+            if not re.match(r'^[A-Za-z\s]+$', value):
+                raise ValidationError("Last name can only contain letters and spaces")
+            return value.strip()
         return value
 
-    def validate_bio(self, value):
-        if value and len(value) > 1000:
-            raise ValidationError("Bio cannot exceed 1000 characters")
+    def validate_full_name(self, value):
+        if not value:
+            raise ValidationError("Display name is required")
+        value = value.strip()
+        if len(value) < 3 or len(value) > 60:
+            raise ValidationError("Display name must be between 3 and 60 characters")
+        if not re.match(r'^[A-Za-z0-9\s]+$', value):
+            raise ValidationError("Display name contains invalid characters")
         return value
 
     def validate_phone(self, value):
-        if value and not value.replace('+', '').replace('-', '').replace(' ', '').isdigit():
-            raise ValidationError("Phone number must contain only digits, spaces, +, or -")
+        if not value:
+            raise ValidationError("Enter a valid phone number")
+        value = value.replace(' ', '')
+        test_val = value
+        if test_val.startswith('+91'):
+            test_val = test_val[3:]
+        elif test_val.startswith('91') and len(test_val) == 12:
+            test_val = test_val[2:]
+            value = '+' + value
+            
+        if not re.match(r'^\d{10}$', test_val):
+            raise ValidationError("Phone number must contain exactly 10 digits")
         return value
-    
+
+    def validate_location(self, value):
+        if not value:
+            raise ValidationError("Location is required")
+        value = value.strip()
+        if len(value) < 2 or len(value) > 100:
+            raise ValidationError("Enter a valid location")
+        if not re.match(r'^[A-Za-z\s,\-]+$', value):
+            raise ValidationError("Location contains invalid characters")
+        return value
+
+    def validate_headline(self, value):
+        if value:
+            if len(value) > 150:
+                raise ValidationError("Headline cannot exceed 150 characters")
+            value = strip_tags(value)
+        return value
+
+    def validate_bio(self, value):
+        if value:
+            if len(value) > 1000:
+                raise ValidationError("About me cannot exceed 1000 characters")
+            value = strip_tags(value)
+        return value
+
+    def validate_current_role(self, value):
+        if not value:
+            raise ValidationError("Current role is required")
+        if len(value) < 2 or len(value) > 100:
+            raise ValidationError("Current role must be between 2 and 100 characters")
+        return value
+
+    def validate_target_role(self, value):
+        if not value:
+            raise ValidationError("Target role is required")
+        if len(value) < 2 or len(value) > 100:
+            raise ValidationError("Target role must be between 2 and 100 characters")
+        return value
+
     def validate_years_experience(self, value):
-
-        if value is not None:
-            if value < 0:
-                raise ValidationError("Years of experience cannot be negative")
-            if value > 100:
-                raise ValidationError("Years of experience cannot exceed 100")
-        return value
-    
-    def validate_preferred_duration(self, value):
-
-        allowed_durations = [30, 45, 60]
-        if value not in allowed_durations:
-            raise ValidationError(f"Preferred duration must be one of {allowed_durations}")
-        return value
-    
-    def validate_preferred_interview_types(self, value):
-
         if value is None:
-            value = []
-        
-        if not isinstance(value, list):
-            raise ValidationError("Interview types must be a list")
-        
-        valid_types = [choice[0] for choice in InterviewType.choices]
-        invalid = [v for v in value if v not in valid_types]
-        if invalid:
-            raise ValidationError(f"Invalid interview types: {invalid}. Choose from {valid_types}")
-        
+            raise ValidationError("Enter valid years of experience")
+        if value < 0 or value > 50:
+            raise ValidationError("Years of experience must be between 0 and 50")
         return value
-    
+
     def validate_skills(self, value):
-  
-        if value is None:
-            value = []
-        
-        if not isinstance(value, list):
-            raise ValidationError("Skills must be a list")
-        
+        if not value or not isinstance(value, list) or len(value) < 1:
+            raise ValidationError("Add at least 1 skill")
         if len(value) > 20:
             raise ValidationError("Maximum 20 skills allowed")
         
-        # Remove duplicates preserving order
         cleaned = []
         seen = set()
         for s in value:
             s = str(s).strip()
-            if s:
-                s_lower = s.lower()
-                if s_lower not in seen:
-                    cleaned.append(s)
-                    seen.add(s_lower)
-        
+            if not s: continue
+            if len(s) < 2 or len(s) > 50:
+                raise ValidationError(f"Skill '{s}' must be between 2 and 50 characters")
+            
+            s_lower = s.lower()
+            if s_lower in seen:
+                raise ValidationError("Duplicate skills are not allowed")
+            
+            cleaned.append(s)
+            seen.add(s_lower)
+            
+        if len(cleaned) < 1:
+            raise ValidationError("Add at least 1 skill")
+            
         return cleaned
-    
+
+    def validate_interviewer_notes(self, value):
+        if value:
+            if len(value) > 500:
+                raise ValidationError("Notes cannot exceed 500 characters")
+            value = strip_tags(value)
+        return value
+
     def validate_linkedin_url(self, value):
-
-        if value and not value.startswith("https://"):
-            raise ValidationError("LinkedIn URL must start with https://")
-        if value and "linkedin.com" not in value.lower():
-            raise ValidationError("Please provide a valid LinkedIn URL")
+        if value:
+            if not value.startswith("https://"):
+                raise ValidationError("Enter a valid LinkedIn profile URL")
+            if not re.match(r'^https:\/\/(www\.)?linkedin\.com\/.*$', value):
+                raise ValidationError("Enter a valid LinkedIn profile URL")
         return value
-    
+
     def validate_github_url(self, value):
- 
-        if value and not value.startswith("https://"):
-            raise ValidationError("GitHub URL must start with https://")
-        if value and "github.com" not in value.lower():
-            raise ValidationError("Please provide a valid GitHub URL")
+        if value:
+            if not value.startswith("https://"):
+                raise ValidationError("Enter a valid GitHub profile URL")
+            if not re.match(r'^https:\/\/(www\.)?github\.com\/.*$', value):
+                raise ValidationError("Enter a valid GitHub profile URL")
         return value
-    
+
     def validate_portfolio_url(self, value):
-
-        if value and not value.startswith("https://"):
-            raise ValidationError("Portfolio URL must start with https://")
+        if value:
+            if not value.startswith("https://"):
+                raise ValidationError("Enter a valid website URL")
         return value
-    
-    def update(self, instance, validated_data):
 
-        # Extract user data
+    def validate_preferred_interview_types(self, value):
+        if not value or not isinstance(value, list) or len(value) == 0:
+            raise ValidationError("Select at least one interview type")
+        
+        valid_types = [choice[0] for choice in InterviewType.choices]
+        invalid = [v for v in value if v not in valid_types]
+        if invalid:
+            raise ValidationError("Invalid interview types selected")
+        return value
+
+    def validate_preferred_duration(self, value):
+        if not value:
+            raise ValidationError("Select interview duration")
+        allowed_durations = [30, 45, 60]
+        if value not in allowed_durations:
+            raise ValidationError("Select interview duration")
+        return value
+
+    def update(self, instance, validated_data):
         user_data = {}
         if 'user' in validated_data:
             user_data = validated_data.pop('user')
         
-        # Update user fields if provided
         if user_data:
             user = instance.user
             for attr, value in user_data.items():
                 setattr(user, attr, value)
             user.save()
         
-        # Update profile fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
-        instance.save()  # Triggers update_profile_completion()
+        instance.save()
         return instance
 
 

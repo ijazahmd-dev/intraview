@@ -53,7 +53,7 @@ class SignupView(APIView):
 
             if not OTPService.can_send_otp(email):
                 return Response(
-                    {"error": "OTP request limit exceeded. Please try again later."},
+                    {"success": False, "errors": {"email": ["OTP request limit exceeded. Please try again later."]}},
                     status=status.HTTP_429_TOO_MANY_REQUESTS
                 )
 
@@ -71,17 +71,42 @@ class SignupView(APIView):
                 send_otp_task.delay(email, otp)
             
                 return Response(
-                    {"message": "Signup successful. OTP sent to email."},
+                    {"success": True, "message": "Signup successful. OTP sent to email."},
                     status=status.HTTP_201_CREATED,
                 )
             except Exception as e:
                 logger.error(f"Error during signup process: {e}")
                 return Response(
-                    {"error": "Internal server error. Please try again."},
+                    {"success": False, "errors": {"non_field_errors": ["Internal server error. Please try again."]}},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"success": False, "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+class CheckAvailabilityView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        username = request.query_params.get("username", "").strip()
+        email = request.query_params.get("email", "").strip().lower()
+        
+        errors = {}
+        
+        if username:
+            if User.objects.filter(username__iexact=username).exists():
+                errors["username"] = "Username already exists."
+        
+        if email:
+            if User.objects.filter(email=email).exists():
+                errors["email"] = "Email already registered."
+                
+        if errors:
+            return Response({"success": False, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({"success": True, "message": "Available"}, status=status.HTTP_200_OK)
 
 
 

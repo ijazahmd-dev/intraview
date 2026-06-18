@@ -264,7 +264,7 @@ import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 import useProfileForm from '../../hooks/useProfileForm';
 import { useProfileData } from '../../hooks/useProfileData';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -288,45 +288,71 @@ const Label = ({ children }) => (
   </label>
 );
 
-const Input = ({ error, ...props }) => (
-  <input
-    {...props}
-    style={{
-      width: '100%', boxSizing: 'border-box', padding: '10px 14px',
-      borderRadius: '12px', border: `1.5px solid ${error ? '#FECACA' : C.grayBorder}`,
-      background: props.readOnly ? C.gray : C.white,
-      fontSize: '13.5px', color: props.readOnly ? C.textMuted : C.text,
-      outline: 'none', fontFamily: '"DM Sans", sans-serif',
-      cursor: props.readOnly ? 'not-allowed' : 'auto',
-      transition: 'border-color 0.15s',
-    }}
-    onFocus={e => { if (!props.readOnly) e.target.style.borderColor = C.teal; }}
-    onBlur={e => {
-      if (!props.readOnly) e.target.style.borderColor = error ? '#FECACA' : C.grayBorder;
-      if (props.onBlur) props.onBlur(e);
-    }}
-  />
-);
+const Input = ({ status, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
 
-const Select = ({ error, children, ...props }) => (
-  <select
-    {...props}
-    style={{
-      width: '100%', boxSizing: 'border-box', padding: '10px 14px',
-      borderRadius: '12px', border: `1.5px solid ${error ? '#FECACA' : C.grayBorder}`,
-      background: C.white, fontSize: '13.5px', color: C.text,
-      outline: 'none', fontFamily: '"DM Sans", sans-serif',
-      cursor: 'pointer', appearance: 'none', transition: 'border-color 0.15s',
-    }}
-    onFocus={e => (e.target.style.borderColor = C.teal)}
-    onBlur={e => {
-      e.target.style.borderColor = error ? '#FECACA' : C.grayBorder;
-      if (props.onBlur) props.onBlur(e);
-    }}
-  >
-    {children}
-  </select>
-);
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: props.readOnly ? C.gray : C.white,
+          fontSize: '13.5px', color: props.readOnly ? C.textMuted : C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: props.readOnly ? 'not-allowed' : 'auto',
+          transition: 'border-color 0.15s',
+        }}
+        onFocus={e => { if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!props.readOnly && !isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      />
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />}
+    </div>
+  );
+};
+
+const Select = ({ status, children, ...props }) => {
+  const isError = status === 'error';
+  const isValid = status === 'valid';
+  let borderColor = C.grayBorder;
+  if (isError) borderColor = '#EF4444';
+  if (isValid) borderColor = '#10B981';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <select
+        {...props}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '10px 36px 10px 14px',
+          borderRadius: '12px', border: `1.5px solid ${borderColor}`,
+          background: C.white, fontSize: '13.5px', color: C.text,
+          outline: 'none', fontFamily: '"DM Sans", sans-serif',
+          cursor: 'pointer', appearance: 'none', transition: 'border-color 0.15s',
+        }}
+        onFocus={e => { if (!isError && !isValid) e.target.style.borderColor = C.teal; }}
+        onBlur={e => {
+          if (!isError && !isValid) e.target.style.borderColor = C.grayBorder;
+          if (props.onBlur) props.onBlur(e);
+        }}
+      >
+        {children}
+      </select>
+      {isValid && <CheckCircle2 size={16} color="#10B981" style={{ position: 'absolute', right: '30px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
+      {isError && <XCircle size={16} color="#EF4444" style={{ position: 'absolute', right: '30px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />}
+      {/* Custom select arrow */}
+      <div style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: `4px solid ${C.textMuted}` }} />
+    </div>
+  );
+};
 
 const FieldError = ({ msg }) => msg
   ? <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#DC2626' }}>{msg}</p>
@@ -345,11 +371,15 @@ const BasicInfoSection = () => {
     timezone: candidateProfile?.timezone || 'Asia/Kolkata',
   };
 
-  const { formData, handleChange, handleBlur, handleSubmit, getFieldError, isSubmitting, isDirty, resetForm } =
+  const { formData, handleChange, handleBlur, handleSubmit, setFieldValue, getFieldError, getFieldStatus, handleApiErrors, isSubmitting, isDirty, resetForm } =
     useProfileForm(initialData, async (data) => {
       const result = await handleUpdateProfile(data);
-      if (result && !result.error) toast.success('Basic info saved!');
-      else if (result?.error) toast.error('Failed to save — please check your inputs.');
+      if (result && !result.error) {
+        toast.success('Basic info saved!');
+      } else if (result?.error) {
+        handleApiErrors(result.error);
+        toast.error('Failed to save — please check your inputs.');
+      }
     });
 
   useEffect(() => { resetForm(); }, [candidateProfile?.id, user?.id]);
@@ -376,19 +406,19 @@ const BasicInfoSection = () => {
 
           <div>
             <Label>First name</Label>
-            <Input type="text" name="user_first_name" value={formData.user_first_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="John" disabled={disabled} error={getFieldError('user_first_name')} />
+            <Input type="text" name="user_first_name" value={formData.user_first_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="John" disabled={disabled} status={getFieldStatus('user_first_name')} />
             <FieldError msg={getFieldError('user_first_name')} />
           </div>
 
           <div>
             <Label>Last name</Label>
-            <Input type="text" name="user_last_name" value={formData.user_last_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="Doe" disabled={disabled} error={getFieldError('user_last_name')} />
+            <Input type="text" name="user_last_name" value={formData.user_last_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="Doe" disabled={disabled} status={getFieldStatus('user_last_name')} />
             <FieldError msg={getFieldError('user_last_name')} />
           </div>
 
           <div>
             <Label>Display name</Label>
-            <Input type="text" name="full_name" value={formData.full_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="John Doe" disabled={disabled} error={getFieldError('full_name')} />
+            <Input type="text" name="full_name" value={formData.full_name || ''} onChange={handleChange} onBlur={handleBlur} placeholder="John Doe" disabled={disabled} status={getFieldStatus('full_name')} />
             <FieldError msg={getFieldError('full_name')} />
           </div>
 
@@ -400,24 +430,25 @@ const BasicInfoSection = () => {
 
           <div>
             <Label>Phone number</Label>
-            <Input type="tel" name="phone" value={formData.phone || ''} onChange={handleChange} onBlur={handleBlur} placeholder="+91 98765 43210" disabled={disabled} error={getFieldError('phone')} />
+            <Input type="tel" name="phone" value={formData.phone || ''} onChange={handleChange} onBlur={handleBlur} placeholder="+91 98765 43210" disabled={disabled} status={getFieldStatus('phone')} />
             <FieldError msg={getFieldError('phone')} />
           </div>
 
           <div>
             <Label>Location</Label>
-            <Input type="text" name="location" value={formData.location || ''} onChange={handleChange} onBlur={handleBlur} placeholder="Kozhikode, Kerala" disabled={disabled} error={getFieldError('location')} />
+            <Input type="text" name="location" value={formData.location || ''} onChange={handleChange} onBlur={handleBlur} placeholder="Kozhikode, Kerala" disabled={disabled} status={getFieldStatus('location')} />
             <FieldError msg={getFieldError('location')} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
             <Label>Timezone</Label>
-            <Select name="timezone" value={formData.timezone || 'Asia/Kolkata'} onChange={handleChange} onBlur={handleBlur} disabled={disabled}>
+            <Select name="timezone" value={formData.timezone || 'Asia/Kolkata'} onChange={handleChange} onBlur={handleBlur} disabled={disabled} status={getFieldStatus('timezone')}>
               <option value="Asia/Kolkata">(GMT+5:30) India Standard Time</option>
               <option value="Asia/Dubai">(GMT+4:00) Gulf Standard Time</option>
               <option value="Europe/London">(GMT+0:00) UK / London</option>
               <option value="America/New_York">(GMT-5:00) US / Eastern</option>
             </Select>
+            <FieldError msg={getFieldError('timezone')} />
           </div>
         </div>
 

@@ -15,6 +15,7 @@ router.register(r"admin/users", views_admin.AdminUserViewSet, basename="admin-us
 urlpatterns = [
 
     path('signup/', views.SignupView.as_view(),name='signup'),
+    path('check-availability/', views.CheckAvailabilityView.as_view(), name='check-availability'),
     path('verify-otp/', views.VerifyOTPView.as_view(), name='verify-otp'),
     path("resend-otp/", views.ResendOtpView.as_view(), name="resend-otp"),
 
