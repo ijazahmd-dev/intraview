@@ -4,6 +4,7 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class FeedbackType(models.TextChoices):
@@ -125,15 +126,17 @@ class CandidateEvaluation(models.Model):
             raise ValidationError("AI evaluation should not have a human interviewer.")
 
     def save(self, *args, **kwargs):
-        self.overall_score = round(
-            (
-                self.technical_score +
-                self.communication_score +
-                self.problem_solving_score +
-                self.confidence_score
-            ) / 4,
-            1
+        # Use exact Decimal arithmetic to avoid float→Decimal conversion errors.
+        # e.g. [4, 2, 5, 3] → Decimal('14') / Decimal('4') → Decimal('3.5')
+        total = (
+            self.technical_score +
+            self.communication_score +
+            self.problem_solving_score +
+            self.confidence_score
         )
+        self.overall_score = (
+            Decimal(str(total)) / Decimal('4')
+        ).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
         self.full_clean()
         super().save(*args, **kwargs)
 

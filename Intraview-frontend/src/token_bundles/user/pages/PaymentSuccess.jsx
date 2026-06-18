@@ -223,7 +223,7 @@ export default function PaymentSuccess() {
               </motion.button>
               
               <button
-                onClick={() => navigate('/wallet')}
+                onClick={() => navigate('/candidate/wallet')}
                 className="px-8 py-4 rounded-2xl bg-white border-2 border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50 hover:border-emerald-400 transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 View Wallet
@@ -236,21 +236,21 @@ export default function PaymentSuccess() {
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-center space-y-6 mb-12">
           <h3 className="text-3xl font-bold text-gray-900 mb-8">What's Next?</h3>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-emerald-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/dashboard')}>
+            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-emerald-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/candidate/interviewers')}>
               <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-emerald-200 transition-colors duration-200">
                 <ArrowRight className="w-8 h-8 text-emerald-600" />
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">Book Interview</h4>
               <p className="text-gray-600">Use your new tokens now</p>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-emerald-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/wallet')}>
+            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-emerald-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/candidate/wallet')}>
               <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-blue-200 transition-colors duration-200">
                 <Gift className="w-8 h-8 text-blue-600" />
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">Check Wallet</h4>
               <p className="text-gray-600">View balance & history</p>
             </motion.div>
-            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-purple-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/candidate/wallet')}>
+            <motion.div whileHover={{ scale: 1.05, y: -5 }} className="group bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:border-purple-300 hover:shadow-2xl transition-all duration-300 cursor-pointer" onClick={() => navigate('/tokens')}>
               <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:bg-purple-200 transition-colors duration-200">
                 <CreditCard className="w-8 h-8 text-purple-600" />
               </div>

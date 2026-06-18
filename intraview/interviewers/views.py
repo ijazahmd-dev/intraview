@@ -159,6 +159,7 @@ class InterviewerApplicationCreateView(APIView):
                     {"message": "Application re-submitted successfully."},
                     status=status.HTTP_200_OK,
                 )
+            print("UPDATE Application validation errors:", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
         # ── Pending / Approved: block ─────────────────────────────────────────
@@ -191,6 +192,7 @@ class InterviewerApplicationCreateView(APIView):
                 status=status.HTTP_201_CREATED,
             )
  
+        print("CREATE Application validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
 

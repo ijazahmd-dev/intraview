@@ -197,7 +197,10 @@ class EvaluationStatusAPIView(APIView):
             'is_evaluation_submitted': CandidateEvaluation.objects.filter(booking=booking).exists(),
             'booking': {
                 'id': booking.id,
-                'candidate_name': f"{booking.candidate.first_name} {booking.candidate.last_name}".strip(),
+                'candidate_name': (
+                    f"{booking.candidate.first_name or ''} {booking.candidate.last_name or ''}".strip()
+                    or booking.candidate.email
+                ),
                 'candidate_email': booking.candidate.email,
                 'start_datetime': booking.start_datetime.isoformat() if booking.start_datetime else None,
                 'status': booking.status,

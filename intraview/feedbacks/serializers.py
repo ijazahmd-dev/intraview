@@ -1,15 +1,35 @@
 # feedback/serializers.py
 
+import re
+
 from rest_framework import serializers
 from .models import CandidateEvaluation, InterviewerReview
 from bookings.models import InterviewBooking
 
 
+def _strip_html(value: str) -> str:
+    """
+    Strip HTML tags and collapse whitespace.
+    Rejects payloads that still contain <script after stripping.
+    """
+    # Remove all HTML/XML tags
+    cleaned = re.sub(r'<[^>]+>', '', value)
+    # Collapse leading/trailing whitespace per line, then overall
+    cleaned = cleaned.strip()
+    return cleaned
 
 
-
-
-
+def _has_malicious_content(value: str) -> bool:
+    """Detect common XSS patterns even after tag stripping."""
+    patterns = [
+        r'javascript\s*:',
+        r'on\w+\s*=',
+        r'<\s*script',
+        r'data\s*:\s*text/html',
+        r'vbscript\s*:',
+    ]
+    lower = value.lower()
+    return any(re.search(p, lower) for p in patterns)
 
 
 #################################################### Interviewer side ##############################################################
@@ -33,16 +53,150 @@ class CandidateEvaluationCreateSerializer(serializers.ModelSerializer):
             "topics_covered",
         ]
 
-    def validate_strengths(self, value):
-        if len(value) < 20:
+    # ─── Score fields ─────────────────────────────────────────────────────────
+
+    def _validate_score(self, value, field_label):
+        if value is None:
+            raise serializers.ValidationError(f"Please rate {field_label}.")
+        if not (1 <= value <= 5):
             raise serializers.ValidationError(
-                "Strengths must be at least 20 characters."
+                f"{field_label} must be between 1 and 5."
             )
         return value
 
+    def validate_technical_score(self, value):
+        return self._validate_score(value, "Technical Skills")
 
+    def validate_communication_score(self, value):
+        return self._validate_score(value, "Communication & Clarity")
 
+    def validate_problem_solving_score(self, value):
+        return self._validate_score(value, "Problem Solving Ability")
 
+    def validate_confidence_score(self, value):
+        return self._validate_score(value, "Confidence & Composure")
+
+    # ─── Text fields ──────────────────────────────────────────────────────────
+
+    def _validate_text_field(self, value, field_label, min_len=30, max_len=500, required=True):
+        cleaned = _strip_html(value or "")
+
+        if _has_malicious_content(value or ""):
+            raise serializers.ValidationError(
+                f"{field_label} contains disallowed content."
+            )
+
+        if required and not cleaned:
+            raise serializers.ValidationError(
+                f"Please provide {field_label}."
+            )
+
+        if required and len(cleaned) < min_len:
+            raise serializers.ValidationError(
+                f"Minimum {min_len} characters required."
+            )
+
+        if len(cleaned) > max_len:
+            raise serializers.ValidationError(
+                f"{field_label} cannot exceed {max_len} characters."
+            )
+
+        return cleaned
+
+    def validate_strengths(self, value):
+        return self._validate_text_field(value, "candidate strengths")
+
+    def validate_areas_for_improvement(self, value):
+        return self._validate_text_field(value, "areas for improvement")
+
+    def validate_actionable_suggestions(self, value):
+        return self._validate_text_field(value, "actionable recommendations")
+
+    def validate_additional_notes(self, value):
+        return self._validate_text_field(
+            value, "additional notes", min_len=0, required=False
+        )
+
+    # ─── Choice fields ────────────────────────────────────────────────────────
+
+    def validate_hire_recommendation(self, value):
+        valid = {'STRONG_YES', 'YES', 'MAYBE', 'NO', 'STRONG_NO'}
+        if not value:
+            raise serializers.ValidationError(
+                "Please select a hiring recommendation."
+            )
+        if value not in valid:
+            raise serializers.ValidationError(
+                "Invalid hiring recommendation."
+            )
+        return value
+
+    def validate_interview_difficulty(self, value):
+        valid = {'EASY', 'MEDIUM', 'HARD', 'EXPERT'}
+        if not value:
+            raise serializers.ValidationError(
+                "Please select interview difficulty."
+            )
+        if value not in valid:
+            raise serializers.ValidationError(
+                "Invalid difficulty level."
+            )
+        return value
+
+    # ─── Topics ───────────────────────────────────────────────────────────────
+
+    def validate_topics_covered(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError(
+                "Topics must be a list."
+            )
+
+        if len(value) < 1:
+            raise serializers.ValidationError(
+                "Add at least one topic covered."
+            )
+
+        if len(value) > 20:
+            raise serializers.ValidationError(
+                "You cannot add more than 20 topics."
+            )
+
+        cleaned_topics = []
+        seen = set()
+
+        for i, topic in enumerate(value):
+            if not isinstance(topic, str):
+                raise serializers.ValidationError(
+                    f"Topic #{i + 1} must be a string."
+                )
+
+            topic = topic.strip()
+
+            if not topic:
+                raise serializers.ValidationError(
+                    f"Topic #{i + 1} cannot be empty or whitespace."
+                )
+
+            if len(topic) < 2:
+                raise serializers.ValidationError(
+                    f"Topic '{topic}' is too short (minimum 2 characters)."
+                )
+
+            if len(topic) > 50:
+                raise serializers.ValidationError(
+                    f"Topic '{topic}' is too long (maximum 50 characters)."
+                )
+
+            lower = topic.lower()
+            if lower in seen:
+                raise serializers.ValidationError(
+                    f"Duplicate topic: '{topic}'."
+                )
+
+            seen.add(lower)
+            cleaned_topics.append(topic)
+
+        return cleaned_topics
 
 
 class CandidateEvaluationUpdateSerializer(CandidateEvaluationCreateSerializer):
