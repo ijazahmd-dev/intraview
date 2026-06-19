@@ -17,8 +17,12 @@ const AdminProtectedRoute = ({ children }) => {
   const isAdmin = admin?.role === "admin" || admin?.user?.role === "admin";
   
 
-  if (!admin || !isAdmin) {
+  if (!admin) {
     return <Navigate to="/admin/login" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/error/403" replace />;
   }
 
   return children;

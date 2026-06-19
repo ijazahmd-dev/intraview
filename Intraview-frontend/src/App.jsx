@@ -8,6 +8,15 @@ import { ToastContainer } from "react-toastify";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthGate from "./components/AuthGate";
+import GlobalErrorBoundary from "./components/GlobalErrorBoundary";
+import NotFoundPage from "./pages/errors/NotFoundPage";
+import AccessDeniedPage from "./pages/errors/AccessDeniedPage";
+import InternalServerErrorPage from "./pages/errors/InternalServerErrorPage";
+import SessionExpiredPage from "./pages/errors/SessionExpiredPage";
+import InterviewUnavailablePage from "./pages/errors/InterviewUnavailablePage";
+import NetworkErrorPage from "./pages/errors/NetworkErrorPage";
+import PaymentFailedPage from "./pages/errors/PaymentFailedPage";
+import PaymentCancelledPage from "./pages/errors/PaymentCancelledPage";
 import Home from "./pages/Home";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -144,7 +153,7 @@ function AppInner() {
         } />
         <Route path="/subscriptions" element={<UserSubscriptionsPage />} />
         <Route path="/subscriptions/success" element={<SubscriptionSuccess />} />
-        <Route path="/subscriptions/cancel" element={<SubscriptionCancel />} />
+        <Route path="/subscriptions/cancel" element={<PaymentCancelledPage />} />
 
         <Route path="/tokens" element={
           <ProtectedRoute>
@@ -152,7 +161,8 @@ function AppInner() {
           </ProtectedRoute>
         } />
         <Route path="/payment/success" element={<PaymentSuccess />} />
-        <Route path="/payment/cancel" element={<PaymentCancel />} />
+        <Route path="/payment/cancel" element={<PaymentCancelledPage />} />
+        <Route path="/payment/failed" element={<PaymentFailedPage />} />
 
         <Route path="/candidate/wallet" element={
           <ProtectedRoute>
@@ -304,7 +314,7 @@ function AppInner() {
 
         <Route path="interviewer/subscriptions" element={<InterviewerSubscriptionsPage />} />
         <Route path="/interviewer/subscription/success" element={<InterviewerSubscriptionSuccess />} />
-        <Route path="/interviewer/subscription/cancel" element={<InterviewerSubscriptionCancel />} />
+        <Route path="/interviewer/subscription/cancel" element={<PaymentCancelledPage />} />
 
         <Route path="/interviewer/payout/request" element={<PayoutRequestPage />} />
         <Route path="/interviewer/payout/history" element={<PayoutHistoryPage />} />
@@ -417,6 +427,15 @@ function AppInner() {
 
 
 
+        {/* Error Pages */}
+        <Route path="/error/403" element={<AccessDeniedPage />} />
+        <Route path="/error/500" element={<InternalServerErrorPage />} />
+        <Route path="/error/network" element={<NetworkErrorPage />} />
+        <Route path="/error/session-expired" element={<SessionExpiredPage />} />
+        <Route path="/error/interview-unavailable" element={<InterviewUnavailablePage />} />
+
+        {/* Catch-all route for 404 Not Found */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );
@@ -430,7 +449,9 @@ function App() {
   return (
     <>
       <BrowserRouter>
-        <AppInner />
+        <GlobalErrorBoundary>
+          <AppInner />
+        </GlobalErrorBoundary>
       </BrowserRouter>
 
     </>

@@ -90,10 +90,45 @@ API.interceptors.response.use(
   (response) => response,
 
   async (error) => {
+    // Ignore aborted/cancelled requests
+    if (axios.isCancel(error)) {
+      return Promise.reject(error);
+    }
+
+    // Handle Network Errors (No response from server)
+    if (!error.response) {
+      window.location.href = "/error/network";
+      return Promise.reject(error);
+    }
+
+    // Handle Access Denied (403)
+    if (error.response.status === 403) {
+      window.location.href = "/error/403";
+      return Promise.reject(error);
+    }
+
+    // Handle Internal Server Error (500)
+    if (error.response.status === 500) {
+      window.location.href = "/error/500";
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
 
-    // Only intercept 401 Unauthorized errors
-    if (!error.response || error.response.status !== 401) {
+    // Handle AI Interview Session specific errors
+    if (originalRequest.url?.includes("/session/")) {
+      if (error.response.status === 404) {
+        window.location.href = "/error/interview-unavailable";
+        return Promise.reject(error);
+      }
+      if (error.response.status === 410) {
+        window.location.href = "/error/session-expired";
+        return Promise.reject(error);
+      }
+    }
+
+    // Only intercept 401 Unauthorized errors for token refresh
+    if (error.response.status !== 401) {
       return Promise.reject(error);
     }
 

@@ -360,6 +360,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { X, Upload, Trash2, Camera, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import useProfileData from '../../hooks/useProfileData';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
@@ -518,9 +519,28 @@ const ProfileHeader = ({ onEditClick }) => {
     }
   }, [pictureSuccess]);
 
+  useEffect(() => {
+    if (pictureError) {
+      toast.error(typeof pictureError === 'string' ? pictureError : pictureError?.detail || 'Upload failed');
+    }
+  }, [pictureError]);
+
   const onFileChange = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file type. Please select an image.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast.error('File too large. Please select an image under 5MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     await handleUploadPicture(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [handleUploadPicture]);
