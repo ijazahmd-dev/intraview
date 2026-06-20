@@ -90,7 +90,7 @@ const GoogleLoginButton = ({ disabled = false }) => {
       window.google.accounts.id.renderButton(hiddenRef.current, {
         theme: "outline",
         size: "large",
-        width: "1",          // minimal width — the div is invisible
+        // width: "1",          // commented out to allow standard width
         shape: "rectangular",
         text: "signin_with",
       });
@@ -189,7 +189,7 @@ const GoogleLoginButton = ({ disabled = false }) => {
         }
       `}</style>
 
-      {/* ── Visible custom button ─────────────────────────────────────────── */}
+      {/* ── Visible custom button ── COMMENTED OUT FOR PROD COMPATIBILITY ──
       <button
         type="button"
         className="glb-btn"
@@ -200,20 +200,18 @@ const GoogleLoginButton = ({ disabled = false }) => {
         {loading ? <Spinner /> : <GoogleIcon />}
         {loading ? "SIGNING IN..." : "CONTINUE WITH GOOGLE"}
       </button>
+      */}
 
-      {/* ── Hidden Google SDK button (positioned off-screen) ─────────────── */}
+      {/* ── Official Google SDK button (Now visible!) ─────────────── */}
       <div
         ref={hiddenRef}
-        aria-hidden="true"
         style={{
-          position: "absolute",
-          width: "1px",
-          height: "1px",
-          overflow: "hidden",
-          opacity: 0,
-          pointerEvents: "none",
-          top: 0,
-          left: 0,
+          display: "flex",
+          justifyContent: "center",
+          width: "100%",
+          marginTop: "10px",
+          pointerEvents: isDisabled ? "none" : "auto",
+          opacity: isDisabled ? 0.6 : 1,
         }}
       />
     </>
