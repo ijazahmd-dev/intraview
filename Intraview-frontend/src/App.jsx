@@ -100,6 +100,7 @@ import InterviewerIssueDetailPage from "./features/issues/interviewer/pages/Inte
 import AdminIssuesPage from "./features/issues/admin/pages/AdminIssuesPage";
 import AdminIssueDetailPage from "./features/issues/admin/pages/AdminIssueDetailPage";
 import CandidateProgressPage from "./features/progress/pages/CandidateProgressPage";
+import MyAiInterviewsPage from "./features/aiInterview/pages/MyAiInterviewsPage";
 import AdminDashboardPage from "./features/adminDashboard/pages/AdminDashboardPage";
 import AdminSessionsPage from "./features/adminSessions/pages/AdminSessionsPage";
 
@@ -214,6 +215,11 @@ function AppInner() {
             <SettingsPage />
             </ProtectedRoute>
             } />
+          <Route path="ai-interviews" element={
+            <ProtectedRoute>
+            <MyAiInterviewsPage />
+            </ProtectedRoute>
+          } />
         </Route>
 
         {/* want to register this page named RoleBasedAiInterviewPage.jsx */}

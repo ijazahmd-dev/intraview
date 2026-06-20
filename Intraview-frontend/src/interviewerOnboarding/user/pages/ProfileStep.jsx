@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { fetchProfile, saveProfile } from "../../interviewerOnboardingApi";
+import { toast } from "sonner";
 
 export default function ProfileStep() {
   const navigate = useNavigate();
@@ -82,6 +83,19 @@ export default function ProfileStep() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Invalid file type. Please select an image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 2MB.");
+      e.target.value = "";
+      return;
+    }
+
     setProfilePicture(file);
     const url = URL.createObjectURL(file);
     setProfilePreview(url);
@@ -93,6 +107,37 @@ export default function ProfileStep() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Form validations
+    if (!form.display_name?.trim() || form.display_name.trim().length < 2) {
+      toast.error("Full Name must be at least 2 characters long.");
+      return;
+    }
+    if (!form.headline?.trim() || form.headline.trim().length < 5) {
+      toast.error("Professional Headline must be at least 5 characters long.");
+      return;
+    }
+    if (!form.bio?.trim() || form.bio.trim().length < 20) {
+      toast.error("Professional Bio must be at least 20 characters long.");
+      return;
+    }
+    if (form.years_of_experience === "" || form.years_of_experience < 0) {
+      toast.error("Years of Experience is required and cannot be negative.");
+      return;
+    }
+    if (!form.location?.trim()) {
+      toast.error("Location is required.");
+      return;
+    }
+    if (!form.specializations || form.specializations.length === 0) {
+      toast.error("Please add at least one Interview Specialization.");
+      return;
+    }
+    if (!form.languages || form.languages.length === 0) {
+      toast.error("Please add at least one Language Spoken.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -115,7 +160,9 @@ export default function ProfileStep() {
       navigate("/interviewer/onboarding/availability");
     } catch (err) {
       const msg = err.response?.data || "Failed to save profile.";
-      setError(typeof msg === "string" ? msg : "Failed to save profile.");
+      const errorMsg = typeof msg === "string" ? msg : "Failed to save profile.";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setSaving(false);
     }

@@ -1201,10 +1201,10 @@ class InterviewerDashboardProfileView(APIView):
                     {
                         "detail": (
                             "Active interviewer subscription required "
-                            "to go public or accept bookings."
+                            "to go public or accept bookings. Please complete your subscription."
                         )
                     },
-                    status=403,
+                    status=400,
                 ) 
 
         serializer = InterviewerProfileSerializer(

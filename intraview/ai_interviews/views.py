@@ -30,7 +30,9 @@ from ai_interviews.serializers import (
     AIInterviewFinalReportSerializer,
     AIInterviewTurnEvaluationDetailSerializer,
     AIInterviewTurnWithEvaluationSerializer,
+    CandidateAIInterviewHistorySerializer,
 )
+
 from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
 from ai_interviews.service.tavus_avatar_service import TavusAvatarSessionService
 from .tasks import evaluate_turn, generate_final_report
@@ -1077,3 +1079,57 @@ class AIInterviewQuotaStatusAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ---------------------------------------------------------------------------
+# Candidate AI Interview History
+# ---------------------------------------------------------------------------
+
+from rest_framework.pagination import PageNumberPagination
+
+
+class AIInterviewHistoryPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class CandidateAIInterviewHistoryAPIView(APIView):
+    """
+    GET /api/ai-interview/sessions/history/
+
+    Returns a paginated list of the authenticated candidate's AI interview
+    sessions, newest first.
+
+    Query params (all optional):
+      - status        filter by session status (COMPLETED, CANCELLED, etc.)
+      - round_type    filter by round type (BEHAVIORAL, CODING, etc.)
+      - page          page number (default 1)
+      - page_size     results per page (default 10, max 50)
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        qs = (
+            AIInterviewSession.objects.filter(user=request.user)
+            .select_related("role", "final_report")
+            .order_by("-created_at")
+        )
+
+        # Optional filters
+        status_filter = request.query_params.get("status")
+        round_type_filter = request.query_params.get("round_type")
+
+        if status_filter:
+            qs = qs.filter(status=status_filter.upper())
+
+        if round_type_filter:
+            qs = qs.filter(round_type=round_type_filter.upper())
+
+        paginator = AIInterviewHistoryPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        serializer = CandidateAIInterviewHistorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)

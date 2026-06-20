@@ -32,4 +32,6 @@ urlpatterns = [
     # Quota / eligibility
     path("eligibility/", views.AIInterviewEligibilityAPIView.as_view(), name="ai-eligibility"),
     path("quota/", views.AIInterviewQuotaStatusAPIView.as_view(), name="ai-quota-status"),
+    # Candidate interview history
+    path("sessions/history/", views.CandidateAIInterviewHistoryAPIView.as_view(), name="ai-sessions-history"),
 ]

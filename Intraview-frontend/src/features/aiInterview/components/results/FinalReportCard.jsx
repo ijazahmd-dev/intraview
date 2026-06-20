@@ -9,23 +9,22 @@ import { ScoreRing } from "./ScoreRing";
  *   strengths, areas_for_improvement, recommendations,
  *   status, created_at
  * }
- *
- * strengths / areas_for_improvement / recommendations are
- * newline-joined strings from backend — split them here.
  */
 function splitLines(str) {
   if (!str) return [];
-  
-  // Already an array (backend sent JSON array)
   if (Array.isArray(str)) return str.map((s) => String(s).trim()).filter(Boolean);
-  
-  // Normal string case
   if (typeof str === "string") {
     return str.split("\n").map((s) => s.trim()).filter(Boolean);
   }
-  
-  // Fallback for any other unexpected type
   return [];
+}
+
+function scoreLabel(score) {
+  if (score === null || score === undefined) return { text: "N/A", color: "text-gray-400" };
+  if (score >= 8) return { text: "Excellent", color: "text-teal-600" };
+  if (score >= 6) return { text: "Good", color: "text-yellow-600" };
+  if (score >= 4) return { text: "Fair", color: "text-orange-500" };
+  return { text: "Needs Work", color: "text-red-500" };
 }
 
 export function FinalReportCard({ report }) {
@@ -34,82 +33,155 @@ export function FinalReportCard({ report }) {
   const strengths = splitLines(report.strengths);
   const areasForImprovement = splitLines(report.areas_for_improvement);
   const recommendations = splitLines(report.recommendations);
+  const { text: perfLabel, color: perfColor } = scoreLabel(report.overall_score);
 
   return (
-    <div className="space-y-4">
-      {/* Score + summary */}
-      <div className="rounded-xl bg-gray-900/70 border border-gray-800 p-5 flex flex-col sm:flex-row gap-5 items-center sm:items-start">
-        <div className="flex-shrink-0">
-          <ScoreRing score={report.overall_score} size={90} label="Overall" />
-        </div>
-        <div className="flex-1">
-          <h2 className="text-sm font-bold text-gray-50 mb-1">
-            Interview Summary
-          </h2>
-          {report.summary ? (
-            <p className="text-11px text-gray-300 leading-relaxed">
-              {report.summary}
-            </p>
-          ) : (
-            <p className="text-11px text-gray-500 italic">
-              No summary available.
-            </p>
-          )}
-          <p className="text-10px text-gray-600 mt-2">
-            Generated{" "}
-            {report.created_at
-              ? new Date(report.created_at).toLocaleString()
-              : ""}
-          </p>
+    <div className="space-y-5">
+
+      {/* ── Hero score + summary card ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Top accent */}
+        <div className="h-1 bg-gradient-to-r from-teal-400 to-teal-600" />
+
+        <div className="p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+          {/* Score ring */}
+          <div className="flex-shrink-0 flex flex-col items-center gap-2">
+            <ScoreRing score={report.overall_score} size={110} />
+            <span className={`text-sm font-bold ${perfColor}`}>{perfLabel}</span>
+          </div>
+
+          {/* Divider */}
+          <div className="hidden sm:block w-px bg-gray-100 self-stretch" />
+
+          {/* Summary */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 border border-teal-100 text-xs font-semibold text-teal-600">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                  <rect x="9" y="3" width="6" height="4" rx="1" />
+                </svg>
+                AI Summary
+              </span>
+              {report.created_at && (
+                <span className="text-xs text-gray-400">
+                  {new Date(report.created_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-base font-bold text-gray-900 mb-2">
+              Overall Performance
+            </h2>
+
+            {report.summary ? (
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {report.summary}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-400 italic">
+                No summary available.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Three column grid — strengths, areas, recommendations */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* ── Three column feedback grid ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FeedbackSection
           title="Strengths"
           items={strengths}
           emptyText="No strengths recorded."
-          iconColor="text-emerald-400"
-          dotColor="bg-emerald-400"
+          accent="teal"
+          icon={
+            <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
         />
         <FeedbackSection
-          title="Areas for Improvement"
+          title="Areas to Improve"
           items={areasForImprovement}
           emptyText="No areas flagged."
-          iconColor="text-amber-400"
-          dotColor="bg-amber-400"
+          accent="yellow"
+          icon={
+            <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a1 1 0 00.86 1.5h18.64a1 1 0 00.86-1.5L13.71 3.86a1 1 0 00-1.72 0z" />
+            </svg>
+          }
         />
         <FeedbackSection
           title="Recommendations"
           items={recommendations}
           emptyText="No recommendations."
-          iconColor="text-teal-400"
-          dotColor="bg-teal-400"
+          accent="gray"
+          icon={
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          }
         />
       </div>
     </div>
   );
 }
 
-function FeedbackSection({ title, items, emptyText, dotColor }) {
+const accentMap = {
+  teal: {
+    header: "bg-teal-50 border-teal-100",
+    title: "text-teal-700",
+    dot: "bg-teal-500",
+    itemText: "text-gray-700",
+    border: "border-teal-100",
+  },
+  yellow: {
+    header: "bg-yellow-50 border-yellow-100",
+    title: "text-yellow-700",
+    dot: "bg-yellow-400",
+    itemText: "text-gray-700",
+    border: "border-yellow-100",
+  },
+  gray: {
+    header: "bg-gray-50 border-gray-200",
+    title: "text-gray-700",
+    dot: "bg-gray-400",
+    itemText: "text-gray-700",
+    border: "border-gray-100",
+  },
+};
+
+function FeedbackSection({ title, items, emptyText, accent = "teal", icon }) {
+  const colors = accentMap[accent] ?? accentMap.teal;
+
   return (
-    <div className="rounded-xl bg-gray-900/70 border border-gray-800 p-4">
-      <p className="text-11px font-semibold text-gray-200 mb-3">{title}</p>
-      {items.length === 0 ? (
-        <p className="text-11px text-gray-500 italic">{emptyText}</p>
-      ) : (
-        <ul className="space-y-2">
-          {items.map((item, i) => (
-            <li key={i} className="flex items-start gap-2 text-11px text-gray-300">
-              <span
-                className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotColor}`}
-              />
-              {item}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${colors.border}`}>
+      {/* Section header */}
+      <div className={`flex items-center gap-2 px-4 py-3 border-b ${colors.header}`}>
+        {icon}
+        <p className={`text-sm font-bold ${colors.title}`}>{title}</p>
+        <span className="ml-auto text-xs font-semibold text-gray-400 bg-white/70 px-2 py-0.5 rounded-full border border-gray-100">
+          {items.length}
+        </span>
+      </div>
+
+      {/* Items */}
+      <div className="p-4">
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">{emptyText}</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {items.map((item, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                <span
+                  className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${colors.dot}`}
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

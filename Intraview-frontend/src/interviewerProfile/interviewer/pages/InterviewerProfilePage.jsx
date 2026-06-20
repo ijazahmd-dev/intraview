@@ -12,6 +12,7 @@ import {
   INTERVIEW_TYPE_LABELS,
   DIFFICULTY_LABELS
 } from "../../../interviewBookings/user/components/SessionConfigModal";
+import { toast } from "sonner";
 
 const normalizeArray = (val) => {
   if (Array.isArray(val)) return val;
@@ -69,12 +70,12 @@ export default function InterviewerProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file.');
+      toast.error('Please select a valid image file.');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('Image size must be less than 5MB.');
+      toast.error('Image size must be less than 5MB.');
       return;
     }
 
@@ -89,9 +90,12 @@ export default function InterviewerProfilePage() {
 
       const { data } = await fetchProfile();
       setProfile(data);
+      toast.success("Profile picture updated successfully!");
 
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to upload image.");
+      const msg = err.response?.data?.detail || "Failed to upload image.";
+      setError(msg);
+      toast.error(msg);
       setImagePreview(profile?.profile_picture);
     } finally {
       setUploadingImage(false);
@@ -111,9 +115,12 @@ export default function InterviewerProfilePage() {
       const { data } = await fetchProfile();
       setProfile(data);
       setImagePreview(null);
+      toast.success("Profile picture removed!");
 
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to remove image.");
+      const msg = err.response?.data?.detail || "Failed to remove image.";
+      setError(msg);
+      toast.error(msg);
       setImagePreview(profile?.profile_picture);
     } finally {
       setRemovingImage(false);
@@ -126,14 +133,56 @@ export default function InterviewerProfilePage() {
 
     try {
       await patchProfile({ [field]: newValue });
+      toast.success(`Profile updated successfully!`);
     } catch (err) {
-      setError(`Failed to update ${field}.`);
+      const msg = err.response?.data?.detail || `Failed to update ${field}.`;
+      setError(msg);
+      toast.error(msg);
       setProfile((prev) => ({ ...prev, [field]: !newValue }));
     }
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    // Frontend validations
+    if (!profile.display_name?.trim() || profile.display_name.trim().length < 2) {
+      toast.error("Display Name must be at least 2 characters long.");
+      return;
+    }
+    if (!profile.headline?.trim() || profile.headline.trim().length < 5) {
+      toast.error("Professional Headline must be at least 5 characters long.");
+      return;
+    }
+    if (!profile.bio?.trim() || profile.bio.trim().length < 20) {
+      toast.error("Professional Bio must be at least 20 characters long.");
+      return;
+    }
+    if (profile.years_of_experience === "" || profile.years_of_experience < 0) {
+      toast.error("Years of Experience is required and cannot be negative.");
+      return;
+    }
+    if (!profile.location?.trim()) {
+      toast.error("Location is required.");
+      return;
+    }
+    if (profile.base_session_rate === "" || profile.base_session_rate < 5) {
+      toast.error("Base Session Rate must be at least 5 tokens.");
+      return;
+    }
+    if (!profile.specializations || normalizeArray(profile.specializations).length === 0) {
+      toast.error("Please add at least one Specialization.");
+      return;
+    }
+    if (!profile.languages || normalizeArray(profile.languages).length === 0) {
+      toast.error("Please add at least one Language.");
+      return;
+    }
+    if (!profile.supported_interview_types || normalizeArray(profile.supported_interview_types).length === 0) {
+      toast.error("Please select at least one Supported Interview Type.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -157,10 +206,13 @@ export default function InterviewerProfilePage() {
 
       const { data } = await fetchProfile();
       setProfile(data);
+      toast.success("Profile saved successfully!");
 
     } catch (err) {
       console.error("Update error:", err.response?.data);
-      setError(err.response?.data?.detail || "Failed to update profile.");
+      const msg = err.response?.data?.detail || "Failed to update profile.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

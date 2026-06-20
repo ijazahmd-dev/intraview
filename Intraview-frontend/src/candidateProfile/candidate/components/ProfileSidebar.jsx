@@ -175,7 +175,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   User, FileText, SlidersHorizontal, WalletCards,
-  ShieldCheck, LogOut, AlertCircle, MessageSquare,
+  ShieldCheck, LogOut, AlertCircle, MessageSquare, Bot
 } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { setActiveTab } from '../../profileSlice';
@@ -201,6 +201,7 @@ const navItems = [
   { id: 'settings', label: 'Account Settings', icon: ShieldCheck, to: '/candidate/settings' },
   { id: 'issues', label: 'My Issues', icon: AlertCircle, to: '/my-issues' },
   { id: 'feedback', label: 'My Feedbacks', icon: MessageSquare, to: '/candidate/feedback' },
+  { id: 'ai-interviews', label: 'My AI Interviews', icon: Bot, to: '/candidate/ai-interviews' },
 ];
 
 const ProfileSidebar = ({ onLogout }) => {
@@ -223,6 +224,7 @@ const ProfileSidebar = ({ onLogout }) => {
     if (item.id === 'settings' && location.pathname === '/candidate/settings') return true;
     if (item.id === 'issues' && location.pathname.startsWith('/my-issues')) return true;
     if (item.id === 'feedback' && location.pathname.startsWith('/candidate/feedback')) return true;
+    if (item.id === 'ai-interviews' && location.pathname.startsWith('/candidate/ai-interviews')) return true;
     return false;
   };
 

@@ -400,3 +400,37 @@ class AIInterviewTurnEvaluationDetailSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
+
+
+class CandidateAIInterviewHistorySerializer(serializers.ModelSerializer):
+    """
+    Lean serializer for the candidate's AI interview history list.
+    GET /api/ai-interview/sessions/history/
+    """
+
+    role_name = serializers.CharField(source="role.name", read_only=True)
+    overall_score = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AIInterviewSession
+        fields = [
+            "id",
+            "role_name",
+            "round_type",
+            "difficulty",
+            "duration_minutes",
+            "status",
+            "created_at",
+            "ended_at",
+            "overall_score",
+        ]
+
+    def get_overall_score(self, obj):
+        """Return overall_score from final report only if it exists and is SUCCESS."""
+        try:
+            report = obj.final_report
+        except AIInterviewFinalReport.DoesNotExist:
+            return None
+        if report.status == AIInterviewFinalReport.Status.SUCCESS:
+            return report.overall_score
+        return None

@@ -4,6 +4,7 @@ import {
   submitVerification,
   fetchVerificationStatus,
 } from "../../interviewerOnboardingApi";
+import { toast } from "sonner";
 
 export default function VerificationStep() {
   const navigate = useNavigate();
@@ -31,9 +32,59 @@ export default function VerificationStep() {
     return () => { mounted = false; };
   }, []);
 
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) {
+      setFile(null);
+      return;
+    }
+
+    // Validate file type (pdf, jpg, png)
+    const validTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (!validTypes.includes(selectedFile.type)) {
+      toast.error("Invalid file format. Only PDF, JPG, and PNG are accepted.");
+      e.target.value = "";
+      setFile(null);
+      return;
+    }
+
+    // Validate file size (e.g. 5MB max)
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 5MB.");
+      e.target.value = "";
+      setFile(null);
+      return;
+    }
+
+    setFile(selectedFile);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file || !documentType) return;
+
+    if (!documentType) {
+      toast.error("Please select a document type.");
+      return;
+    }
+
+    if (!file) {
+      toast.error("Please upload a document file.");
+      return;
+    }
+
+    // Validate file type (pdf, jpg, png)
+    const validTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Invalid file format. Only PDF, JPG, and PNG are accepted.");
+      return;
+    }
+
+    // Validate file size (e.g. 5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 5MB.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -46,7 +97,9 @@ export default function VerificationStep() {
       setRejectionReason("");
     } catch (err) {
       const msg = err.response?.data || "Failed to submit verification.";
-      setError(typeof msg === "string" ? msg : "Failed to submit verification.");
+      const errorMsg = typeof msg === "string" ? msg : "Failed to submit verification.";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -109,7 +162,8 @@ export default function VerificationStep() {
                 </label>
                 <input
                   type="file"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={handleFileChange}
+                  accept=".pdf, .jpg, .jpeg, .png"
                   className="text-xs"
                 />
                 <p className="mt-1 text-[11px] text-slate-400">
