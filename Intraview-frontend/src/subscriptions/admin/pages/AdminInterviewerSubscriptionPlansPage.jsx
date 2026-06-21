@@ -20,6 +20,7 @@ const AdminInterviewerSubscriptionPlansPage = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
@@ -62,6 +63,8 @@ const AdminInterviewerSubscriptionPlansPage = () => {
   };
 
   const handleCreatePlan = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(createPlan(formData))
       .unwrap()
       .then(() => {
@@ -70,17 +73,21 @@ const AdminInterviewerSubscriptionPlansPage = () => {
         resetForm();
         dispatch(fetchPlans({ page: 1, pageSize: 20 }));
       })
-      .catch((err) => toast.error(formatError(err)));
+      .catch((err) => toast.error(formatError(err)))
+      .finally(() => setIsSubmitting(false));
   };
 
   const handleEditPlan = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(updatePlan({ id: selectedPlan.id, planData: formData }))
       .unwrap()
       .then(() => {
         toast.success('Interviewer plan updated successfully!');
         setShowEditModal(false);
       })
-      .catch((err) => toast.error(formatError(err)));
+      .catch((err) => toast.error(formatError(err)))
+      .finally(() => setIsSubmitting(false));
   };
 
   const resetForm = () => {
@@ -334,10 +341,10 @@ const AdminInterviewerSubscriptionPlansPage = () => {
               <div className="flex gap-4 pt-6">
                 <button
                   onClick={showCreateModal ? handleCreatePlan : handleEditPlan}
-                  disabled={loading || !formData.name || !formData.slug || !formData.price_inr || !formData.billing_cycle_days}
+                  disabled={loading || isSubmitting || !formData.name || !formData.slug || formData.price_inr === undefined || formData.price_inr === null || formData.price_inr === "" || !formData.billing_cycle_days}
                   className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Saving...' : (showCreateModal ? 'Create Plan' : 'Update Plan')}
+                  {isSubmitting ? (showCreateModal ? 'Creating...' : 'Updating...') : (showCreateModal ? 'Create Plan' : 'Update Plan')}
                 </button>
                 <button
                   type="button"

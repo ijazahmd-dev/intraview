@@ -20,6 +20,7 @@ const AdminSubscriptionPlansPage = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -51,6 +52,8 @@ const AdminSubscriptionPlansPage = () => {
   };
 
   const handleCreatePlan = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(createPlan(formData))
       .unwrap()
       .then(() => {
@@ -68,17 +71,21 @@ const AdminSubscriptionPlansPage = () => {
         });
         dispatch(fetchPlans({ page: 1, pageSize: 20 }));
       })
-      .catch(toast.error);
+      .catch(toast.error)
+      .finally(() => setIsSubmitting(false));
   };
 
   const handleEditPlan = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(updatePlan({ id: selectedPlan.id, planData: formData }))
       .unwrap()
       .then(() => {
         toast.success('Plan updated successfully!');
         setShowEditModal(false);
       })
-      .catch(toast.error);
+      .catch(toast.error)
+      .finally(() => setIsSubmitting(false));
   };
 
   const handleToggleActive = (id, isActive) => {
@@ -374,10 +381,10 @@ const AdminSubscriptionPlansPage = () => {
               <div className="flex gap-4 pt-6">
                 <button
                   onClick={showCreateModal ? handleCreatePlan : handleEditPlan}
-                  disabled={loading || !formData.name || !formData.price_inr || !formData.billing_cycle_days}
+                  disabled={loading || isSubmitting || !formData.name || formData.price_inr === undefined || formData.price_inr === null || formData.price_inr === "" || !formData.billing_cycle_days}
                   className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-50 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Saving...' : (showCreateModal ? 'Create Plan' : 'Update Plan')}
+                  {isSubmitting ? (showCreateModal ? 'Creating...' : 'Updating...') : (showCreateModal ? 'Create Plan' : 'Update Plan')}
                 </button>
                 <button
                   type="button"

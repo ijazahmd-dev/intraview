@@ -18,6 +18,7 @@ const AdminTokenPacksPage = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     price_inr: 0,
@@ -58,6 +59,8 @@ const AdminTokenPacksPage = () => {
   };
 
   const handleCreatePack = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(createTokenPack(formData))
       .unwrap()
       .then(() => {
@@ -66,17 +69,21 @@ const AdminTokenPacksPage = () => {
         resetForm();
         dispatch(fetchTokenPacks({ page: 1, pageSize: 20, ...filters }));
       })
-      .catch(toast.error);
+      .catch(toast.error)
+      .finally(() => setIsSubmitting(false));
   };
 
   const handleEditPack = () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     dispatch(updateTokenPack({ id: selectedPack.id, packData: formData }))
       .unwrap()
       .then(() => {
         toast.success('Token pack updated successfully!');
         setShowEditModal(false);
       })
-      .catch(toast.error);
+      .catch(toast.error)
+      .finally(() => setIsSubmitting(false));
   };
 
   const resetForm = () => {
@@ -355,10 +362,10 @@ const AdminTokenPacksPage = () => {
               <div className="flex gap-4 pt-6">
                 <button
                   onClick={showCreateModal ? handleCreatePack : handleEditPack}
-                  disabled={loading || !formData.name || formData.price_inr <= 0 || formData.tokens <= 0}
+                  disabled={loading || isSubmitting || !formData.name || formData.price_inr <= 0 || formData.tokens <= 0}
                   className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Saving...' : (showCreateModal ? 'Create Pack' : 'Update Pack')}
+                  {isSubmitting ? (showCreateModal ? 'Creating...' : 'Updating...') : (showCreateModal ? 'Create Pack' : 'Update Pack')}
                 </button>
                 <button
                   type="button"
