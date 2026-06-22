@@ -1,238 +1,192 @@
-# Intraview 🎯  
-A Full-Stack Mock Interview & Skill Assessment Platform (React + Django REST Framework)
+# Intraview 🎯
 
-## 📌 Project Overview
-**Intraview** is a mock interview and skill-assessment platform designed to help candidates prepare for real interviews through structured interview bookings, token-based payments, subscription features, and interviewer onboarding workflows.
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=Stripe&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-The platform supports **three major roles**:
-
-- **Candidate** → Book interview sessions, manage tokens, subscriptions, dashboard, and interview history  
-- **Interviewer** → Onboarding, availability setup, accept/cancel sessions, earnings, dashboards  
-- **Admin** → Manage interviewers, bookings, subscription plans, token packs, and revenue monitoring  
-
-This project follows a scalable architecture with proper separation of concerns using:
-- **Django REST Framework APIs**
-- **Role-based authentication & permissions**
-- **Token wallet system**
-- **Stripe Checkout integration**
-- **Atomic booking + token locking transactions**
+**Intraview** is a comprehensive, full-stack mock interview and skill-assessment platform. It connects candidates with expert interviewers, manages bookings, incorporates a robust token-based economy, and now includes AI-powered interview capabilities.
 
 ---
 
 ## 🚀 Key Features
 
-## ✅ Candidate Features
-- Browse available interviewers
-- View interviewer profile & details
-- Discover interview slots based on interviewer availability
-- Book interview sessions with **token locking**
-- Cancel booking (with reason) → **tokens unlocked**
-- View Upcoming Interviews & Past Interviews
-- Purchase token packs (Stripe checkout)
-- Subscription plans (Free / Starter / Pro)
-- Candidate wallet dashboard:
-  - balance
-  - locked balance
-  - transaction history
-  - token spending summary
+### 👨‍🎓 Candidate Features
+- **Browse & Discover**: View public profiles of verified interviewers and search by skills/roles.
+- **Book Interviews**: Schedule sessions based on interviewer availability using a **Token-Locking** mechanism.
+- **AI Mock Interviews**: Conduct role-based mock interviews with AI agents powered by LiveKit and Tavus avatars, receiving detailed feedback and evaluations via Gemini models.
+- **Token Economy**: Purchase token packs via Stripe to book interviews. Tokens are locked on booking and refunded if canceled.
+- **Subscriptions**: Subscribe to premium plans (Free / Starter / Pro) for monthly token grants and prioritized access.
+- **Dashboard & Wallets**: Track past/upcoming interviews, wallet balances (available vs. locked), and full transaction history.
+
+### 👔 Interviewer Features
+- **Onboarding & Verification**: Seamless onboarding workflow (Profile Setup -> Availability Setup -> Verification).
+- **Interviewer Subscriptions**: Required to go public, accept bookings, and appear in search results.
+- **Availability Management**: Set one-time or recurring weekly availability slots.
+- **Session Management**: View upcoming/completed sessions. Cancel bookings with mandatory reasoning (refunds candidate).
+- **Earnings & Payouts**: Mark sessions as completed to transfer locked tokens to the interviewer wallet. Track earnings and request payouts.
+
+### 🛡️ Admin Features
+- **User Management**: Monitor and manage all candidates and interviewers.
+- **Subscription & Token Management**: Full CRUD operations for token packs and candidate/interviewer subscription plans.
+- **Platform Monitoring**: Monitor all platform bookings, payouts, and flagged issues.
+- **Payout Queue**: Process withdrawal requests from interviewers.
 
 ---
 
-## ✅ Interviewer Features
-- Interviewer onboarding flow:
-  - Profile setup
-  - Availability setup (Recurring / One-time)
-  - Verification submission
-- Subscription required to go public & accept bookings
-- Manage availability blocks (set, list, delete, recurring)
-- Interviewer dashboard:
-  - Upcoming sessions list
-  - Completed sessions list
-  - Tokens earned summary
-- Cancel confirmed booking (with reason) → candidate tokens refunded
-- Mark session completed → **locked tokens transferred to interviewer wallet**
-- Interviewer wallet dashboard:
-  - earnings transactions
-  - token history
+## ⚙️ Architecture & Tech Stack
+
+### Backend (Django)
+- **Framework**: Django & Django REST Framework (DRF)
+- **Database**: PostgreSQL
+- **Caching & Async Tasks**: Redis + Celery (for background jobs like sending OTPs, reminders, and webhook processing)
+- **Authentication**: Custom JWT Cookie Auth with strict role-based access control (RBAC).
+- **Payments**: Stripe API with Webhook routing.
+- **Real-Time Video**: ZEGOCLOUD (for P2P video) & LiveKit (for AI Agent WebRTC infrastructure).
+- **AI Integrations**: Google Gemini API (for NLP/evaluation), Tavus API (for AI Avatars).
+- **Notifications**: Novu for real-time notifications via WebSockets.
+
+### Frontend (React)
+- **Framework**: React.js powered by Vite
+- **State Management**: Redux Toolkit (with unified auth slices)
+- **Styling**: Tailwind CSS & Lucide Icons
+- **Routing**: React Router DOM (with protected route wrappers based on roles)
+- **HTTP Client**: Axios with global interceptors for automatic token refresh
 
 ---
 
-## ✅ Admin Features
-- Manage user subscription plans (CRUD + soft delete)
-- Manage interviewer subscription plans (CRUD + soft delete)
-- View and manage platform bookings
-- Booking detail API for admin monitoring
-- Revenue intelligence & future hooks for penalties/refunds (planned)
+## 💳 Payment & Token System (The Economy)
+
+Intraview operates on a robust token-based economy enforced strictly by `transaction.atomic()` blocks and row-level locking (`select_for_update()`).
+
+1. **Purchasing**: Candidates purchase Token Packs via Stripe Checkout.
+2. **Booking (Locking)**: When a candidate books an interview, the required tokens are deducted from `balance` and moved to `locked_balance`.
+3. **Completion (Transfer)**: Once the interviewer marks the session completed, the locked tokens are formally transferred to the interviewer's wallet.
+4. **Cancellation (Refund)**: If either party cancels before the session, the locked tokens are unlocked and refunded to the candidate's available balance.
 
 ---
 
-## ✅ Subscription & Token System
+## 🛠️ Environment Variables Configuration
 
-### 🔹 Subscription Plans (Candidate)
-Candidate subscription plans can include:
-- monthly free token grants
-- AI interviews quota (schema ready)
-- feature flags (priority booking, advanced AI feedback)
+To run the project locally, you need to configure the `.env` files for both the frontend and backend.
 
-**Active subscription access is enforced using `SubscriptionEntitlementService`.**
+### Backend (`intraview/.env`)
+Create a `.env` file in the `intraview/` directory. Here are the required keys:
 
-### 🔹 Interviewer Subscription Plans
-Interviewers must maintain an active interviewer subscription to:
-- make profile public
-- accept bookings
-- appear in candidate search
+```env
+# Django Settings
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_SECRET_KEY=your_django_secret_key
+FRONTEND_URL=http://localhost:5173
 
-**Active interviewer subscription is enforced using `InterviewerEntitlementService`.**
+# Database (PostgreSQL)
+POSTGRES_DB=intraview_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+DATABASE_URL=postgres://postgres:postgres@db:5432/intraview_db
 
-### 🔹 Token Wallet (Core System)
-Each user has a wallet with:
-- `balance`
-- `locked_balance`
+# Redis & Celery
+REDIS_URL=redis://redis:6379/0
+REDIS_HOST=redis
+REDIS_PORT=6379
+CELERY_BROKER_URL=redis://redis:6379/1
 
-When a candidate books a session:
-✅ tokens are **locked**  
-When cancelled:
-✅ tokens are **unlocked**  
-When completed:
-✅ locked tokens are **transferred** to interviewer  
+# Cloudinary (Media Storage)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 
-All operations are implemented with:
-- `transaction.atomic()`
-- row-level locks using `select_for_update()`
+# Email (SMTP)
+EMAIL_HOST_USER=your_email@gmail.com
+EMAIL_HOST_PASSWORD=your_app_password
 
----
+# OAuth & Integrations
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-## 💳 Stripe Payments (Token Packs + Subscriptions)
-Stripe Checkout is integrated for:
-✅ Candidate subscription purchase  
-✅ Token pack purchases  
-✅ Webhook-based activation flow  
+# Stripe Payments
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
-Stripe Webhook triggers:
-- Subscription activation
-- Monthly token grant idempotent credits
+# Real-time Video & Notifications
+ZEGO_APP_ID=your_zego_app_id
+ZEGO_SERVER_SECRET=your_zego_server_secret
+ZEGO_TOKEN_EXPIRY_SECONDS=3600
+ZEGO_EARLY_JOIN_MINUTES=5
+NOVU_SECRET_KEY=your_novu_secret
 
----
+# LiveKit & AI Interviews
+LIVEKIT_URL=wss://your-livekit-url
+LIVEKIT_API_KEY=your_livekit_key
+LIVEKIT_API_SECRET=your_livekit_secret
+BACKEND_AGENT_SHARED_SECRET=your_shared_secret
 
-## 🧠 AI Readiness (Planned Feature)
-AI interview feature is **not implemented yet**, only schema hooks are prepared:
-- `monthly_ai_used`
-- plan-based `ai_quota`
+# Google Gemini (AI Feedback & Evaluation)
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_EVALUATION_MODEL=gemini-1.5-flash
+GEMINI_FINAL_REPORT_MODEL=gemini-1.5-pro
 
-🚫 No AI logic implemented yet  
-🚫 No AI token deductions implemented yet  
+# Tavus (AI Avatars)
+TAVUS_API_KEY=your_tavus_api_key
+TAVUS_AVATAR_ENABLED=true
+TAVUS_REPLICA_ID=your_replica_id
+TAVUS_PERSONA_ID=your_persona_id
+TAVUS_AVATAR_PARTICIPANT_IDENTITY=tavus-avatar-agent
+TAVUS_AVATAR_PARTICIPANT_NAME=AI Interviewer
+```
 
----
+### Frontend (`Intraview-frontend/.env`)
+Create a `.env` file in the `Intraview-frontend/` directory.
 
-## 🛠 Tech Stack
-
-### Backend
-- **Django**
-- **Django REST Framework**
-- PostgreSQL (recommended)
-- Stripe API
-- JWT Cookie Auth (Custom Authentication classes)
-- Transaction-safe booking logic
-
-### Frontend
-- **React (Vite)**
-- Redux Toolkit (state management)
-- Axios (API calls)
-- TailwindCSS (UI styling)
-
----
-
-## 📂 Backend Modules / Apps
-- `authentication` → custom user model, JWT cookie auth, role permissions
-- `interviewers` → interviewer onboarding, profile, availability, verification
-- `bookings` → booking creation, lifecycle, dashboards, details
-- `wallet` → token wallet, transactions, lock/unlock/transfer logic
-- `subscriptions` → candidate subscription plans + entitlement gating
-- `interviewer_subscriptions` → interviewer plan & subscription gating
-- `payments` → Stripe checkout + webhook handling
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_WS_BASE_URL=ws://localhost:8000
+VITE_GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+```
 
 ---
 
-## 🔐 Authentication & Permissions
-The project supports role-based secure access:
+## 💻 Local Setup Instructions
 
-- Candidate APIs protected by `CookieJWTAuthentication`
-- Interviewer APIs protected by `InterviewerCookieJWTAuthentication`
-- Role permissions include:
-  - `IsActiveInterviewer`
-  - onboarding restrictions
-  - verified-only visibility checks
-
----
-
-## 🔄 Booking Lifecycle (Phase 4)
-
-### ✅ Booking Creation (Atomic + Token Locking)
-1. Candidate selects availability slot
-2. System checks:
-   - slot active
-   - remaining capacity
-   - interviewer eligible (subscription + profile public + accepting bookings)
-   - candidate token balance
-3. In atomic block:
-   - lock availability
-   - lock wallet
-   - lock tokens
-   - create booking as CONFIRMED
-
----
-
-### ✅ Cancel Booking
-Candidate can cancel booking by providing a reason:
-- booking must be confirmed
-- booking must not have started
-- tokens unlocked back to candidate
-
-Interviewer can also cancel booking with reason:
-- candidate tokens refunded
-- booking marked as cancelled by interviewer
-
----
-
-### ✅ Complete Booking
-Interviewer completes booking after session end:
-- candidate locked tokens transferred
-- interviewer receives token earnings
-- booking marked COMPLETED
-
----
-
-## 📌 API Highlights
-
-### Candidate Side
-- List available interviewers
-- Interviewer detail view
-- Slot discovery by interviewer & date
-- Create booking
-- Upcoming bookings
-- Past bookings
-- Booking detail
-- Cancel booking
-- Wallet info + transaction history
-
-### Interviewer Side
-- Availability create/list/delete
-- Upcoming sessions
-- Completed sessions history
-- Cancel booking with reason
-- Mark booking completed
-- Wallet earnings overview
-
-### Admin Side
-- Subscription plan management (CRUD)
-- Interviewer plan management (CRUD)
-- Booking listing + booking detail API
-
----
-
-## ✅ Setup Instructions
-
-### 1) Clone Repo
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/intraview.git
+git clone https://github.com/ijazahmed5432100/intraview.git
 cd intraview
+```
+
+### 2. Setup Environment Variables
+Populate the `.env` files in both the `intraview/` and `Intraview-frontend/` directories using the templates provided above.
+
+### 3. Run with Docker Compose (Recommended)
+The easiest way to run the entire backend infrastructure (Django, PostgreSQL DB, Redis, Celery Workers, Celery Beat) is via Docker Compose.
+
+```bash
+# Build and start all backend services
+docker compose up --build
+```
+
+### 4. Run the Frontend
+In a new terminal window, navigate to the frontend directory, install dependencies, and start the Vite dev server.
+
+```bash
+cd Intraview-frontend
+npm install
+npm run dev
+```
+
+### 5. Stripe Webhooks (Local Testing)
+To test payments locally, you must run the Stripe CLI to forward webhook events to your local Django server:
+
+```bash
+stripe listen --forward-to localhost:8000/api/payments/webhook/stripe/
+```
+*(Copy the webhook secret printed in the console and put it in your `.env` under `STRIPE_WEBHOOK_SECRET`)*
+
+---
+
+*Built with ❤️ for aspiring engineers.*
