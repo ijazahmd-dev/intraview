@@ -104,13 +104,12 @@ export default function Home() {
               <span>Meta</span>
             </div>
           </div>
-          <div className="relative">
-            <div className="grid grid-cols-2 gap-4">
-              <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=300&fit=crop" alt="Professional interview" className="rounded-lg shadow-lg w-full h-48 object-cover" />
-              <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=400&h=300&fit=crop" alt="Remote work" className="rounded-lg shadow-lg w-full h-48 object-cover mt-8" />
-              <img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400&h=300&fit=crop" alt="Collaboration" className="rounded-lg shadow-lg w-full h-48 object-cover" />
-              <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=300&fit=crop" alt="Success" className="rounded-lg shadow-lg w-full h-48 object-cover mt-8" />
-            </div>
+          <div className="relative w-full h-[464px] flex items-center justify-center">
+            <img
+              src="https://res.cloudinary.com/dpn42vumz/image/upload/v1782381018/ChatGPT_Image_png_6_y37zpy.png"
+              alt="AI Interviewer"
+              className="w-full h-full object-contain object-center transform scale-[1.15] hover:scale-[1.3] md:-translate-x-8 lg:-translate-x-10 transition-transform duration-300"
+            />
           </div>
         </div>
       </section>
@@ -208,16 +207,11 @@ export default function Home() {
 
             {/* RIGHT SIDE – ILLUSTRATION BLOCK */}
             <div className="relative">
-              <div
-                className="rounded-2xl shadow-2xl p-6 md:p-8"
-                style={{ backgroundColor: "#ffffff" }}
-              >
-                <img
-                  src=""
-                  alt="Interviewer illustration"
-                  className="w-full h-auto object-contain opacity-95"
-                />
-              </div>
+              <img
+                src="https://res.cloudinary.com/dpn42vumz/image/upload/v1782392499/ChatGPT_Image_png_7_ikvvq4.png"
+                alt="Interviewer illustration"
+                className="w-full h-auto object-contain transform scale-135 hover:scale-[1.45] transition-transform duration-300 opacity-95 relative z-10"
+              />
 
               {/* Decorative floating shape */}
               <div
@@ -254,7 +248,7 @@ export default function Home() {
               {plans?.filter(p => !p.name.toLowerCase().includes("basic") && p.is_active).map(plan => {
                 const isPro = plan.name.toLowerCase().includes("pro");
                 return (
-                  <div key={plan.id} className={isPro ? "bg-gray-900 text-white rounded-xl p-8 relative" : "bg-white border-2 border-gray-200 rounded-xl p-8 relative"}>
+                  <div key={plan.id} className={isPro ? "bg-gray-900 text-white rounded-xl p-8 relative flex flex-col h-full shadow-lg" : "bg-white border-2 border-gray-200 rounded-xl p-8 relative flex flex-col h-full transform md:translate-y-1"}>
 
                     {!isPro && (
                       <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-500 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-sm">
