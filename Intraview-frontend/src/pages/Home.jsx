@@ -115,53 +115,114 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="bg-white py-16">
+      <section className="py-12 md:py-16" style={{ background: 'linear-gradient(160deg, #f0fdfa 0%, #f8fafc 60%, #ffffff 100%)' }}>
+        <style>{`
+          .fcard { transition: all 0.22s ease; }
+          .fcard:hover { transform: translateY(-5px); box-shadow: 0 20px 50px rgba(20,184,166,0.12); }
+          .fcard-icon { transition: transform 0.2s ease; }
+          .fcard:hover .fcard-icon { transform: scale(1.12) rotate(-4deg); }
+        `}</style>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Smarter Interview Prep Starts Here
-          </h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 p-8 rounded-xl">
-              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Mic className="w-6 h-6 text-teal-600" />
+
+          {/* Centered heading */}
+          <div className="text-center mb-10">
+            <span className="inline-block bg-teal-50 border border-teal-200 text-teal-600 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-4">
+              Why IntraView
+            </span>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight mb-3">
+              Smarter Interview <span className="text-teal-500">Prep</span><br className="hidden md:block" /> Starts Here
+            </h2>
+            <p className="text-gray-500 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+              Everything you need to walk into your next interview feeling prepared, sharp, and genuinely confident.
+            </p>
+          </div>
+
+          {/* Top row: 1 wide card + 1 tall card */}
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+
+            {/* Wide feature card */}
+            <div className="fcard md:col-span-2 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex gap-4 items-start">
+              <div className="fcard-icon flex-shrink-0 w-12 h-12 bg-teal-500 rounded-2xl flex items-center justify-center shadow-md" style={{ boxShadow: '0 6px 18px rgba(20,184,166,0.30)' }}>
+                <Mic className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Voice-Based Realism</h3>
-              <p className="text-gray-600">
-                Simulate real interviews using natural, two-way voice — not tedious, clunky typing.
-              </p>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-1.5">
+                  <h3 className="text-lg font-bold text-gray-900">Voice-Based Realism</h3>
+                  <span className="text-[10px] font-bold text-teal-500 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">01</span>
+                </div>
+                <p className="text-gray-500 text-xs sm:text-sm leading-relaxed mb-3">
+                  Simulate real interviews using natural, two-way voice — not tedious, clunky typing. Feel the pressure. Build the habit. Train your mind to respond naturally under pressure.
+                </p>
+                <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-semibold text-teal-600 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
+                  Live voice conversations
+                </span>
+              </div>
             </div>
-            <div className="bg-gray-50 p-8 rounded-xl">
-              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Target className="w-6 h-6 text-teal-600" />
+
+            {/* Tall teal-tinted card */}
+            <div className="fcard bg-teal-500 rounded-2xl p-6 flex flex-col justify-between" style={{ boxShadow: '0 8px 30px rgba(20,184,166,0.22)' }}>
+              <div>
+                <div className="fcard-icon w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <h3 className="text-base font-bold text-white">AI-Personalized Practice</h3>
+                </div>
+                <p className="text-teal-100 text-xs sm:text-sm leading-relaxed">
+                  Upload your resume to get questions tailored to your exact background and target role.
+                </p>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">AI-Personalized Practice</h3>
-              <p className="text-gray-600">
-                Upload your resume and role to get tailored questions that match your background.
-              </p>
-            </div>
-            <div className="bg-gray-50 p-8 rounded-xl">
-              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-teal-600" />
+              <div className="mt-4">
+                <span className="text-[10px] sm:text-xs font-bold text-white/60 uppercase tracking-widest">02 · Smart AI</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">On-Demand and Flexible</h3>
-              <p className="text-gray-600">
-                Practice anytime, on your schedule — whether at lunch or late at night.
-              </p>
-            </div>
-            <div className="bg-gray-50 p-8 rounded-xl">
-              <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Lightbulb className="w-6 h-6 text-teal-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Instant Smart Feedback</h3>
-              <p className="text-gray-600">
-                Get clear insights on clarity, pacing, filler words, and communication quality.
-              </p>
             </div>
           </div>
+
+          {/* Bottom row: 2 equal cards */}
+          <div className="grid md:grid-cols-2 gap-4">
+
+            {/* Card 3 */}
+            <div className="fcard bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex gap-4 items-start">
+              <div className="fcard-icon flex-shrink-0 w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center border border-teal-100">
+                <Clock className="w-5 h-5 text-teal-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-sm font-bold text-gray-900">On-Demand & Flexible</h3>
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 ml-auto">03</span>
+                </div>
+                <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">
+                  Practice anytime, anywhere — whether at lunch, late at night, or the morning of your interview. No scheduling needed.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 4 — yellow accent */}
+            <div className="fcard bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex gap-4 items-start">
+              <div className="fcard-icon flex-shrink-0 w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center border border-yellow-100">
+                <Lightbulb className="w-5 h-5 text-yellow-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-sm font-bold text-gray-900">Instant Smart Feedback</h3>
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 ml-auto">04</span>
+                </div>
+                <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">
+                  Get clear insights on clarity, pacing, filler words, and communication quality — right after every session.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 
+
+
       {/* Demo Section */}
+
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div
           className="rounded-3xl bg-gray-100 p-10 md:p-16 shadow-xl"

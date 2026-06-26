@@ -773,19 +773,19 @@ const styles = `
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 40px 64px 64px;
+    padding: 32px 50px 50px;
   }
 
   .tvs-logo-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-shrink: 0;
   }
 
   .tvs-logo-word {
     font-weight: 900;
-    font-size: 30px;
+    font-size: 24px;
     letter-spacing: -0.01em;
     color: #211C18;
     line-height: 1;
@@ -796,29 +796,29 @@ const styles = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 150px;
+    padding-top: 120px;
   }
 
   .tvs-form-card {
     width: 100%;
-    max-width: 460px;
+    max-width: 360px;
   }
 
   .tvs-heading {
     font-family: Georgia, 'Times New Roman', Times, serif;
     font-weight: 400;
-    font-size: 48px;
+    font-size: 38px;
     line-height: 1.05;
     color: #211C18;
-    margin: 0 0 14px;
+    margin: 0 0 11px;
   }
 
   .tvs-subtext {
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 17px;
+    font-size: 14px;
     line-height: 1.55;
     color: #6B6560;
-    margin: 0 0 26px;
+    margin: 0 0 20px;
   }
 
   /* ── Field: unfocused — dashed border, transparent background ── */
@@ -826,8 +826,8 @@ const styles = `
     position: relative;
     border: 1.5px dashed #B8B0A5;
     background: transparent;
-    padding: 4px 20px;
-    margin-bottom: 12px;
+    padding: 3px 16px;
+    margin-bottom: 10px;
     transition: border 0.15s ease, background 0.15s ease;
   }
 
@@ -849,12 +849,12 @@ const styles = `
 
   .tvs-field input {
     width: 100%;
-    height: 58px;
+    height: 46px;
     border: none;
     outline: none;
     background: transparent;
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 17px;
+    font-size: 14px;
     color: #211C18;
   }
 
@@ -868,17 +868,17 @@ const styles = `
   }
 
   .tvs-field-password input {
-    padding-right: 34px;
+    padding-right: 28px;
   }
 
   .tvs-eye-btn {
     position: absolute;
-    right: 18px;
+    right: 14px;
     top: 50%;
     transform: translateY(-50%);
     background: none;
     border: none;
-    padding: 4px;
+    padding: 3px;
     cursor: pointer;
     color: #A39C92;
     display: flex;
@@ -889,9 +889,9 @@ const styles = `
   .tvs-field-error-text {
     display: block;
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 12.5px;
+    font-size: 10px;
     color: #ef4444;
-    margin: -8px 0 12px;
+    margin: -6px 0 10px;
     letter-spacing: 0.02em;
   }
 
@@ -899,13 +899,13 @@ const styles = `
   .tvs-error-box {
     background: rgba(239, 68, 68, 0.07);
     border: 1.5px dashed #ef4444;
-    padding: 10px 16px;
-    margin-bottom: 14px;
+    padding: 8px 12px;
+    margin-bottom: 11px;
   }
 
   .tvs-error-box p {
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 12.5px;
+    font-size: 10px;
     color: #ef4444;
     margin: 0;
     letter-spacing: 0.02em;
@@ -914,9 +914,9 @@ const styles = `
   .tvs-forgot-link {
     display: block;
     text-align: center;
-    margin: 18px 0 32px;
+    margin: 14px 0 25px;
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 12.5px;
+    font-size: 10px;
     letter-spacing: 0.06em;
     color: #6B6560;
     text-decoration: underline;
@@ -931,31 +931,31 @@ const styles = `
   /* ── Buttons ── */
   .tvs-btn {
     width: 100%;
-    height: 54px;
+    height: 44px;
     border-radius: 2px;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 12px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin-bottom: 18px;
-    box-shadow: 4px 4px 0 0 #211C18;
+    gap: 8px;
+    margin-bottom: 14px;
+    box-shadow: 3px 3px 0 0 #211C18;
     transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
   }
 
   .tvs-btn:hover:not(:disabled) {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 0 #211C18;
+    box-shadow: 4px 4px 0 0 #211C18;
   }
 
   .tvs-btn:active:not(:disabled) {
     transform: translate(2px, 2px);
-    box-shadow: 2px 2px 0 0 #211C18;
+    box-shadow: 1px 1px 0 0 #211C18;
   }
 
   .tvs-btn:disabled {
@@ -987,11 +987,11 @@ const styles = `
   }
 
   .tvs-footer-text {
-    margin-top: 130px;
+    margin-top: 100px;
     text-align: center;
     width: 100%;
     font-family: 'Courier New', 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 13px;
+    font-size: 11px;
     letter-spacing: 0.05em;
     color: #79716A;
   }
@@ -1104,20 +1104,19 @@ function LoginPage() {
         <div className="tvs-left-panel-inner" style={{ position: 'relative' }}>
 
           {/* Centered logo positioned absolutely to push it up and reduce the gap below */}
-          <div className="w-full flex justify-center" style={{ position: 'absolute', top: '20px', left: 0, zIndex: 10, pointerEvents: 'none' }}>
+          <div className="w-full flex justify-center" style={{ position: 'absolute', top: '16px', left: 0, zIndex: 10, pointerEvents: 'none' }}>
             <img
               src="https://res.cloudinary.com/dpn42vumz/image/upload/v1781793772/ChatGPT_Image_Jun_18_2026_08_08_24_PM_ivbob8.png"
               alt="IntraView Logo"
-              style={{ height: '250px', width: 'auto', objectFit: 'contain', pointerEvents: 'auto' }}
+              style={{ height: '225px', width: 'auto', objectFit: 'contain', pointerEvents: 'auto' }}
             />
           </div>
 
-          <div className="tvs-form-area" style={{ paddingTop: '250px' }}>
+          <div className="tvs-form-area" style={{ paddingTop: '220px' }}>
             <div className="tvs-form-card" style={{ position: 'relative', zIndex: 20 }}>
               <h1 className="tvs-heading text-center">Log in</h1>
               <p className="tvs-subtext">
                 Enter your email and password below to log in
-                <br />
                 to your account
               </p>
 

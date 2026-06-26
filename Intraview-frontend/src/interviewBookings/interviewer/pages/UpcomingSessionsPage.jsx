@@ -134,7 +134,7 @@ const UpcomingSessionsPage = () => {
     }
   };
 
-  // ✅ Combine date + start_time (SAME AS CompletedSessionsPage)
+  // Build a JS Date from separate date + time strings
   const formatDateTime = (date, time) => {
     if (!date || !time) return null;
     try {
@@ -145,8 +145,22 @@ const UpcomingSessionsPage = () => {
     }
   };
 
-  const formatTimeUntil = (dateTime) => {
+  // Returns true if the session window is currently active
+  const isSessionLive = (booking) => {
+    // A LIVE status booking is explicitly live
+    if (booking.status === 'LIVE') return true;
+    // Also check the time window for CONFIRMED bookings that started
+    const startDt = formatDateTime(booking.date, booking.start_time);
+    const endDt = formatDateTime(booking.date, booking.end_time);
+    const now = new Date();
+    return startDt && endDt && now >= startDt && now <= endDt;
+  };
+
+  const formatTimeUntil = (dateTime, booking) => {
     if (!dateTime || isNaN(dateTime)) return 'Loading...';
+
+    // If session is explicitly LIVE or within its time window, show LIVE NOW
+    if (booking && isSessionLive(booking)) return 'LIVE NOW';
 
     const now = new Date();
     const start = dateTime;
@@ -215,6 +229,7 @@ const UpcomingSessionsPage = () => {
             {sessions.map((booking) => {
               const dateTime = formatDateTime(booking.date, booking.start_time);
               const endTime = formatDateTime(booking.date, booking.end_time);
+              const live = isSessionLive(booking);
 
               const hasPendingReschedule =
                 booking.reschedule_status === 'PENDING';
@@ -227,7 +242,11 @@ const UpcomingSessionsPage = () => {
               return (
                 <div
                   key={booking.id}
-                  className="group bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-slate-200 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 hover:border-slate-300 cursor-pointer"
+                  className={`group backdrop-blur-xl rounded-3xl p-8 border hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-pointer ${
+                    live
+                      ? 'bg-emerald-50/90 border-emerald-300 hover:border-emerald-400'
+                      : 'bg-white/80 border-slate-200 hover:border-slate-300'
+                  }`}
                   onClick={() =>
                     navigate(`/interviewer/dashboard/bookings/${booking.id}`)
                   }
@@ -238,9 +257,16 @@ const UpcomingSessionsPage = () => {
                       <span className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-xs font-semibold">
                         {INTERVIEW_TYPE_LABELS[booking.interview_type] || booking.interview_type || 'Interview Session'}
                       </span>
-                      <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
-                        CONFIRMED
-                      </span>
+                      {live ? (
+                        <span className="px-3 py-1 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                          <span className="w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+                          LIVE NOW
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+                          CONFIRMED
+                        </span>
+                      )}
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-slate-900 truncate group-hover:text-indigo-600">
@@ -337,8 +363,12 @@ const UpcomingSessionsPage = () => {
 
                   {/* Countdown + Tokens */}
                   <div className="flex items-center justify-between mb-8">
-                    <span className="px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">
-                      {formatTimeUntil(dateTime)}
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      live
+                        ? 'bg-emerald-500 text-white animate-pulse'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {formatTimeUntil(dateTime, booking)}
                     </span>
                     <div className="text-right">
                       <div className="text-lg font-bold text-emerald-600">

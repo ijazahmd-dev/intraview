@@ -495,7 +495,10 @@ class CandidateUpcomingInterviewsAPIView(APIView):
             InterviewBooking.objects
             .filter(
                 candidate=request.user,
-                status=InterviewBooking.Status.CONFIRMED,
+                status__in=[
+                    InterviewBooking.Status.CONFIRMED,
+                    InterviewBooking.Status.LIVE,  # Keep card visible while session is active
+                ],
                 end_datetime__gt=timezone.now(),
             )
             .select_related(
