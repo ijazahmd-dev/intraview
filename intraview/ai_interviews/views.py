@@ -1112,10 +1112,49 @@ class CandidateAIInterviewHistoryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        user = request.user
+
+        # ── DEBUG: entry point ────────────────────────────────────────────────
+        logger.info(
+            "[AI-HISTORY] GET request received | user_id=%s | user_email=%s | "
+            "query_params=%s",
+            getattr(user, "id", "ANONYMOUS"),
+            getattr(user, "email", "unknown"),
+            dict(request.query_params),
+        )
+
+        # ── DEBUG: total sessions in DB for this user (no filters) ────────────
+        total_for_user = AIInterviewSession.objects.filter(user=user).count()
+        logger.info(
+            "[AI-HISTORY] Total AIInterviewSession rows for user_id=%s: %d",
+            user.id,
+            total_for_user,
+        )
+
+        if total_for_user == 0:
+            logger.warning(
+                "[AI-HISTORY] No AI interview sessions found for user_id=%s. "
+                "Check that sessions are being saved with the correct user FK.",
+                user.id,
+            )
+
         qs = (
-            AIInterviewSession.objects.filter(user=request.user)
+            AIInterviewSession.objects.filter(user=user)
             .select_related("role", "final_report")
             .order_by("-created_at")
+        )
+
+        # ── DEBUG: status distribution for this user ──────────────────────────
+        from django.db.models import Count
+        status_dist = (
+            AIInterviewSession.objects.filter(user=user)
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+        logger.info(
+            "[AI-HISTORY] Status distribution for user_id=%s: %s",
+            user.id,
+            list(status_dist),
         )
 
         # Optional filters
@@ -1123,13 +1162,64 @@ class CandidateAIInterviewHistoryAPIView(APIView):
         round_type_filter = request.query_params.get("round_type")
 
         if status_filter:
+            logger.info(
+                "[AI-HISTORY] Applying status filter: %s", status_filter.upper()
+            )
             qs = qs.filter(status=status_filter.upper())
 
         if round_type_filter:
+            logger.info(
+                "[AI-HISTORY] Applying round_type filter: %s", round_type_filter.upper()
+            )
             qs = qs.filter(round_type=round_type_filter.upper())
 
-        paginator = AIInterviewHistoryPagination()
-        page = paginator.paginate_queryset(qs, request)
+        # ── DEBUG: queryset count after filters ───────────────────────────────
+        try:
+            filtered_count = qs.count()
+            logger.info(
+                "[AI-HISTORY] Queryset count after filters: %d", filtered_count
+            )
+        except Exception as exc:
+            logger.error(
+                "[AI-HISTORY] ERROR evaluating queryset count: %s", exc, exc_info=True
+            )
+            return Response(
+                {"detail": "Internal error evaluating queryset.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        serializer = CandidateAIInterviewHistorySerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+        # ── Paginate ──────────────────────────────────────────────────────────
+        paginator = AIInterviewHistoryPagination()
+        try:
+            page = paginator.paginate_queryset(qs, request)
+            logger.info(
+                "[AI-HISTORY] Pagination succeeded | page_count=%d",
+                len(page) if page is not None else 0,
+            )
+        except Exception as exc:
+            logger.error(
+                "[AI-HISTORY] ERROR during pagination: %s", exc, exc_info=True
+            )
+            return Response(
+                {"detail": "Internal error during pagination.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # ── Serialize ─────────────────────────────────────────────────────────
+        try:
+            serializer = CandidateAIInterviewHistorySerializer(page, many=True)
+            data = serializer.data
+            logger.info(
+                "[AI-HISTORY] Serialization succeeded | items=%d", len(data)
+            )
+        except Exception as exc:
+            logger.error(
+                "[AI-HISTORY] ERROR during serialization: %s", exc, exc_info=True
+            )
+            return Response(
+                {"detail": "Internal error during serialization.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        logger.info("[AI-HISTORY] Returning paginated response successfully.")
+        return paginator.get_paginated_response(data)
