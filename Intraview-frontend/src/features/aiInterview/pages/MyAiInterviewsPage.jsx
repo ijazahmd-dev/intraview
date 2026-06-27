@@ -33,22 +33,22 @@ const C = {
 // ── Status badge config ───────────────────────────────────────────────────────
 const STATUS_CONFIG = {
   COMPLETED: { bg: C.tealLight, color: C.tealDark, border: C.tealBorder, label: "Completed" },
-  LIVE:      { bg: "#ECFDF5",   color: "#059669",  border: "#A7F3D0",    label: "Live" },
-  READY:     { bg: C.yellowLight, color: "#92400E", border: C.yellowBorder, label: "Ready" },
-  CREATED:   { bg: C.yellowLight, color: "#92400E", border: C.yellowBorder, label: "Created" },
-  CANCELLED: { bg: "#FEF2F2",  color: "#9F1239",  border: "#FECDD3",    label: "Cancelled" },
-  FAILED:    { bg: "#FEF2F2",  color: "#9F1239",  border: "#FECDD3",    label: "Failed" },
+  LIVE: { bg: "#ECFDF5", color: "#059669", border: "#A7F3D0", label: "Live" },
+  READY: { bg: C.yellowLight, color: "#92400E", border: C.yellowBorder, label: "Ready" },
+  CREATED: { bg: C.yellowLight, color: "#92400E", border: C.yellowBorder, label: "Created" },
+  CANCELLED: { bg: "#FEF2F2", color: "#9F1239", border: "#FECDD3", label: "Cancelled" },
+  FAILED: { bg: "#FEF2F2", color: "#9F1239", border: "#FECDD3", label: "Failed" },
 };
 
 const ROUND_LABELS = {
-  WARMUP:       "Warm-up",
-  BEHAVIORAL:   "Behavioral",
+  WARMUP: "Warm-up",
+  BEHAVIORAL: "Behavioral",
   ROLE_RELATED: "Role Related",
-  CODING:       "Coding",
+  CODING: "Coding",
 };
 
 const DIFFICULTY_LABELS = {
-  BEGINNER:     "Beginner",
+  BEGINNER: "Beginner",
   INTERMEDIATE: "Intermediate",
   PROFESSIONAL: "Professional",
 };
@@ -105,8 +105,8 @@ function SessionRow({ session, onViewReport }) {
 
   const date = session.created_at
     ? new Date(session.created_at).toLocaleDateString("en-GB", {
-        day: "2-digit", month: "short", year: "numeric",
-      })
+      day: "2-digit", month: "short", year: "numeric",
+    })
     : "—";
 
   return (
@@ -244,7 +244,7 @@ function ErrorState({ message, onRetry }) {
       <svg width="40" height="40" fill="none" stroke="#EF4444" strokeWidth="1.5" viewBox="0 0 24 24" style={{ margin: "0 auto 12px", display: "block" }}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a1 1 0 00.86 1.5h18.64a1 1 0 00.86-1.5L13.71 3.86a1 1 0 00-1.72 0z" />
       </svg>
-      <p style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#9F1239" }}>Failed to load interviews</p>
+      <p style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: "#9F1239" }}>Failed to load interviews from Ijaz. its actually really sad right?.</p>
       <p style={{ margin: "0 0 20px", fontSize: 13, color: "#B91C1C" }}>{message}</p>
       <button
         onClick={onRetry}
