@@ -85,6 +85,8 @@ services:
       - ./intraview/.env
     volumes:
       - ./intraview:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_started
@@ -98,6 +100,8 @@ services:
       - ./intraview/.env
     volumes:
       - ./intraview:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_started
@@ -111,6 +115,8 @@ services:
       - ./intraview/.env
     volumes:
       - ./intraview:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       redis:
         condition: service_started

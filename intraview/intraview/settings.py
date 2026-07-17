@@ -275,25 +275,25 @@ WSGI_APPLICATION = 'intraview.wsgi.application'
 
 
 
-# DATABASES = {
-#   'default': {
-#     'ENGINE': 'django.db.backends.postgresql',
-#     'NAME': os.getenv("POSTGRES_DB"),
-#     'USER': os.getenv("POSTGRES_USER"),
-#     'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-#     'HOST': os.getenv("POSTGRES_HOST"),
-#     'PORT': os.getenv("POSTGRES_PORT"),
-#   }
-# }
-
-
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True,
-    )
-}
+if os.getenv("USE_LOCAL_DB", "False").lower() == "true" or not os.getenv("DATABASE_URL"):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("POSTGRES_DB"),
+            'USER': os.getenv("POSTGRES_USER"),
+            'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
+            'HOST': os.getenv("POSTGRES_HOST"),
+            'PORT': os.getenv("POSTGRES_PORT"),
+        }
+    }
+else:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            os.getenv("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
 
 
 
