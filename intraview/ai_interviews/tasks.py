@@ -24,6 +24,8 @@ from .service.gemini.reporting import generate_final_report_payload
 
 logger = logging.getLogger(__name__)
 
+SKIPPED_NO_ANSWER_TEXT = "Candidate did not provide an answer to this question."
+
 
 
 
@@ -35,6 +37,9 @@ def _build_combined_turn_answer(
     max_length: int,
 ) -> str:
     metadata = turn.metadata or {}
+
+    if metadata.get("skipped_no_answer"):
+        return SKIPPED_NO_ANSWER_TEXT
 
     followup_exchanges = (
         metadata.get("followup_exchanges")
@@ -181,6 +186,58 @@ def evaluate_turn(self, turn_id: int) -> None:
                 "task_id": self.request.id,
             },
         )
+        return
+
+    if (turn.metadata or {}).get("skipped_no_answer"):
+        evaluation.score = 0.0
+        evaluation.strengths = []
+        evaluation.weaknesses = [
+            "No answer was provided for this question."
+        ]
+        evaluation.suggestions = [
+            "Practice giving a brief structured response even when you are unsure."
+        ]
+        evaluation.confidence = "high"
+        evaluation.status = AIInterviewEvaluation.Status.SUCCESS
+        evaluation.raw_response = {
+            "reason": "NO_ANSWER_SKIPPED",
+            "skip_reason": (turn.metadata or {}).get("skip_reason"),
+            "answer": SKIPPED_NO_ANSWER_TEXT,
+        }
+        evaluation.save(
+            update_fields=[
+                "score",
+                "strengths",
+                "weaknesses",
+                "suggestions",
+                "confidence",
+                "status",
+                "raw_response",
+                "updated_at",
+            ]
+        )
+
+        logger.info(
+            "evaluate_turn: unanswered skipped turn %s evaluated deterministically",
+            turn_id,
+            extra={
+                "turn_id": turn.id,
+                "session_id": turn.session_id,
+                "task_id": self.request.id,
+            },
+        )
+
+        session = turn.session
+
+        if session.status == AIInterviewSession.Status.COMPLETED:
+            unfinished_count = AIInterviewEvaluation.objects.filter(
+                turn__session=session,
+                status=AIInterviewEvaluation.Status.PENDING,
+            ).count()
+
+            if unfinished_count == 0:
+                generate_final_report.delay(session.id)
+
         return
 
     if not turn.answer_text or not turn.answer_text.strip():

@@ -45,6 +45,8 @@ from turn_manager import TurnManager
 
 logger = logging.getLogger(__name__)
 
+NO_ANSWER_PLACEHOLDER_TEXT = "No answer provided."
+
 
 class InterviewRuntime:
     """
@@ -559,6 +561,98 @@ class InterviewRuntime:
         )
         await self._sync_runtime_state()
 
+    async def _ask_current_prepared_question(self, total_q: int):
+        """
+        Ask the current prepared base question directly.
+
+        We already have finalized question text from session setup, so
+        speaking it directly removes per-turn LLM latency and makes
+        question playback fully non-interruptible.
+        """
+
+        assert self.planner is not None
+        assert self.tm is not None
+
+        idx = self.tm.current_turn_index_0based()
+        base_q = self.planner.base_question_for_turn(idx)
+
+        await self._speak_question_text(
+            question_text=base_q.text,
+            total_q=total_q,
+        )
+
+    async def _repeat_current_question(self, total_q: int):
+        """
+        Politely repeat the current question after a no-answer timeout.
+
+        The retry remains on the same question slot and does not create
+        duplicate transcript/question events in the frontend.
+        """
+
+        assert self.tm is not None
+
+        current_question = (
+            (self.tm.state.base_question_text or "").strip()
+            or (self.tm.state.last_question_text or "").strip()
+        )
+
+        if not current_question:
+            await self._ask_current_prepared_question(total_q)
+            return
+
+        retry_text = (
+            "I didn't hear a response. Let me repeat the question. "
+            f"{current_question}"
+        )
+
+        try:
+            self.state_machine.transition(InterviewState.ASKING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to ASKING from %s",
+                self.state_machine.value.name,
+            )
+
+        self._reset_transcript_buffer()
+        self.tm.state.waiting_for_answer = False
+        self.tm.state.last_question_time = 0.0
+
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
+        await self._safe_say(
+            text=retry_text,
+            allow_interruptions=False,
+        )
+
+        try:
+            self.state_machine.transition(InterviewState.LISTENING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to LISTENING from %s",
+                self.state_machine.value.name,
+            )
+
+        self.tm.state.last_question_time = time.monotonic()
+        self.tm.state.waiting_for_answer = True
+
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
     async def _conclude_interview(
         self,
         *,
@@ -826,7 +920,7 @@ class InterviewRuntime:
 
         # AgentSession: STT/LLM/TTS pipeline via LiveKit Inference.
         self.session = AgentSession(
-            stt=inference.STT(model="deepgram/nova-3", language="multi"),
+            stt=inference.STT(model="deepgram/nova-3", language="en-US"),  
             llm=inference.LLM(model="google/gemini-2.5-flash"),
             tts=inference.TTS(
                 model="cartesia/sonic-2",
@@ -2390,7 +2484,12 @@ class InterviewRuntime:
 
     # ---------- base turn finalization (NEW) ----------
 
-    async def _finalize_base_turn(self, total_q: int):
+    async def _finalize_base_turn(
+        self,
+        total_q: int,
+        *,
+        skip_reason: str | None = None,
+    ):
         """
         Post the completed base turn to the backend, then advance turn_index
         and ask the next base question (or end the interview).
@@ -2449,102 +2548,86 @@ class InterviewRuntime:
         answer_text = (
             self.tm.state.base_answer_text or ""
         ).strip()
+        skipped_no_answer = bool(skip_reason)
 
         if not answer_text:
-
-            #
-            # Try salvaging from active transcript buffer.
-            #
-            # Covers race:
-            #
-            # user speaking
-            # ↓
-            # stabilization not committed yet
-            # ↓
-            # finalize triggered
-            #
-            salvaged = (
-                self.tm.current_transcript_buffer().strip()
-            )
-
-            if (
-                salvaged
-                and self._is_valid_user_answer(
-                    salvaged
-                )
-            ):
-
+            if skipped_no_answer:
                 logger.info(
-                    "Salvaged answer from transcript "
-                    "buffer: %r",
-                    salvaged[:80],
+                    "Finalizing unanswered turn as skipped: turn=%s reason=%s",
+                    turn_index_1based,
+                    skip_reason,
                 )
-
-                answer_text = salvaged
-
-                self._reset_transcript_buffer()
-
-                self.tm.state.base_answer_text = (
-                    answer_text
-                )
-
+                answer_text = NO_ANSWER_PLACEHOLDER_TEXT
+                self.tm.state.base_answer_text = answer_text
             else:
 
-                logger.warning(
-                    "Empty answer detected. "
-                    "Re-asking SAME question "
-                    "(not consuming question slot)."
+                #
+                # Try salvaging from active transcript buffer.
+                #
+                # Covers race:
+                #
+                # user speaking
+                # ↓
+                # stabilization not committed yet
+                # ↓
+                # finalize triggered
+                #
+                salvaged = (
+                    self.tm.current_transcript_buffer().strip()
                 )
 
-                self._reset_transcript_buffer()
-
-                #
-                # FIX: Do NOT call mark_answer_received()
-                # which would advance turn_index and
-                # consume a question slot for nothing.
-                #
-                # Instead, reset current turn state
-                # so the same question can be re-asked.
-                #
-                self.tm.reset_current_turn_state()
-
-                await self._sync_runtime_state()
-
-                # Re-ask the SAME question (turn_index unchanged).
-                if self.tm.can_ask_new_question():
-                    _idx = self.tm.current_turn_index_0based()
-                    _base_q = self.planner.base_question_for_turn(_idx)
-                    _instr = self.planner.build_llm_instruction(
-                        turn_index=_idx,
-                        base_q=_base_q,
-                        last_answer=None,
+                if (
+                    salvaged
+                    and self._is_valid_user_answer(
+                        salvaged
                     )
-                    try:
-                        self.state_machine.transition(InterviewState.ASKING)
-                    except ValueError:
-                        logger.warning(
-                            "Illegal state transition to ASKING from %s",
-                            self.state_machine.value.name,
-                        )
-                    await self._send_data(
-                        {
-                            "type": "state",
-                            "state": self.state_machine.value.name,
-                            "current_index": self.tm.current_turn_index_1based(),
-                            "max_questions": total_q,
-                        }
+                ):
+
+                    logger.info(
+                        "Salvaged answer from transcript "
+                        "buffer: %r",
+                        salvaged[:80],
                     )
-                    await self._sync_runtime_state()
-                    await self._safe_generate_reply(
-                        instructions=_instr,
-                        generation_type="QUESTION",
+
+                    answer_text = salvaged
+
+                    self._reset_transcript_buffer()
+
+                    self.tm.state.base_answer_text = (
+                        answer_text
                     )
+
                 else:
-                    await self._conclude_interview(
-                        total_q=total_q,
-                        reason="no_more_questions",
+
+                    logger.warning(
+                        "Empty answer detected. "
+                        "Re-asking SAME question "
+                        "(not consuming question slot)."
                     )
-                return
+
+                    self._reset_transcript_buffer()
+
+                    #
+                    # FIX: Do NOT call mark_answer_received()
+                    # which would advance turn_index and
+                    # consume a question slot for nothing.
+                    #
+                    # Instead, reset current turn state
+                    # so the same question can be re-asked.
+                    #
+                    self.tm.reset_current_turn_state()
+
+                    await self._sync_runtime_state()
+
+                    # Re-ask the SAME question (turn_index unchanged).
+                    if self.tm.can_ask_new_question():
+                        await self._ask_current_prepared_question(total_q)
+                    else:
+                        await self._conclude_interview(
+                            total_q=total_q,
+                            reason="no_more_questions",
+                        )
+                    return
 
         # Merge base metadata with follow-up extras.
         metadata = {
@@ -2552,10 +2635,13 @@ class InterviewRuntime:
             "difficulty": self.cfg.difficulty,
             "role_slug": self.cfg.role_slug,
             "question_topic": self.planner.base_question_for_turn(
-                self.tm.current_turn_index_0based()
+            self.tm.current_turn_index_0based()
             ).topic,
             "question_source": self.planner.question_source,
+            "skipped_no_answer": skipped_no_answer,
         }
+        if skipped_no_answer and skip_reason:
+            metadata["skip_reason"] = skip_reason
 
         try:
 
@@ -2640,38 +2726,7 @@ class InterviewRuntime:
 
         # Ask next base question or end interview.
         if self.tm.can_ask_new_question():
-            idx = self.tm.current_turn_index_0based()
-            base_q = self.planner.base_question_for_turn(idx)
-            instr = self.planner.build_llm_instruction(
-                turn_index=idx,
-                base_q=base_q,
-                last_answer=None,
-            )
-
-            try:
-                self.state_machine.transition(InterviewState.ASKING)
-            except ValueError:
-                logger.warning(
-                    "Illegal state transition to ASKING from %s",
-                    self.state_machine.value.name,
-                )
-
-            await self._send_data(
-                {
-                    "type": "state",
-                    "state": self.state_machine.value.name,
-                    "current_index": self.tm.current_turn_index_1based(),
-                    "max_questions": total_q,
-                }
-            )
-            await self._sync_runtime_state()
-
-
-
-            await self._safe_generate_reply(
-                instructions=instr,
-                generation_type="QUESTION",
-            )
+            await self._ask_current_prepared_question(total_q)
 
         else:
             await self._conclude_interview(
@@ -2737,14 +2792,6 @@ class InterviewRuntime:
             )
             return
 
-        idx = self.tm.current_turn_index_0based()
-        base_q = self.planner.base_question_for_turn(idx)
-        instr = self.planner.build_llm_instruction(
-            turn_index=idx,
-            base_q=base_q,
-            last_answer=None,
-        )
-
         if self._should_greet_on_start():
             greeting_text = self._build_greeting_text()
             self._greeting_spoken = True
@@ -2766,65 +2813,19 @@ class InterviewRuntime:
             )
             await self._sync_runtime_state()
 
-            question_task = asyncio.create_task(
-                self._generate_question_text(
-                    instructions=instr,
-                    fallback_text=base_q.text,
-                )
-            )
-            self._track_background_task(question_task)
-
             await self._safe_say(
                 text=greeting_text,
                 allow_interruptions=False,
             )
 
-            question_text = base_q.text
-            try:
-                question_text = await asyncio.wait_for(
-                    question_task,
-                    timeout=max(
-                        1.0,
-                        ASSISTANT_GENERATION_TIMEOUT_SECONDS - 1.0,
-                    ),
-                )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Timed out waiting for first question pre-generation; using fallback text."
-                )
-            except Exception:
-                logger.exception(
-                    "First question pre-generation failed after greeting; using fallback text."
-                )
-
-            await self._speak_question_text(
-                question_text=question_text,
-                total_q=self.planner.total_questions(),
+            await self._ask_current_prepared_question(
+                self.planner.total_questions()
             )
 
             return
 
-        # We are now in ASKING state while LLM generates/speaks the question.
-        try:
-            self.state_machine.transition(InterviewState.ASKING)
-        except ValueError:
-            logger.warning(
-                "Illegal state transition to ASKING from %s",
-                self.state_machine.value.name,
-            )
-        await self._send_data(
-            {
-                "type": "state",
-                "state": self.state_machine.value.name,
-                "current_index": self.tm.current_turn_index_1based(),
-                "max_questions": self.planner.total_questions(),
-            }
-        )
-        await self._sync_runtime_state()
-
-        await self._safe_generate_reply(
-            instructions=instr,
-            generation_type="QUESTION",
+        await self._ask_current_prepared_question(
+            self.planner.total_questions()
         )
 
 
@@ -3061,22 +3062,7 @@ class InterviewRuntime:
                         }
                     )
 
-                    # [NEW] Use the original base question topic for retry instruction
-                    # regardless of whether we are in a follow-up or base question.
-                    base_q = self.planner.base_question_for_turn(
-                        self.tm.current_turn_index_0based()
-                    )
-                    retry_instr = (
-                        "The candidate did not respond clearly to your last question about:\n"
-                        f"\"{base_q.text}\"\n\n"
-                        "Please politely repeat the SAME question in different words. "
-                        "Do not add new information, hints, or commentary. "
-                        "Respond with the question only."
-                    )
-                    await self._safe_generate_reply(
-                        instructions=retry_instr,
-                        generation_type="RETRY",
-                    )
+                    await self._repeat_current_question(total_q)
                     await self._sync_runtime_state()
                     continue
 
@@ -3145,7 +3131,10 @@ class InterviewRuntime:
                         # after timeout skips.
                         self._reset_transcript_buffer()
 
-                        await self._finalize_base_turn(total_q)
+                        await self._finalize_base_turn(
+                            total_q,
+                            skip_reason="no_answer_timeout",
+                        )
 
         except asyncio.CancelledError:
             raise
