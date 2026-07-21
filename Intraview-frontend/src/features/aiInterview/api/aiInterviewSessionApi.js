@@ -42,6 +42,13 @@ export const stopAiInterviewAvatarSession = (sessionId) => {
   return API.post(`/api/ai-interview/session/${sessionId}/avatar/stop/`);
 };
 
+export const postAiInterviewIntegrityEvents = (sessionId, payload) => {
+  return API.post(
+    `/api/ai-interview/session/${sessionId}/integrity-events/`,
+    payload
+  );
+};
+
 
 
 /**

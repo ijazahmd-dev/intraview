@@ -9,8 +9,10 @@ from .models import (
     AIInterviewTurn,
     AIInterviewEvaluation,
     AIInterviewFinalReport,
+    AIInterviewIntegrityEvent,
     InterviewRuntimeState,
 )
+from .service.services import AIInterviewIntegrityService
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -203,6 +205,9 @@ class AIInterviewEvaluationSerializer(serializers.ModelSerializer):
 
 
 class AIInterviewFinalReportSerializer(serializers.ModelSerializer):
+    integrity_summary = serializers.SerializerMethodField()
+    integrity_score = serializers.SerializerMethodField()
+
     class Meta:
         model = AIInterviewFinalReport
         fields = [
@@ -214,9 +219,18 @@ class AIInterviewFinalReportSerializer(serializers.ModelSerializer):
             "areas_for_improvement",
             "recommendations",
             "status",
+            "integrity_summary",
+            "integrity_score",
             "created_at",
         ]
         read_only_fields = ["id", "session", "status", "created_at"]
+
+    def get_integrity_summary(self, obj):
+        return AIInterviewIntegrityService.build_summary(obj.session)
+
+    def get_integrity_score(self, obj):
+        summary = AIInterviewIntegrityService.build_summary(obj.session)
+        return AIInterviewIntegrityService.calculate_score(summary)
 
 
 
@@ -253,6 +267,47 @@ class AgentTurnCreateSerializer(serializers.Serializer):
         if not value.strip():
             raise serializers.ValidationError("Answer cannot be empty.")
         return value
+
+
+class AIInterviewIntegrityEventWriteSerializer(serializers.Serializer):
+    client_event_id = serializers.CharField(max_length=64)
+    event_type = serializers.ChoiceField(
+        choices=AIInterviewIntegrityEvent.EventType.choices,
+    )
+    started_at = serializers.DateTimeField()
+    ended_at = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+    )
+    duration_seconds = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+    )
+    metadata = serializers.JSONField(required=False)
+
+    def validate(self, attrs):
+        started_at = attrs["started_at"]
+        ended_at = attrs.get("ended_at")
+        duration_seconds = attrs.get("duration_seconds")
+
+        if ended_at and ended_at < started_at:
+            raise serializers.ValidationError(
+                {"ended_at": "ended_at cannot be before started_at."}
+            )
+
+        if duration_seconds is None and ended_at:
+            attrs["duration_seconds"] = max(
+                int((ended_at - started_at).total_seconds()),
+                0,
+            )
+
+        attrs["metadata"] = attrs.get("metadata") or {}
+        return attrs
+
+
+class AIInterviewIntegrityEventBatchSerializer(serializers.Serializer):
+    events = AIInterviewIntegrityEventWriteSerializer(many=True)
 
 
 

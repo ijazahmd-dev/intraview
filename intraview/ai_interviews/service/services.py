@@ -9,6 +9,7 @@ from ai_interviews.models import (
     AIInterviewTurn,
     AIInterviewEvaluation,
     AIInterviewFinalReport,
+    AIInterviewIntegrityEvent,
 )
 from ai_interviews.repositories import RoleRepository, AIInterviewSessionRepository
 from ai_interviews.tasks import generate_final_report
@@ -31,6 +32,84 @@ import json
 from livekit import api as lkapi
 
 logger = logging.getLogger(__name__)
+
+
+class AIInterviewIntegrityService:
+    """
+    Aggregates lightweight browser-side integrity events into a neutral summary
+    suitable for interview reports.
+    """
+
+    SUMMARY_DEFAULTS = {
+        "tab_switch_count": 0,
+        "tab_switch_duration_seconds": 0,
+        "window_focus_loss_count": 0,
+        "window_focus_loss_duration_seconds": 0,
+        "fullscreen_exit_count": 0,
+        "face_missing_count": 0,
+        "face_missing_duration_seconds": 0,
+        "total_event_count": 0,
+    }
+
+    @staticmethod
+    def _event_duration_seconds(event: AIInterviewIntegrityEvent) -> int:
+        if event.duration_seconds is not None:
+            return max(int(event.duration_seconds), 0)
+
+        if event.ended_at and event.started_at:
+            delta = int((event.ended_at - event.started_at).total_seconds())
+            return max(delta, 0)
+
+        return 0
+
+    @classmethod
+    def build_summary_from_events(
+        cls,
+        events: list[AIInterviewIntegrityEvent],
+    ) -> dict:
+        summary = dict(cls.SUMMARY_DEFAULTS)
+        summary["total_event_count"] = len(events)
+
+        for event in events:
+            duration_seconds = cls._event_duration_seconds(event)
+
+            if event.event_type == AIInterviewIntegrityEvent.EventType.TAB_SWITCH:
+                summary["tab_switch_count"] += 1
+                summary["tab_switch_duration_seconds"] += duration_seconds
+
+            elif (
+                event.event_type
+                == AIInterviewIntegrityEvent.EventType.WINDOW_FOCUS_LOSS
+            ):
+                summary["window_focus_loss_count"] += 1
+                summary["window_focus_loss_duration_seconds"] += duration_seconds
+
+            elif event.event_type == AIInterviewIntegrityEvent.EventType.FULLSCREEN_EXIT:
+                summary["fullscreen_exit_count"] += 1
+
+            elif event.event_type == AIInterviewIntegrityEvent.EventType.FACE_MISSING:
+                summary["face_missing_count"] += 1
+                summary["face_missing_duration_seconds"] += duration_seconds
+
+        return summary
+
+    @classmethod
+    def build_summary(cls, session: AIInterviewSession) -> dict:
+        events = list(
+            session.integrity_events.all().order_by("started_at", "id")
+        )
+        return cls.build_summary_from_events(events)
+
+    @classmethod
+    def calculate_score(cls, summary: dict) -> int:
+        penalty = 0
+        penalty += int(summary.get("tab_switch_count", 0)) * 4
+        penalty += int(summary.get("window_focus_loss_count", 0)) * 3
+        penalty += int(summary.get("fullscreen_exit_count", 0)) * 2
+        penalty += int(summary.get("face_missing_count", 0)) * 6
+        penalty += int(summary.get("face_missing_duration_seconds", 0)) // 15 * 2
+
+        return max(75, 100 - min(penalty, 25))
 
 class RoleService:
     @staticmethod

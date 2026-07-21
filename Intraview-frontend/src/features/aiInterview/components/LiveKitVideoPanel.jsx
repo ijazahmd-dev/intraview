@@ -14,6 +14,7 @@ import {
 } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { InterviewerAvatar } from "./InterviewerAvatar";
+import { InterviewIntegrityMonitor } from "./InterviewIntegrityMonitor";
 import { useInterviewerParticipant } from "../hooks/useInterviewerParticipant";
 
 // ── Icons ────────────────────────────────────────────────────
@@ -363,6 +364,11 @@ export function LiveKitVideoPanel({
           overflow: "hidden",
         }}
       >
+        <InterviewIntegrityMonitor
+          sessionId={sessionId}
+          enabled={connect && !isEnding}
+        />
+
         {/* LEFT: Avatar + PiP + controls */}
         <VideoArea
           avatarSession={avatarSession}

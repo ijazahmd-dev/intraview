@@ -16,6 +16,7 @@ urlpatterns = [
     path("session/<int:pk>/end/",views.AIInterviewSessionEndAPIView.as_view(),name="ai-session-end",),
     path("session/<int:pk>/avatar/",views.AIInterviewAvatarSessionCreateAPIView.as_view(),name="ai-session-avatar-create",),
     path("session/<int:pk>/avatar/stop/",views.AIInterviewAvatarSessionStopAPIView.as_view(),name="ai-session-avatar-stop",),
+    path("session/<int:pk>/integrity-events/",views.AIInterviewIntegrityEventsAPIView.as_view(),name="ai-session-integrity-events",),
     path("ping/",views.PingAPIView.as_view(),name="ai-ping",),
     path("session/<int:session_id>/turns/",views.RecordTurnFromAgentView.as_view(),name="ai-interview-record-turn",),
 

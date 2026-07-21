@@ -639,3 +639,82 @@ class AIInterviewFinalReport(models.Model):
 
   def __str__(self) -> str:
       return f"Final report for session #{self.session_id} ({self.status})"
+
+
+class AIInterviewIntegrityEvent(models.Model):
+  """
+  Candidate-friendly interview integrity events captured during the live session.
+
+  These events are intentionally lightweight:
+  - focus / tab / fullscreen changes from browser APIs
+  - local face-presence gaps detected fully in the browser
+
+  Raw video frames are never stored or uploaded.
+  """
+
+  class EventType(models.TextChoices):
+      TAB_SWITCH = "TAB_SWITCH", "Tab Switch"
+      WINDOW_FOCUS_LOSS = "WINDOW_FOCUS_LOSS", "Window Focus Loss"
+      FULLSCREEN_EXIT = "FULLSCREEN_EXIT", "Fullscreen Exit"
+      FACE_MISSING = "FACE_MISSING", "Face Missing"
+
+  session = models.ForeignKey(
+      AIInterviewSession,
+      on_delete=models.CASCADE,
+      related_name="integrity_events",
+  )
+
+  client_event_id = models.CharField(
+      max_length=64,
+      help_text="Client-generated id used for best-effort de-duplication.",
+  )
+
+  event_type = models.CharField(
+      max_length=32,
+      choices=EventType.choices,
+      db_index=True,
+  )
+
+  started_at = models.DateTimeField(
+      help_text="When the browser-side event started.",
+  )
+
+  ended_at = models.DateTimeField(
+      null=True,
+      blank=True,
+      help_text="When the event ended, if a duration could be measured.",
+  )
+
+  duration_seconds = models.PositiveIntegerField(
+      null=True,
+      blank=True,
+      help_text="Rounded event duration in seconds when available.",
+  )
+
+  metadata = models.JSONField(
+      default=dict,
+      blank=True,
+      help_text="Lightweight structured context such as warning variant or visibility state.",
+  )
+
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  class Meta:
+      ordering = ["started_at", "id"]
+      constraints = [
+          models.UniqueConstraint(
+              fields=["session", "client_event_id"],
+              name="uniq_ai_integrity_event_per_session_client_id",
+          )
+      ]
+      indexes = [
+          models.Index(fields=["session", "event_type"]),
+          models.Index(fields=["session", "started_at"]),
+      ]
+
+  def __str__(self) -> str:
+      return (
+          f"IntegrityEvent(session={self.session_id}, "
+          f"type={self.event_type}, started_at={self.started_at.isoformat()})"
+      )

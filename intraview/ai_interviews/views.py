@@ -16,6 +16,7 @@ from .models import (
     InterviewRuntimeState,
     AIInterviewFinalReport,
     AIInterviewTurn,
+    AIInterviewIntegrityEvent,
 )
 from ai_interviews.serializers import (
     RoleSerializer,
@@ -28,12 +29,18 @@ from ai_interviews.serializers import (
     InterviewRuntimeStateSerializer,
     InterviewRuntimeStateUpdateSerializer,
     AIInterviewFinalReportSerializer,
+    AIInterviewIntegrityEventBatchSerializer,
     AIInterviewTurnEvaluationDetailSerializer,
     AIInterviewTurnWithEvaluationSerializer,
     CandidateAIInterviewHistorySerializer,
 )
 
-from ai_interviews.service.services import RoleService, AIInterviewSessionService, AIInterviewTurnService
+from ai_interviews.service.services import (
+    RoleService,
+    AIInterviewIntegrityService,
+    AIInterviewSessionService,
+    AIInterviewTurnService,
+)
 from ai_interviews.service.tavus_avatar_service import TavusAvatarSessionService
 from .tasks import evaluate_turn, generate_final_report
 
@@ -283,6 +290,72 @@ class AIInterviewAvatarSessionStopAPIView(APIView):
 
         serializer = AIInterviewAvatarSessionSerializer(avatar_session)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AIInterviewIntegrityEventsAPIView(APIView):
+    """
+    POST /api/ai-interview/session/<id>/integrity-events/
+
+    Accepts a small batch of client-side integrity events captured during the
+    live interview session.
+    """
+
+    authentication_classes = [MultiRoleJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        session = AIInterviewSessionService.get_session_for_user(pk, request.user)
+        if not session:
+            return Response(
+                {"detail": "Session not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = AIInterviewIntegrityEventBatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        events_data = serializer.validated_data["events"]
+        client_event_ids = [item["client_event_id"] for item in events_data]
+        existing_ids = set(
+            AIInterviewIntegrityEvent.objects.filter(
+                session=session,
+                client_event_id__in=client_event_ids,
+            ).values_list("client_event_id", flat=True)
+        )
+
+        events_to_create = []
+        for item in events_data:
+            if item["client_event_id"] in existing_ids:
+                continue
+
+            events_to_create.append(
+                AIInterviewIntegrityEvent(
+                    session=session,
+                    client_event_id=item["client_event_id"],
+                    event_type=item["event_type"],
+                    started_at=item["started_at"],
+                    ended_at=item.get("ended_at"),
+                    duration_seconds=item.get("duration_seconds"),
+                    metadata=item.get("metadata") or {},
+                )
+            )
+
+        if events_to_create:
+            AIInterviewIntegrityEvent.objects.bulk_create(events_to_create)
+
+        summary = AIInterviewIntegrityService.build_summary(session)
+
+        return Response(
+            {
+                "accepted_count": len(events_to_create),
+                "ignored_duplicates": len(events_data) - len(events_to_create),
+                "integrity_summary": summary,
+                "integrity_score": AIInterviewIntegrityService.calculate_score(
+                    summary
+                ),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 
