@@ -455,6 +455,7 @@ export default function AdminInterviewerVerificationsPage() {
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null); // { action: 'approve' | 'reject' }
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -507,15 +508,21 @@ export default function AdminInterviewerVerificationsPage() {
     setRejectReason("");
   };
 
-  const handleReview = async (action) => {
-    if (!selectedId) return;
+  const requestReview = (action) => {
     if (action === "reject" && !rejectReason.trim()) {
       alert("Rejection reason is required.");
       return;
     }
+    setConfirmModal({ action });
+  };
+
+  const handleReview = async () => {
+    if (!selectedId || !confirmModal) return;
+    const { action } = confirmModal;
 
     setReviewing(true);
     setError(null);
+    setConfirmModal(null);
     try {
       await reviewAdminVerification(selectedId, {
         action,
@@ -921,19 +928,15 @@ export default function AdminInterviewerVerificationsPage() {
                             <div className="flex gap-3">
                               <button
                                 disabled={reviewing}
-                                onClick={() => handleReview("approve")}
+                                onClick={() => requestReview("approve")}
                                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                               >
-                                {reviewing ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-4 h-4" />
-                                )}
+                                <CheckCircle className="w-4 h-4" />
                                 Approve
                               </button>
                               <button
                                 disabled={reviewing}
-                                onClick={() => handleReview("reject")}
+                                onClick={() => requestReview("reject")}
                                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-semibold text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 <XCircle className="w-4 h-4" />
@@ -973,6 +976,102 @@ export default function AdminInterviewerVerificationsPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{
+            backgroundColor: 'rgba(17, 24, 39, 0.7)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)'
+          }}
+          onClick={() => !reviewing && setConfirmModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className={`px-6 py-5 border-b border-gray-100 ${
+              confirmModal.action === 'approve'
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50'
+                : 'bg-gradient-to-r from-red-50 to-rose-50'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md ${
+                  confirmModal.action === 'approve'
+                    ? 'bg-gradient-to-br from-green-500 to-green-600'
+                    : 'bg-gradient-to-br from-red-500 to-red-600'
+                }`}>
+                  {confirmModal.action === 'approve'
+                    ? <CheckCircle className="w-6 h-6 text-white" />
+                    : <XCircle className="w-6 h-6 text-white" />
+                  }
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">
+                    {confirmModal.action === 'approve' ? 'Approve Verification' : 'Reject Verification'}
+                  </h2>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                {confirmModal.action === 'approve'
+                  ? <>Are you sure you want to <span className="font-semibold text-green-700">approve</span> this document verification? The interviewer will be marked as verified.</>
+                  : <>Are you sure you want to <span className="font-semibold text-red-700">reject</span> this document verification? The interviewer will be notified with the rejection reason.</>
+                }
+              </p>
+
+              {confirmModal.action === 'reject' && rejectReason && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-xs font-semibold text-red-700 mb-1">Rejection Reason:</p>
+                  <p className="text-sm text-red-700 whitespace-pre-wrap">{rejectReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                disabled={reviewing}
+                onClick={() => setConfirmModal(null)}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-all duration-200 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={reviewing}
+                onClick={handleReview}
+                className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm text-white transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-60 disabled:cursor-not-allowed ${
+                  confirmModal.action === 'approve'
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700'
+                    : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700'
+                }`}
+              >
+                {reviewing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {confirmModal.action === 'approve' ? 'Approving...' : 'Rejecting...'}
+                  </>
+                ) : (
+                  <>
+                    {confirmModal.action === 'approve'
+                      ? <CheckCircle className="w-4 h-4" />
+                      : <XCircle className="w-4 h-4" />
+                    }
+                    {confirmModal.action === 'approve' ? 'Yes, Approve' : 'Yes, Reject'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
