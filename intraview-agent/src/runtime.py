@@ -923,8 +923,9 @@ class InterviewRuntime:
             stt=inference.STT(model="deepgram/nova-3", language="en-US"),  
             llm=inference.LLM(model="google/gemini-2.5-flash"),
             tts=inference.TTS(
-                model="cartesia/sonic-2",
-                voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+                model="cartesia/sonic-3.5",
+                # voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc", 
+                voice="b24f41fd-00a3-4cd8-992a-a0c9f13f3ef1",
             ),
             vad=self.ctx.proc.userdata["vad"],
             turn_handling={

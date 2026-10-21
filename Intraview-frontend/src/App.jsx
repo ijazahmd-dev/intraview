@@ -103,6 +103,9 @@ import CandidateProgressPage from "./features/progress/pages/CandidateProgressPa
 import MyAiInterviewsPage from "./features/aiInterview/pages/MyAiInterviewsPage";
 import AdminDashboardPage from "./features/adminDashboard/pages/AdminDashboardPage";
 import AdminSessionsPage from "./features/adminSessions/pages/AdminSessionsPage";
+import TermsOfUse from "./pages/LegalTerms";
+import PrivacyPolicy from "./pages/LegalPrivacy";
+import TermsAndConditions from "./pages/LegalConditions";
 
 
 
@@ -147,6 +150,9 @@ function AppInner() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/terms-of-use" element={<TermsOfUse />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
         <Route path="/home" element={
           // <ProtectedRoute>
           <Home />

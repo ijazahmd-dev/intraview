@@ -1,180 +1,416 @@
 // src/components/AuthRequiredModal.jsx
-
 import React, { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { X, LogIn, UserPlus, Lock, ArrowRight, Shield } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
-/**
- * AuthRequiredModal
- * -----------------
- * Shown by ProtectedRoute when the user is NOT authenticated.
- * Replaces the hard <Navigate to="/login" /> with a polished modal.
- *
- * Props:
- *   onClose — called when user dismisses the modal (e.g. backdrop click / X).
- *             Typically navigates back or to home.
- */
+const LOGO_URL =
+  'https://res.cloudinary.com/dpn42vumz/image/upload/v1790803589/7a01858e-5b2d-420e-b5da-6722ef1f99d90000000000_injfdo.png';
+
+function ArrowRightIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+const MODAL_STYLES = `
+  @keyframes armModalFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .arm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background-color: rgba(22, 33, 28, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .arm-card {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    background: #ffffff;
+    border-radius: 24px;
+    border: 1px solid rgb(224, 224, 224);
+    padding: 40px 36px 34px;
+    box-sizing: border-box;
+    box-shadow: 0 24px 60px -12px rgba(22, 33, 28, 0.28);
+    animation: armModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @media (max-width: 500px) {
+    .arm-card {
+      padding: 32px 22px 26px;
+      border-radius: 20px;
+    }
+  }
+
+  .arm-close-btn {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: none;
+    border: none;
+    padding: 6px;
+    color: rgb(150, 155, 153);
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+  .arm-close-btn:hover {
+    color: rgb(33, 33, 33);
+    background-color: rgb(245, 245, 245);
+  }
+
+  .arm-logo-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .arm-logo-img {
+    height: 72px;
+    width: 122px;
+    object-fit: fill;
+    display: block;
+  }
+
+  .arm-heading {
+    font-size: 1.625rem;
+    font-weight: 420;
+    line-height: 1.3;
+    color: rgb(33, 33, 33);
+    text-align: center;
+    margin: 0 0 8px 0;
+  }
+
+  .arm-subheading {
+    font-size: 0.875rem;
+    color: rgb(97, 97, 97);
+    line-height: 1.5;
+    text-align: center;
+    margin: 0 auto 28px auto;
+    max-width: 360px;
+  }
+
+  /* Cohere-style Cell Button */
+  .arm-submit-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .arm-cell-btn {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    height: 42px;
+    width: 100%;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    outline: none;
+  }
+
+  .arm-cell-part {
+    display: flex;
+    height: 100%;
+    transition: transform 0.15s ease;
+  }
+  .arm-cell-btn:hover .arm-cell-part {
+    transform: translateX(-4px);
+  }
+  .arm-cell-part-main {
+    flex: 1;
+    min-width: 120px;
+  }
+  .arm-cell-part-arrow {
+    flex: none;
+  }
+
+  .arm-bg-color {
+    background: rgb(57, 89, 77);
+    transition: background 0.15s ease;
+  }
+  .arm-cell-btn:hover .arm-bg-color {
+    background: rgb(43, 66, 57);
+  }
+  .arm-cell-btn:active .arm-bg-color {
+    background: rgb(22, 33, 28);
+  }
+
+  .arm-cell-l {
+    width: 12px;
+    border-radius: 6px 0 0 6px;
+    margin-right: -2px;
+    transform-origin: top right;
+  }
+  .arm-cell-mid {
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 0 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: 0.0025em;
+  }
+  .arm-cell-skew-r {
+    width: 24px;
+    transform: skewX(-21deg);
+    border-radius: 0 10px 4px 0;
+    transform-origin: top right;
+  }
+  .arm-cell-skew-l {
+    width: 24px;
+    transform: skewX(-21deg);
+    border-radius: 4px 0 0 10px;
+    transform-origin: top right;
+    margin-right: -16px;
+  }
+  .arm-cell-r {
+    width: 12px;
+    border-radius: 0 6px 6px 0;
+    margin-left: -2px;
+    transform-origin: top right;
+  }
+
+  .arm-cell-arrow-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease;
+    padding: 0 6px;
+  }
+
+  /* Divider */
+  .arm-divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 18px 0;
+  }
+  .arm-divider-line {
+    flex: 1;
+    height: 1.5px;
+    background-color: rgb(57, 89, 77);
+    display: block;
+    border: none;
+  }
+  .arm-divider-text {
+    padding: 0 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(57, 89, 77);
+    user-select: none;
+    line-height: 1;
+  }
+
+  /* Secondary button (matches OAuth button style on Login) */
+  .arm-secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 42px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgb(218, 220, 224);
+    background: #ffffff;
+    color: rgb(33, 33, 33);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    box-sizing: border-box;
+    text-decoration: none;
+  }
+  .arm-secondary-btn:hover {
+    background: rgb(245, 245, 245);
+    border-color: rgb(117, 117, 117);
+  }
+  .arm-secondary-btn:active {
+    background: rgb(238, 238, 238);
+    border-color: rgb(33, 33, 33);
+  }
+
+  /* Terms row */
+  .arm-terms {
+    margin-top: 24px;
+    font-size: 0.8125rem;
+    color: rgb(97, 97, 97);
+    line-height: 1.5;
+    text-align: center;
+  }
+  .arm-terms a {
+    color: rgb(57, 89, 77);
+    text-decoration: underline;
+    transition: color 0.15s ease;
+  }
+  .arm-terms a:hover {
+    color: rgb(22, 33, 28);
+  }
+`;
+
 const AuthRequiredModal = ({ onClose }) => {
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Save the intended destination so login/signup can redirect back.
+  // Save intended destination for redirect back
   const intendedPath = location.pathname + location.search;
 
-  // Lock body scroll while modal is open.
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
-  const handleLogin  = () => navigate('/login',  { state: { from: intendedPath } });
+  const handleLogin = () => navigate('/login', { state: { from: intendedPath } });
   const handleSignup = () => navigate('/signup', { state: { from: intendedPath } });
-  const handleClose  = () => (onClose ? onClose() : navigate(-1));
+  const handleClose = () => (onClose ? onClose() : navigate(-1));
 
-  // Stop propagation so clicks inside card don't close the modal.
-  const stopPropagation = (e) => e.stopPropagation();
+  return createPortal(
+    <div
+      className="arm-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sign in required"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
+      <style>{MODAL_STYLES}</style>
 
-  return (
-    <>
-      {/* ── Keyframes injected once ────────────────────────────────── */}
-      <style>{`
-        @keyframes iv-modal-in {
-          from { opacity: 0; transform: translateY(18px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)    scale(1);    }
-        }
-        .iv-modal-card {
-          animation: iv-modal-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-        }
-        @keyframes iv-pulse-ring {
-          0%, 100% { transform: scale(1);    opacity: 0.5; }
-          50%       { transform: scale(1.18); opacity: 0;   }
-        }
-        .iv-lock-pulse::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 1rem;
-          background: #14b8a6;
-          animation: iv-pulse-ring 2.4s ease-out infinite;
-        }
-      `}</style>
-
-      {/* ── Full-viewport overlay ───────────────────────────────────── */}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        onClick={handleClose}
-        aria-modal="true"
-        role="dialog"
-        aria-label="Sign in required"
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-gray-900/55 backdrop-blur-[3px]" />
-
-        {/* ── Modal card ────────────────────────────────────────────── */}
-        <div
-          className="iv-modal-card relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
-          onClick={stopPropagation}
+      <div className="arm-card">
+        {/* Close button */}
+        <button
+          type="button"
+          className="arm-close-btn"
+          onClick={handleClose}
+          aria-label="Close modal"
         >
-          {/* ── Teal top accent strip ─── */}
-          <div className="h-1.5 bg-gradient-to-r from-teal-400 via-teal-500 to-teal-600" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
 
-          <div className="px-8 pt-8 pb-10">
-
-            {/* ── Close button ──────────────────────────── */}
-            <button
-              onClick={handleClose}
-              className="absolute top-5 right-5 p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* ── Brand mark ───────────────────────────── */}
-            <div className="flex items-center justify-center gap-2.5 mb-7">
-              <div className="w-8 h-8 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm select-none">In</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">IntraView</span>
-            </div>
-
-            {/* ── Lock icon with pulse ─────────────────── */}
-            <div className="flex justify-center mb-6">
-              <div className="relative iv-lock-pulse">
-                <div className="relative z-10 w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center border-2 border-teal-100">
-                  <Lock className="w-7 h-7 text-teal-500" />
-                </div>
-              </div>
-            </div>
-
-            {/* ── Heading ─────────────────────────────── */}
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-              Sign in to continue
-            </h2>
-            <p className="text-gray-500 text-center text-sm leading-relaxed max-w-xs mx-auto mb-8">
-              This page requires you to be signed in. Log in or create a free
-              account to get started with IntraView.
-            </p>
-
-            {/* ── Trust badge row ─────────────────────── */}
-            <div className="flex items-center justify-center gap-4 mb-8 text-xs text-gray-400">
-              <span className="flex items-center gap-1">
-                <Shield className="w-3.5 h-3.5 text-teal-400" />
-                Secure sign in
-              </span>
-              <span className="w-px h-3.5 bg-gray-200" />
-              <span>Free to join</span>
-              <span className="w-px h-3.5 bg-gray-200" />
-              <span>No credit card</span>
-            </div>
-
-            {/* ── Action buttons ──────────────────────── */}
-            <div className="space-y-3">
-              {/* Primary — Log In */}
-              <button
-                id="auth-modal-login-btn"
-                onClick={handleLogin}
-                className="
-                  w-full bg-teal-500 hover:bg-teal-600 active:bg-teal-700
-                  text-white font-semibold py-3.5 rounded-xl
-                  transition-all duration-200
-                  flex items-center justify-center gap-2
-                  shadow-sm hover:shadow-md
-                  group
-                "
-              >
-                <LogIn className="w-4 h-4" />
-                Log In to Your Account
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              {/* Secondary — Sign Up */}
-              <button
-                id="auth-modal-signup-btn"
-                onClick={handleSignup}
-                className="
-                  w-full border-2 border-gray-200 hover:border-teal-300 hover:bg-teal-50
-                  text-gray-700 font-semibold py-3.5 rounded-xl
-                  transition-all duration-200
-                  flex items-center justify-center gap-2
-                "
-              >
-                <UserPlus className="w-4 h-4 text-teal-500" />
-                Create a Free Account
-              </button>
-            </div>
-
-            {/* ── Divider ─────────────────────────────── */}
-            <p className="text-center text-xs text-gray-400 mt-6">
-              By continuing you agree to our{' '}
-              <span className="text-teal-600 hover:underline cursor-pointer">Terms</span>
-              {' '}and{' '}
-              <span className="text-teal-600 hover:underline cursor-pointer">Privacy Policy</span>
-            </p>
-          </div>
+        {/* IntraView brand logo */}
+        <div className="arm-logo-wrap">
+          <img src={LOGO_URL} alt="IntraView" className="arm-logo-img" />
         </div>
+
+        {/* Heading */}
+        <h2 className="arm-heading">Sign in to continue</h2>
+
+        {/* Subtitle */}
+        <p className="arm-subheading">
+          This page requires an account. Log in or create a free account to continue with IntraView.
+        </p>
+
+        {/* Primary Action: Log in cell button */}
+        <div className="arm-submit-wrap">
+          <button
+            id="auth-modal-login-btn"
+            type="button"
+            onClick={handleLogin}
+            className="arm-cell-btn"
+            aria-label="Log in to your account"
+          >
+            <div className="arm-cell-part arm-cell-part-main">
+              <span className="arm-bg-color arm-cell-l"></span>
+              <div className="arm-bg-color arm-cell-mid">Log in to your account</div>
+              <span className="arm-bg-color arm-cell-skew-r"></span>
+            </div>
+            <div className="arm-cell-part arm-cell-part-arrow">
+              <span className="arm-bg-color arm-cell-skew-l"></span>
+              <div className="arm-bg-color arm-cell-mid arm-cell-arrow-icon">
+                <ArrowRightIcon />
+              </div>
+              <span className="arm-bg-color arm-cell-r"></span>
+            </div>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="arm-divider" role="separator" aria-label="Or">
+          <span className="arm-divider-line" />
+          <span className="arm-divider-text">or</span>
+          <span className="arm-divider-line" />
+        </div>
+
+        {/* Secondary Action: Create account button */}
+        <button
+          id="auth-modal-signup-btn"
+          type="button"
+          onClick={handleSignup}
+          className="arm-secondary-btn"
+        >
+          Create a free account
+        </button>
+
+        {/* Terms row */}
+        <p className="arm-terms">
+          By continuing you agree to our{' '}
+          <Link to="/terms-of-use" onClick={handleClose}>
+            Terms of Use
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy-policy" onClick={handleClose}>
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
-    </>
+    </div>,
+    document.body
   );
 };
 

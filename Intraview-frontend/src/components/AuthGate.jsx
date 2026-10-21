@@ -9,9 +9,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import AuthRequiredModal from './AuthRequiredModal';
 
+const PUBLIC_PATHS = [
+  '/',
+  '/home',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/terms-of-use',
+  '/privacy-policy',
+  '/terms-and-conditions',
+];
+
 const AuthGate = () => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+
+  const isPublicPage = PUBLIC_PATHS.includes(location.pathname);
 
   // Close the modal automatically if the route changes (e.g., user clicks Login)
   useEffect(() => {
@@ -19,6 +33,7 @@ const AuthGate = () => {
   }, [location.pathname]);
 
   const handleAuthRequired = useCallback(() => {
+    if (PUBLIC_PATHS.includes(window.location.pathname)) return;
     setOpen(true);
   }, []);
 
@@ -29,7 +44,7 @@ const AuthGate = () => {
     };
   }, [handleAuthRequired]);
 
-  if (!open) return null;
+  if (!open || isPublicPage) return null;
 
   // onClose just hides the modal — user stays on the page.
   // They can still browse public content; if they try a protected action again

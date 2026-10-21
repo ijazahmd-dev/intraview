@@ -42,6 +42,9 @@ const NO_REFRESH_URLS = [
   "/auth/login/",
   "/auth/admin/login/",
   "/auth/interviewer/login/",
+  "/auth/me/",
+  "/auth/admin/me/",
+  "/auth/interviewer/me/",
 ];
 
 // Tracks whether a refresh is already in flight so we don't fire multiple
