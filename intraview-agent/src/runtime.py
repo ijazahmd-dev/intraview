@@ -11,6 +11,7 @@ import time
 from typing import Optional, Set
 from difflib import SequenceMatcher
 
+import httpx
 from livekit.agents import (
     AgentSession,
     JobContext,
@@ -35,8 +36,12 @@ from constants import (
     TRANSCRIPT_BUFFER_MAX_SECONDS,
     TRANSCRIPT_SIMILARITY_THRESHOLD,
     MAX_TRANSCRIPT_UPDATES_PER_PROMPT,
-    NO_ANSWER_TIMEOUT_SECONDS,
-    
+    MAX_CLARIFICATION_REQUESTS_PER_QUESTION,
+    SILENCE_STAGE_SECONDS,
+    TURN_SUBMISSION_INITIAL_BACKOFF_SECONDS,
+    TURN_SUBMISSION_MAX_ATTEMPTS,
+    TURN_SUBMISSION_MAX_BACKOFF_SECONDS,
+    TURN_SUBMISSION_TIMEOUT_SECONDS,
 )
 from planner import InterviewConfig, QuestionPlanner
 from questions import normalize_stored_questions
@@ -46,6 +51,51 @@ from turn_manager import TurnManager
 logger = logging.getLogger(__name__)
 
 NO_ANSWER_PLACEHOLDER_TEXT = "No answer provided."
+
+_FILLER_TRANSCRIPTS = {
+    "ah",
+    "er",
+    "erm",
+    "hmm",
+    "mm",
+    "uh",
+    "uh huh",
+    "um",
+}
+_NOISE_TRANSCRIPT_RE = re.compile(
+    r"^\s*\[(?:noise|music|silence|inaudible|crosstalk)\]\s*$",
+    re.IGNORECASE,
+)
+_CLARIFICATION_PATTERNS = (
+    re.compile(
+        r"^(?:could|can|would|will) you (?:please )?"
+        r"(?:repeat|restate|clarify|explain|say (?:that|it) again)"
+        r"(?: the question| that| it)?(?: please)?$"
+    ),
+    re.compile(
+        r"^(?:please )?(?:repeat|restate|clarify) "
+        r"(?:the )?(?:question|that|it)(?: please)?$"
+    ),
+    re.compile(r"^(?:pardon(?: me)?|sorry|excuse me)$"),
+    re.compile(
+        r"^(?:i )?(?:didn't|did not|can't|cannot) "
+        r"(?:hear|catch|understand) (?:that|the question|you)$"
+    ),
+    re.compile(
+        r"^(?:which|what) (?:programming )?language "
+        r"(?:should|do) (?:i|we) (?:use|answer)(?: in)?$"
+    ),
+    re.compile(r"^(?:what|which) do you mean(?: by (?:that|the question))?$") ,
+)
+
+
+class TurnSubmissionFailure(RuntimeError):
+    """A classified, bounded turn-submission failure."""
+
+    def __init__(self, *, category: str, detail: str, retryable: bool):
+        super().__init__(detail)
+        self.category = category
+        self.retryable = retryable
 
 
 class InterviewRuntime:
@@ -138,9 +188,6 @@ class InterviewRuntime:
         self._loaded_runtime_state_name: str = "INITIALIZING"
         self._loaded_waiting_for_answer: bool = False
 
-        self._minimum_answer_words = 3
-        self._minimum_answer_chars = 12
-
         # ---------------------------------------------------------
         # Streaming transcript assembly state
         # ---------------------------------------------------------
@@ -183,6 +230,11 @@ class InterviewRuntime:
         # NOT transcript timing.
         #
         self._candidate_is_speaking: bool = False
+
+        # True only while scripted speech is playing.  Timeout stages are
+        # suspended during agent speech, but the active answer window remains
+        # open for interruptible prompts.
+        self._agent_is_speaking: bool = False
 
         #
         # Timestamp of latest detected speech end.
@@ -436,6 +488,7 @@ class InterviewRuntime:
             await self.runtime_guard.ensure_runtime_valid()
 
         try:
+            self._agent_is_speaking = True
             handle = self.session.say(
                 text=text,
                 allow_interruptions=allow_interruptions,
@@ -449,6 +502,8 @@ class InterviewRuntime:
             logger.exception("Scripted speech timed out.")
         except Exception:
             logger.exception("Scripted speech failed.")
+        finally:
+            self._agent_is_speaking = False
 
     async def _generate_question_text(
         self,
@@ -1032,13 +1087,11 @@ class InterviewRuntime:
 
     def _is_valid_user_answer(self, text: str) -> bool:
         """
-        Filters fragmented / low-signal STT transcript events.
+        Filters empty and clearly non-semantic STT transcript events.
 
-        Prevents:
-        - empty transcripts
-        - tiny partial chunks
-        - accidental endpoint fragments
-        - premature turn finalization
+        Answer length is intentionally not a validity signal.  A one-word
+        response can be a complete answer to a yes/no or technology question;
+        it must be persisted or handled explicitly, never discarded silently.
         """
 
         if not text:
@@ -1049,15 +1102,27 @@ class InterviewRuntime:
         if not cleaned:
             return False
 
-        if len(cleaned) < self._minimum_answer_chars:
+        if _NOISE_TRANSCRIPT_RE.fullmatch(cleaned):
             return False
 
         words = re.findall(r"\b[\w'-]+\b", cleaned)
 
-        if len(words) < self._minimum_answer_words:
+        if not words:
             return False
 
-        return True       
+        normalized = " ".join(word.lower() for word in words)
+        return normalized not in _FILLER_TRANSCRIPTS
+
+    def _is_clarification_request(self, text: str) -> bool:
+        """Recognize narrowly-scoped requests about the active question."""
+        normalized = self._normalize_transcript(text)
+        if not normalized:
+            return False
+        return any(pattern.fullmatch(normalized) for pattern in _CLARIFICATION_PATTERNS)
+
+    def _is_meaningful_candidate_speech(self, text: str) -> bool:
+        """Use the same conservative noise boundary for silence pacing."""
+        return self._is_valid_user_answer(text)
 
 
 
@@ -1456,6 +1521,20 @@ class InterviewRuntime:
                 self.tm.current_transcript_buffer() or ""
             ).strip()
 
+            if self._is_clarification_request(answer_text):
+                # Clarifications are not answers.  Reset only the transient
+                # STT buffer and leave the same base question open.
+                self._reset_transcript_buffer()
+                logger.info(
+                    "Handling clarification request without finalizing turn: %r",
+                    answer_text[:160],
+                )
+                task = asyncio.create_task(
+                    self._handle_clarification_request(total_q=total_q)
+                )
+                self._track_background_task(task)
+                return
+
             if not self._is_valid_user_answer(answer_text):
 
                 logger.info(
@@ -1597,6 +1676,74 @@ class InterviewRuntime:
                 # Always release processing guard.
                 #
                 self._processing_answer = False
+
+    async def _handle_clarification_request(self, *, total_q: int) -> None:
+        """Repeat the current question without recording or consuming a turn."""
+        assert self.tm is not None
+
+        current_question = (
+            (self.tm.state.base_question_text or "").strip()
+            or (self.tm.state.last_question_text or "").strip()
+        )
+        if not current_question:
+            logger.warning("Clarification requested without an active question.")
+            return
+
+        try:
+            self.state_machine.transition(InterviewState.RETRYING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to RETRYING from %s",
+                self.state_machine.value.name,
+            )
+
+        if self.tm.state.clarification_count < MAX_CLARIFICATION_REQUESTS_PER_QUESTION:
+            self.tm.state.clarification_count += 1
+            spoken_text = f"Certainly. {current_question}"
+            info_message = "Repeating the current question."
+        else:
+            spoken_text = (
+                "Let's continue with the current question. "
+                "Please share your answer when you're ready."
+            )
+            info_message = "The current question is still open for your answer."
+
+        await self._send_data(
+            {
+                "type": "info",
+                "reason": "clarification_request",
+                "message": info_message,
+                "index": self.tm.current_turn_index_1based(),
+            }
+        )
+        await self._sync_runtime_state()
+
+        # A clarification/retry prompt is intentionally interruptible.  The
+        # question itself remains non-interruptible so background sound cannot
+        # repeatedly truncate its delivery.
+        await self._safe_say(text=spoken_text, allow_interruptions=True)
+
+        if not self.tm.has_pending_question() or self.tm.state.is_finalizing_turn:
+            return
+
+        try:
+            self.state_machine.transition(InterviewState.LISTENING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to LISTENING from %s",
+                self.state_machine.value.name,
+            )
+
+        self.tm.reset_silence_timer()
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
 
 
 
@@ -2483,7 +2630,217 @@ class InterviewRuntime:
 
    
 
-    # ---------- base turn finalization (NEW) ----------
+    def _classify_turn_submission_response(
+        self, status_code: int, detail: str
+    ) -> TurnSubmissionFailure | None:
+        if 200 <= status_code < 300:
+            return None
+        if status_code in {408, 429} or status_code >= 500:
+            return TurnSubmissionFailure(
+                category="server_or_rate_limit",
+                detail=f"retryable backend response ({status_code}): {detail}",
+                retryable=True,
+            )
+        if status_code in {401, 403}:
+            return TurnSubmissionFailure(
+                category="authentication",
+                detail=f"backend authentication failed ({status_code}): {detail}",
+                retryable=False,
+            )
+        if status_code == 409:
+            return TurnSubmissionFailure(
+                category="idempotency_conflict",
+                detail=f"turn identity conflicts with a persisted turn: {detail}",
+                retryable=False,
+            )
+        if 400 <= status_code < 500:
+            return TurnSubmissionFailure(
+                category="validation",
+                detail=f"backend rejected turn payload ({status_code}): {detail}",
+                retryable=False,
+            )
+        return TurnSubmissionFailure(
+            category="unknown_response",
+            detail=f"unexpected backend response ({status_code}): {detail}",
+            retryable=True,
+        )
+
+    async def _post_turn_with_retry(
+        self,
+        *,
+        session_id: int,
+        turn_index_1based: int,
+        question_text: str,
+        answer_text: str,
+        metadata: dict,
+    ) -> None:
+        """Persist a single immutable logical turn with bounded retries."""
+        assert self.backend is not None
+
+        payload = {
+            "session_id": session_id,
+            "turn_index_1based": turn_index_1based,
+            "question_text": question_text,
+            "answer_text": answer_text,
+            "metadata": metadata,
+        }
+        failure: TurnSubmissionFailure | None = None
+
+        for attempt in range(1, TURN_SUBMISSION_MAX_ATTEMPTS + 1):
+            try:
+                response = await asyncio.wait_for(
+                    self.backend.post_turn(**payload),
+                    timeout=TURN_SUBMISSION_TIMEOUT_SECONDS,
+                )
+            except asyncio.CancelledError:
+                raise
+            except (asyncio.TimeoutError, httpx.TimeoutException) as exc:
+                failure = TurnSubmissionFailure(
+                    category="timeout",
+                    detail=f"turn post timed out: {exc}",
+                    retryable=True,
+                )
+            except httpx.NetworkError as exc:
+                failure = TurnSubmissionFailure(
+                    category="network",
+                    detail=f"turn post network failure: {exc}",
+                    retryable=True,
+                )
+            except BackendOwnershipConflict as exc:
+                failure = TurnSubmissionFailure(
+                    category="ownership",
+                    detail=f"runtime ownership rejected turn post: {exc}",
+                    retryable=False,
+                )
+            except Exception as exc:
+                failure = TurnSubmissionFailure(
+                    category="client",
+                    detail=f"turn post client failure: {exc}",
+                    retryable=True,
+                )
+            else:
+                failure = self._classify_turn_submission_response(
+                    response.status_code,
+                    getattr(response, "text", ""),
+                )
+                if failure is None:
+                    logger.info(
+                        "TURN POST SUCCESS → session=%s turn=%s attempt=%s",
+                        session_id,
+                        turn_index_1based,
+                        attempt,
+                    )
+                    return
+
+            assert failure is not None
+            logger.warning(
+                "Turn post failed: session=%s turn=%s attempt=%s/%s category=%s retryable=%s detail=%s",
+                session_id,
+                turn_index_1based,
+                attempt,
+                TURN_SUBMISSION_MAX_ATTEMPTS,
+                failure.category,
+                failure.retryable,
+                failure,
+            )
+            if not failure.retryable or attempt == TURN_SUBMISSION_MAX_ATTEMPTS:
+                raise failure
+
+            delay = min(
+                TURN_SUBMISSION_INITIAL_BACKOFF_SECONDS * (2 ** (attempt - 1)),
+                TURN_SUBMISSION_MAX_BACKOFF_SECONDS,
+            )
+            await asyncio.sleep(delay)
+
+        # Kept for type checkers; all loop exits either return or raise.
+        raise failure or TurnSubmissionFailure(
+            category="unknown",
+            detail="turn post failed without a classified error",
+            retryable=False,
+        )
+
+    async def _recover_from_turn_submission_failure(
+        self,
+        *,
+        failure: TurnSubmissionFailure,
+        total_q: int,
+    ) -> None:
+        """Recover without advancing when the answer could not be persisted."""
+        assert self.tm is not None
+
+        await self._send_data(
+            {
+                "type": "info",
+                "reason": "turn_submission_failed",
+                "category": failure.category,
+                "message": "Your response was not saved. The current question remains open.",
+                "index": self.tm.current_turn_index_1based(),
+            }
+        )
+
+        if not failure.retryable:
+            self.tm.abort_turn_finalization()
+            self.tm.state.waiting_for_answer = False
+            try:
+                self.state_machine.transition(InterviewState.FAILED)
+            except ValueError:
+                logger.warning(
+                    "Illegal state transition to FAILED from %s",
+                    self.state_machine.value.name,
+                )
+            await self._sync_runtime_state()
+            await self._safe_say(
+                text=(
+                    "I could not save your response, so this interview cannot "
+                    "continue safely. Please reconnect or start a new session."
+                ),
+                allow_interruptions=True,
+            )
+            self._interview_done.set()
+            return
+
+        # A transient outage has exhausted its bounded retries.  The prior
+        # answer is retained in memory only for diagnostics, while the answer
+        # window is deliberately reopened on the same question.  We never
+        # advance or imply that the response was saved.
+        self.tm.reopen_after_submission_failure()
+        self._reset_transcript_buffer()
+        try:
+            self.state_machine.transition(InterviewState.RETRYING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to RETRYING from %s",
+                self.state_machine.value.name,
+            )
+        await self._sync_runtime_state()
+        await self._safe_say(
+            text=(
+                "I could not save that response because of a temporary "
+                "connection issue. Please repeat your answer when you're ready."
+            ),
+            allow_interruptions=True,
+        )
+
+        if not self.tm.has_pending_question() or self.tm.state.is_finalizing_turn:
+            return
+        try:
+            self.state_machine.transition(InterviewState.LISTENING)
+        except ValueError:
+            logger.warning(
+                "Illegal state transition to LISTENING from %s",
+                self.state_machine.value.name,
+            )
+        await self._send_data(
+            {
+                "type": "state",
+                "state": self.state_machine.value.name,
+                "current_index": self.tm.current_turn_index_1based(),
+                "max_questions": total_q,
+            }
+        )
+        await self._sync_runtime_state()
+
+    # ---------- base turn finalization ----------
 
     async def _finalize_base_turn(
         self,
@@ -2644,58 +3001,34 @@ class InterviewRuntime:
         if skipped_no_answer and skip_reason:
             metadata["skip_reason"] = skip_reason
 
+        logger.info(
+            "Posting turn: session=%s turn=%s answer_words=%s",
+            self.cfg.session_id,
+            turn_index_1based,
+            len(re.findall(r"\b[\w'-]+\b", answer_text)),
+        )
         try:
-
-            logger.warning(
-                (
-                    "POSTING TURN → "
-                    "session=%s "
-                    "turn=%s "
-                    "question=%r "
-                    "answer_words=%s "
-                    "answer=%r"
-                ),
+            await self._post_turn_with_retry(
+                session_id=self.cfg.session_id,
+                turn_index_1based=turn_index_1based,
+                question_text=question_text,
+                answer_text=answer_text,
+                metadata=metadata,
+            )
+        except asyncio.CancelledError:
+            raise
+        except TurnSubmissionFailure as failure:
+            logger.error(
+                "Turn submission exhausted or rejected: session=%s turn=%s category=%s detail=%s",
                 self.cfg.session_id,
                 turn_index_1based,
-                question_text[:120],
-                len(
-                    re.findall(
-                        r"\b[\w'-]+\b",
-                        answer_text,
-                    )
-                ),
-                answer_text[:300],
+                failure.category,
+                failure,
             )
-
-            resp = await asyncio.wait_for(
-                self.backend.post_turn(
-                    session_id=self.cfg.session_id,
-                    turn_index_1based=turn_index_1based,
-                    question_text=question_text,
-                    answer_text=answer_text,
-                    metadata=metadata,
-                ),
-                timeout=15.0,
+            await self._recover_from_turn_submission_failure(
+                failure=failure,
+                total_q=total_q,
             )
-            if resp.status_code >= 400:
-                logger.error(
-                    "Backend turn post failed: status=%s body=%s",
-                    resp.status_code,
-                    resp.text,
-                )
-                raise RuntimeError(
-                    f"Backend turn post failed with status={resp.status_code}"
-                )
-            else:
-                logger.info(
-                    "TURN POST SUCCESS → session=%s turn=%s",
-                    self.cfg.session_id,
-                    turn_index_1based,
-                )    
-        except Exception:
-            logger.exception("Error posting turn to backend")
-            # Recover finalize fence.
-            self.tm.abort_turn_finalization()
             return
 
 

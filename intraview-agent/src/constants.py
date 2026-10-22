@@ -6,12 +6,10 @@
 This file prevents scattering magic numbers across the codebase.
 """
 
-# How long to wait for a candidate answer before a gentle retry.
-NO_ANSWER_TIMEOUT_SECONDS: float = 75.0
-
-# Maximum multiplier for total no-answer wait after retry.
-# 40s (initial) + 40s (retry) = 80s total window.
-NO_ANSWER_MAX_MULTIPLIER: int = 2
+# Candidate silence stages, measured while the runtime is listening for an
+# answer.  The runtime pauses these stages while it is speaking and resets
+# them after meaningful candidate speech.
+SILENCE_STAGE_SECONDS: tuple[float, float, float] = (15.0, 30.0, 45.0)
 
 # How often the timeout loop wakes up to inspect state.
 TIMEOUT_LOOP_INTERVAL_SECONDS: float = 0.8
@@ -23,10 +21,18 @@ EMPTY_ROOM_GRACE_SECONDS: float = 60.0
 # for STT deduplication. This avoids unbounded growth over long sessions.
 PROCESSED_ITEM_ID_LIMIT: int = 2000
 
-# Minimum answer quality heuristics.
-# These are intentionally conservative; you can tune them later.
-MIN_ANSWER_CHARS: int = 15   # ignore extremely short transcripts
-MIN_ANSWER_WORDS: int = 3    # ignore 1-word / 2-word fillers
+# A small cap prevents a candidate from asking for the same clarification
+# forever while still allowing an accidental missed question to be recovered.
+MAX_CLARIFICATION_REQUESTS_PER_QUESTION: int = 2
+
+# Bounded, in-memory retries for posting a finalized turn.  The exact payload
+# and turn index are reused for each attempt.  If all attempts fail, the
+# runtime reopens the current question rather than advancing without a durable
+# record.
+TURN_SUBMISSION_MAX_ATTEMPTS: int = 3
+TURN_SUBMISSION_TIMEOUT_SECONDS: float = 12.0
+TURN_SUBMISSION_INITIAL_BACKOFF_SECONDS: float = 0.5
+TURN_SUBMISSION_MAX_BACKOFF_SECONDS: float = 2.0
 
 # Maximum number of follow-up questions allowed per base question.
 # Follow-ups do not increment turn_index or count toward max_questions.
@@ -42,10 +48,6 @@ MAX_DUPLICATE_TRANSCRIPT_EVENTS: int = 2
 #
 # Helps protect against uncontrolled conversational continuation.
 MAX_AUTONOMOUS_ASSISTANT_MESSAGES: int = 3
-
-# Maximum retry attempts for a single pending prompt
-# before runtime forcefully skips the question.
-MAX_NO_ANSWER_RETRIES: int = 1
 
 # Maximum time allowed for assistant response generation
 # before runtime considers generation stalled.
@@ -107,10 +109,9 @@ TRANSCRIPT_STABILIZATION_SECONDS: float = 1.0
 # - speech grace timing serves answer completeness
 # - candidates naturally pause 2-4s mid-thought
 #
-# Tuned to 1.5s: sufficient for a natural breath pause in
-# a structured interview answer without causing the
-# 4-second dead silence users were experiencing.
-SPEECH_END_GRACE_SECONDS: float = 1.5
+# 2.5s accommodates normal thinking pauses while remaining short enough for
+# concise answers to proceed without a noticeable delay.
+SPEECH_END_GRACE_SECONDS: float = 2.5
 
 # Minimum transcript size before runtime considers
 # the answer meaningful enough to commit.

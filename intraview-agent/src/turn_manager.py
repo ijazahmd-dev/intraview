@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 
 
-from constants import NO_ANSWER_TIMEOUT_SECONDS, NO_ANSWER_MAX_MULTIPLIER
+from constants import SILENCE_STAGE_SECONDS
 
 
 @dataclass
@@ -17,6 +17,11 @@ class TurnState:
     last_question_text: str | None = None
     last_question_time: float = 0.0
     no_answer_retry_used: bool = False
+    # Number of completed silence prompts for this answer window.  This is
+    # deliberately separate from the historical retry flag so stages can be
+    # progressed deterministically without consuming a question.
+    silence_stage: int = 0
+    clarification_count: int = 0
     done: bool = False
     # True once current base turn is entering finalization.
     #
@@ -62,6 +67,10 @@ class TurnState:
     # - analytics
     transcript_update_count: int = 0
 
+    # Kept only for the lifetime of this runtime so a submission failure is
+    # observable during recovery.  It is never treated as a persisted answer.
+    last_failed_submission_answer: str = ""
+
 
 
 class TurnManager:
@@ -99,6 +108,9 @@ class TurnManager:
         self.state.waiting_for_answer = True
         self.state.last_question_time = time.monotonic()
         self.state.no_answer_retry_used = False
+        self.state.silence_stage = 0
+        self.state.clarification_count = 0
+        self.state.last_failed_submission_answer = ""
 
         self.complete_turn_finalization()
         self.reset_transcript_state()
@@ -112,6 +124,8 @@ class TurnManager:
         self.state.last_question_text = None
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
+        self.state.silence_stage = 0
+        self.state.clarification_count = 0
         self.complete_turn_finalization()
 
         if self.state.turn_index >= self.total_questions:
@@ -134,6 +148,7 @@ class TurnManager:
         self.state.last_question_text = None
         self.state.last_question_time = 0.0
         self.state.no_answer_retry_used = False
+        self.state.silence_stage = 0
         self.complete_turn_finalization()
         self.reset_transcript_state() 
 
@@ -204,25 +219,55 @@ class TurnManager:
     
 
 
-    def should_retry_for_no_answer(self) -> bool:
-        if not self.state.waiting_for_answer or self.state.no_answer_retry_used:
-            return False
-        if self.state.last_question_time <= 0:
-            return False
-        elapsed = time.monotonic() - self.state.last_question_time
-        return elapsed > NO_ANSWER_TIMEOUT_SECONDS
-
-    def mark_retry_used(self):
-        self.state.no_answer_retry_used = True
-
-    def should_timeout_and_skip(self) -> bool:
+    def next_silence_stage(self) -> int | None:
+        """Return the next due silence stage without mutating turn state."""
         if not self.state.waiting_for_answer or self.state.last_question_time <= 0:
-            return False
+            return None
+
+        if self.state.silence_stage >= len(SILENCE_STAGE_SECONDS):
+            return None
+
         elapsed = time.monotonic() - self.state.last_question_time
-        threshold = NO_ANSWER_TIMEOUT_SECONDS * (
-            NO_ANSWER_MAX_MULTIPLIER if self.state.no_answer_retry_used else 1
-        )
-        return elapsed > threshold
+        next_stage = self.state.silence_stage + 1
+        threshold = SILENCE_STAGE_SECONDS[next_stage - 1]
+        return next_stage if elapsed >= threshold else None
+
+    def mark_silence_stage_handled(self, stage: int) -> None:
+        """Record one handled silence stage; each stage can run only once."""
+        if stage != self.state.silence_stage + 1:
+            return
+        self.state.silence_stage = stage
+
+    def mark_meaningful_speech(self) -> None:
+        """Restart silence pacing when the candidate begins a real response."""
+        if not self.state.waiting_for_answer:
+            return
+        self.reset_silence_timer()
+
+    def reset_silence_timer(self) -> None:
+        """Restart silence pacing while preserving the active question."""
+        if not self.state.waiting_for_answer:
+            return
+        self.state.last_question_time = time.monotonic()
+        self.state.silence_stage = 0
+        self.state.no_answer_retry_used = False
+
+    def reopen_after_submission_failure(self) -> None:
+        """
+        Safely reopen the same question when a finalized answer was not saved.
+
+        This intentionally does not advance turn_index.  The caller must tell
+        the candidate that the earlier response was not saved before accepting
+        a replacement answer.
+        """
+        self.state.last_failed_submission_answer = self.state.base_answer_text
+        self.state.base_answer_text = ""
+        self.state.waiting_for_answer = True
+        self.state.last_question_time = time.monotonic()
+        self.state.no_answer_retry_used = False
+        self.state.silence_stage = 0
+        self.complete_turn_finalization()
+        self.reset_transcript_state()
 
     # ------------------------------------------------------------------ #
     #  New follow-up methods                                               #
@@ -246,10 +291,10 @@ class TurnManager:
 
         existing = (self.state.base_answer_text or "").strip()
 
-        # Keep longer/more complete answer.
-        # Helps realtime transcript refinement.
-        if len(cleaned) > len(existing):
-            self.state.base_answer_text = cleaned
+        # This method is called only after a single transcript has been
+        # stabilized.  Keeping the longer string here used to preserve stale
+        # false starts and made a legitimate shorter correction impossible.
+        self.state.base_answer_text = cleaned
 
         self.state.waiting_for_answer = False
         self.state.last_question_time = 0.0
@@ -270,29 +315,10 @@ class TurnManager:
         if not cleaned:
             return
 
-        existing = (
-            self.state.active_transcript_buffer
-            or ""
-        ).strip()
-
-        #
-        # Ignore smaller regressions.
-        #
-        # Example:
-        #
-        # "I worked on auth system"
-        # ↓ provider glitch
-        # "I worked"
-        #
-        if (
-            existing
-            and len(cleaned) < len(existing)
-        ):
-            return
-
-        self.state.active_transcript_buffer = (
-            cleaned
-        )
+        # A smaller provider update may be a fresh utterance or correction,
+        # not merely a degraded cumulative transcript.  Runtime-level merge
+        # logic decides whether it belongs to the same utterance.
+        self.state.active_transcript_buffer = cleaned
 
         self.state.last_transcript_at = (
             time.monotonic()
