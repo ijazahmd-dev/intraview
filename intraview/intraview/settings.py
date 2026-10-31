@@ -39,10 +39,14 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = os.getenv(
-    "ALLOWED_HOSTS",
-    "localhost,127.0.0.1"
-).split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "ALLOWED_HOSTS",
+        "localhost,127.0.0.1,api.intraview.ijazdev.xyz,13.239.83.150,backend"
+    ).split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -159,16 +163,26 @@ FRONTEND_URL = os.getenv(
     "http://localhost:5173"
 )
 
-
-
+_cors_origins_raw = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    f"{FRONTEND_URL},https://intraview.ijazdev.xyz,http://localhost:5173"
+)
 CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
+    origin.strip()
+    for origin in _cors_origins_raw.split(",")
+    if origin.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
+_csrf_origins_raw = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    f"{FRONTEND_URL},https://intraview.ijazdev.xyz,https://api.intraview.ijazdev.xyz,http://localhost:5173"
+)
 CSRF_TRUSTED_ORIGINS = [
-    FRONTEND_URL,
+    origin.strip()
+    for origin in _csrf_origins_raw.split(",")
+    if origin.strip()
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -275,25 +289,54 @@ WSGI_APPLICATION = 'intraview.wsgi.application'
 
 
 
-if os.getenv("USE_LOCAL_DB", "False").lower() == "true" or not os.getenv("DATABASE_URL"):
+if os.getenv("USE_LOCAL_DB", "False").lower() == "true":
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.getenv("POSTGRES_DB"),
             'USER': os.getenv("POSTGRES_USER"),
             'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-            'HOST': os.getenv("POSTGRES_HOST"),
-            'PORT': os.getenv("POSTGRES_PORT"),
+            'HOST': os.getenv("POSTGRES_HOST", "localhost"),
+            'PORT': os.getenv("POSTGRES_PORT", "5432"),
         }
     }
-else:
+elif os.getenv("POSTGRES_HOST") and os.getenv("USE_DATABASE_URL", "False").lower() != "true":
+    _db_options = {}
+    _sslmode = os.getenv("POSTGRES_SSLMODE")
+    _sslrootcert = os.getenv("POSTGRES_SSLROOTCERT")
+    if _sslmode:
+        _db_options['sslmode'] = _sslmode
+    if _sslrootcert:
+        _db_options['sslrootcert'] = _sslrootcert
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("POSTGRES_DB", "intraview"),
+            'USER': os.getenv("POSTGRES_USER", "intraview_admin"),
+            'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
+            'HOST': os.getenv("POSTGRES_HOST"),
+            'PORT': os.getenv("POSTGRES_PORT", "5432"),
+            'CONN_MAX_AGE': int(os.getenv("CONN_MAX_AGE", "600")),
+            'OPTIONS': _db_options,
+        }
+    }
+elif os.getenv("DATABASE_URL"):
     DATABASES = {
         "default": dj_database_url.parse(
             os.getenv("DATABASE_URL"),
-            conn_max_age=600,
-            ssl_require=True,
+            conn_max_age=int(os.getenv("CONN_MAX_AGE", "600")),
+            ssl_require=os.getenv("DB_SSL_REQUIRE", "False").lower() == "true",
         )
     }
+    _sslmode = os.getenv("POSTGRES_SSLMODE")
+    _sslrootcert = os.getenv("POSTGRES_SSLROOTCERT")
+    if _sslmode or _sslrootcert:
+        DATABASES['default'].setdefault('OPTIONS', {})
+        if _sslmode:
+            DATABASES['default']['OPTIONS']['sslmode'] = _sslmode
+        if _sslrootcert:
+            DATABASES['default']['OPTIONS']['sslrootcert'] = _sslrootcert
 
 
 

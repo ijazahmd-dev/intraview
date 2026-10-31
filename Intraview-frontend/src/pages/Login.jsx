@@ -926,41 +926,59 @@ const PAGE_STYLES = `
   .clp-nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     width: 100%;
     max-width: 1800px;
     padding: 24px 28px;
     top: 0;
     z-index: 20;
+    box-sizing: border-box;
   }
   @media (min-width: 768px) {
     .clp-nav { position: fixed; }
   }
 
-  .clp-nav-logo {
+  /* ── Card brand header with logo and title ── */
+  .clp-card-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    cursor: pointer;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .clp-card-logo-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     padding: 0;
+    margin: 0 auto 0 auto;
+    cursor: pointer;
+    border-radius: 8px;
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
-  .clp-nav-logo:hover {
+  .clp-card-logo-btn:hover {
     opacity: 0.85;
     transform: translateY(-1px);
   }
-  .clp-nav-logo-img {
-    height: 80px;
-    width: 135px;
-    object-fit: fill;
+  .clp-card-logo-btn:active {
+    transform: translateY(0);
+  }
+
+  .clp-card-logo-img {
+    height: 115px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
     display: block;
-    transition: transform 0.15s ease;
   }
   @media (max-width: 640px) {
-    .clp-nav-logo-img {
-      height: 64px;
-      width: 110px;
+    .clp-card-logo-img {
+      height: 85px;
+      max-width: 150px;
     }
   }
 
@@ -1010,6 +1028,10 @@ const PAGE_STYLES = `
 
   .clp-flip-card.is-flipped {
     transform: rotateY(180deg);
+  }
+
+  .clp-flip-card.is-flipped .clp-card {
+    min-height: 870px;
   }
 
   .clp-card {
@@ -1076,15 +1098,16 @@ const PAGE_STYLES = `
   .clp-strength-wrap { margin-top: 6px; margin-bottom: 4px; }
 
   .clp-heading {
-    font-size: 1.75rem;
-    font-weight: 420;
-    line-height: 1.36;
+    font-size: 1.375rem;
+    font-weight: 500;
+    line-height: 1.3;
     color: rgb(33, 33, 33);
     margin: 0;
     text-align: center;
+    letter-spacing: -0.015em;
   }
   @media (min-width: 1024px) {
-    .clp-heading { font-size: 2.375rem; line-height: 1.2; }
+    .clp-heading { font-size: 1.5rem; line-height: 1.25; }
   }
 
   /* ── OAuth row ── */
@@ -1564,18 +1587,15 @@ function LoginPage() {
         <nav className="clp-nav" aria-label="Site navigation">
           <button
             type="button"
-            className="clp-nav-logo"
-            onClick={() => { if (!isSubmitting) navigate('/'); }}
-            aria-label="IntraView home"
+            className="clp-nav-link"
+            onClick={() => {
+              if (!isSubmitting && !signupFormik.isSubmitting) {
+                setIsFlipped(!isFlipped);
+              }
+            }}
+            aria-label={isFlipped ? "Go to log in" : "Go to sign up"}
           >
-            <img
-              src={LOGO_URL}
-              alt="IntraView"
-              className="clp-nav-logo-img"
-            />
-          </button>
-          <button type="button" className="clp-nav-link" onClick={() => { if (!isSubmitting) setIsFlipped(true); }} aria-label="Go to sign up">
-            Sign up
+            {isFlipped ? "Log in" : "Sign up"}
           </button>
         </nav>
 
@@ -1583,7 +1603,21 @@ function LoginPage() {
           <div className="clp-flip-scene">
           <div className={`clp-flip-card${isFlipped ? ' is-flipped' : ''}`}>
           <div className="clp-card" role="main">
-            <h1 className="clp-heading">Log in</h1>
+            <div className="clp-card-header">
+              <button
+                type="button"
+                className="clp-card-logo-btn"
+                onClick={() => { if (!isSubmitting) navigate('/'); }}
+                aria-label="IntraView home"
+              >
+                <img
+                  src={LOGO_URL}
+                  alt="IntraView"
+                  className="clp-card-logo-img"
+                />
+              </button>
+              <h1 className="clp-heading">Log in</h1>
+            </div>
 
             <div className="clp-oauth-row">
               <GoogleLoginButton disabled={isSubmitting} variant="circle" />
@@ -1689,7 +1723,21 @@ function LoginPage() {
 
           {/* ── Back face: Signup form ── */}
           <div className="clp-card-back">
-            <h1 className="clp-heading">Sign up</h1>
+            <div className="clp-card-header">
+              <button
+                type="button"
+                className="clp-card-logo-btn"
+                onClick={() => { if (!signupFormik.isSubmitting) navigate('/'); }}
+                aria-label="IntraView home"
+              >
+                <img
+                  src={LOGO_URL}
+                  alt="IntraView"
+                  className="clp-card-logo-img"
+                />
+              </button>
+              <h1 className="clp-heading">Sign up</h1>
+            </div>
 
             <div className="clp-oauth-row">
               <GoogleLoginButton disabled={signupFormik.isSubmitting} variant="circle" />

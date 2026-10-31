@@ -78,9 +78,9 @@ function GoogleColoredIcon({ size = 20 }) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 // variant: undefined | 'cohere' | 'circle'
-//   default  — renders the official Google SDK button (original behaviour).
-//   'cohere' — renders a custom-styled button that triggers the hidden SDK.
-//   'circle' — renders a circular button with Google icon that triggers the hidden SDK.
+//   default  — renders the official Google SDK button.
+//   'cohere' — renders custom-styled button with Google SDK overlay.
+//   'circle' — renders circular button with Google SDK overlay.
 const GoogleLoginButton = ({ disabled = false, variant, className }) => {
   const hiddenRef = useRef(null);
   const navigate = useNavigate();
@@ -91,33 +91,6 @@ const GoogleLoginButton = ({ disabled = false, variant, className }) => {
   const [sdkReady, setSdkReady] = useState(false);
 
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-  // Initialise the Google SDK and render the hidden widget
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!window.google) return;
-      if (!hiddenRef.current) return;
-
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-      });
-
-      window.google.accounts.id.renderButton(hiddenRef.current, {
-        theme: "outline",
-        size: "large",
-        // width: "1",          // commented out to allow standard width
-        shape: "rectangular",
-        text: "signin_with",
-      });
-
-      setSdkReady(true);
-      clearInterval(interval);
-    }, 100);
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Handle the credential returned by the Google SDK
   const handleCredentialResponse = async (response) => {
@@ -145,14 +118,51 @@ const GoogleLoginButton = ({ disabled = false, variant, className }) => {
     }
   };
 
-  // Click the hidden SDK button when the visible button is clicked
+  // Initialise the Google SDK and render the widget
+  useEffect(() => {
+    let interval = null;
+
+    const setupGoogle = () => {
+      if (!window.google?.accounts?.id || !hiddenRef.current) return false;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+      });
+
+      window.google.accounts.id.renderButton(hiddenRef.current, {
+        type: variant === "circle" ? "icon" : "standard",
+        shape: variant === "circle" ? "circle" : "rectangular",
+        theme: "outline",
+        size: "large",
+        text: "signin_with",
+      });
+
+      setSdkReady(true);
+      return true;
+    };
+
+    if (!setupGoogle()) {
+      interval = setInterval(() => {
+        if (setupGoogle()) {
+          clearInterval(interval);
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant, GOOGLE_CLIENT_ID]);
+
+  // Click handler fallback
   const handleClick = () => {
-    if (disabled || loading || !sdkReady) return;
+    if (disabled || loading) return;
     const sdkBtn = hiddenRef.current?.querySelector("div[role='button'], iframe");
     if (sdkBtn) {
       sdkBtn.click();
     } else {
-      // Fallback: prompt the one-tap flow
       window.google?.accounts?.id?.prompt();
     }
   };
@@ -162,46 +172,107 @@ const GoogleLoginButton = ({ disabled = false, variant, className }) => {
   // ── Circle variant ────────────────────────────────────────────────────────
   if (variant === 'circle') {
     return (
-      <>
-        <div
-          ref={hiddenRef}
-          aria-hidden="true"
-          style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}
-        />
+      <div
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: "48px",
+          height: "48px",
+          borderRadius: "50%",
+          overflow: "hidden",
+        }}
+        onClick={handleClick}
+      >
+        {/* Visible custom circular button */}
         <button
           type="button"
-          onClick={handleClick}
           disabled={isDisabled}
-          aria-label="Sign in with Google"
-          title="Sign in with Google"
+          tabIndex={-1}
+          aria-hidden="true"
           className={className || "clp-google-circle-btn"}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            margin: 0,
+            pointerEvents: "none",
+          }}
         >
           {loading ? <Spinner /> : <GoogleColoredIcon size={22} />}
         </button>
-      </>
+
+        {/* Real Google SDK button directly over the custom button so user clicks trigger Google popup */}
+        <div
+          ref={hiddenRef}
+          aria-label="Sign in with Google"
+          title="Sign in with Google"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            opacity: 0.001,
+            zIndex: 10,
+            cursor: isDisabled ? "not-allowed" : "pointer",
+            pointerEvents: isDisabled ? "none" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transform: "scale(1.4)",
+            overflow: "hidden",
+          }}
+        />
+      </div>
     );
   }
 
   // ── Cohere variant ────────────────────────────────────────────────────────
   if (variant === 'cohere') {
     return (
-      <>
-        <div
-          ref={hiddenRef}
-          aria-hidden="true"
-          style={{ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}
-        />
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+        }}
+        onClick={handleClick}
+      >
         <button
           type="button"
-          onClick={handleClick}
           disabled={isDisabled}
-          aria-label="Continue with Google"
+          tabIndex={-1}
+          aria-hidden="true"
           className={className || "clp-oauth-btn"}
+          style={{ width: "100%", pointerEvents: "none" }}
         >
           {loading ? <Spinner /> : <GoogleColoredIcon />}
           <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
         </button>
-      </>
+
+        <div
+          ref={hiddenRef}
+          aria-label="Continue with Google"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            opacity: 0.001,
+            zIndex: 10,
+            cursor: isDisabled ? "not-allowed" : "pointer",
+            pointerEvents: isDisabled ? "none" : "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transform: "scale(1.1)",
+            overflow: "hidden",
+          }}
+        />
+      </div>
     );
   }
 
