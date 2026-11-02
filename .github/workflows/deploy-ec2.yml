@@ -1,0 +1,51 @@
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Backend CI"]
+    branches: [master]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "🚀 Starting Deployment on EC2..."
+            cd /home/ubuntu/intraview
+
+            echo "📥 Pulling latest changes from master..."
+            git pull origin master
+
+            echo "📁 Ensuring staticfiles directory permissions..."
+            sudo mkdir -p staticfiles && sudo chmod -R 777 staticfiles
+
+            echo "🐳 Rebuilding and updating Docker containers..."
+            sudo docker compose -f docker-compose.prod.yml up -d --build
+
+            echo "⏳ Waiting for backend container to settle..."
+            sleep 5
+
+            echo "🗄️ Running database migrations..."
+            sudo docker compose -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+
+            echo "🧹 Pruning unused Docker images..."
+            sudo docker image prune -f
+
+            echo "🔍 Verifying running containers..."
+            sudo docker compose -f docker-compose.prod.yml ps
+
+            echo "✅ Deployment completed successfully!"
