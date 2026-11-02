@@ -79,6 +79,42 @@ class TokenPackListAPIView(APIView):
 
 
 
+def _get_or_sync_succeeded_order(user, internal_order_id):
+    """
+    Fetch PaymentOrder for user. If still PENDING, verify directly with Stripe
+    as a resilient fallback to handle webhook delays or signature mismatches.
+    """
+    try:
+        payment_order = PaymentOrder.objects.select_related(
+            'user', 'token_pack'
+        ).get(
+            internal_order_id=internal_order_id,
+            user=user,
+        )
+    except PaymentOrder.DoesNotExist:
+        return None
+
+    if payment_order.status == PaymentStatus.PENDING and payment_order.stripe_checkout_session_id:
+        try:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            session = stripe.checkout.Session.retrieve(payment_order.stripe_checkout_session_id)
+            if session.payment_status == 'paid':
+                event = {'type': 'checkout.session.completed', 'data': {'object': dict(session)}}
+                StripeWebhookRouter(event).route_event()
+                payment_order.refresh_from_db()
+        except Exception as sync_err:
+            logger.warning(
+                "Failed to auto-verify Stripe checkout session %s: %s",
+                payment_order.stripe_checkout_session_id,
+                sync_err,
+            )
+
+    if payment_order.status != PaymentStatus.SUCCEEDED:
+        return None
+
+    return payment_order
+
+
 class PaymentOrderRetrieveAPIView(APIView):
     """
     Retrieve PaymentOrder details by internal_order_id for success page.
@@ -87,28 +123,15 @@ class PaymentOrderRetrieveAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, internal_order_id):
-        try:
-            # Fetch order for authenticated user only
-            payment_order = PaymentOrder.objects.select_related(
-                'user', 'token_pack'
-            ).get(
-                internal_order_id=internal_order_id,
-                user=request.user,
-                status=PaymentStatus.SUCCEEDED  # Only successful payments
-            )
-
-            # Serialize response
-            serializer = PaymentOrderSerializer(payment_order)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except PaymentOrder.DoesNotExist:
+        payment_order = _get_or_sync_succeeded_order(request.user, internal_order_id)
+        if not payment_order:
             return Response(
-                {'error': 'Payment order not found or access denied.'}, 
+                {'error': 'Payment order not found or payment not completed.'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
-
-
+        serializer = PaymentOrderSerializer(payment_order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PaymentInvoiceDownloadAPIView(APIView):
@@ -119,20 +142,14 @@ class PaymentInvoiceDownloadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, internal_order_id):
-        try:
-            # 1️⃣ Fetch PaymentOrder by internal_order_id
-            payment_order = PaymentOrder.objects.select_related(
-                'user', 'token_pack'
-            ).get(
-                internal_order_id=internal_order_id,
-                user=request.user,
-                status=PaymentStatus.SUCCEEDED
-            )
+        payment_order = _get_or_sync_succeeded_order(request.user, internal_order_id)
+        if not payment_order:
+            raise NotFound("Invoice not found or access denied.")
 
-            # 2️⃣ Generate PDF invoice
+        try:
+            # Generate PDF invoice
             pdf_buffer = generate_payment_invoice_pdf(payment_order)
             
-            # 3️⃣ Return as downloadable file
             response = HttpResponse(
                 pdf_buffer, 
                 content_type='application/pdf'
@@ -142,11 +159,8 @@ class PaymentInvoiceDownloadAPIView(APIView):
             logger.info(
                 f"Invoice downloaded for PaymentOrder {payment_order.id} by user {request.user.id}"
             )
-            
             return response
             
-        except PaymentOrder.DoesNotExist:
-            raise NotFound("Invoice not found or access denied.")
         except Exception as e:
             logger.error(f"Invoice generation failed: {e}")
             raise ValidationError("Failed to generate invoice.")
