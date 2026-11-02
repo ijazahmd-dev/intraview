@@ -709,8 +709,14 @@ class AIInterviewIntegrityEvent(models.Model):
           )
       ]
       indexes = [
-          models.Index(fields=["session", "event_type"]),
-          models.Index(fields=["session", "started_at"]),
+          models.Index(
+              fields=["session", "event_type"],
+              name="ai_intervie_session_707238_idx",
+          ),
+          models.Index(
+              fields=["session", "started_at"],
+              name="ai_intervie_session_475319_idx",
+          ),
       ]
 
   def __str__(self) -> str:
